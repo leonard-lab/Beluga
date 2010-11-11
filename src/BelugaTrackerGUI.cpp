@@ -14,7 +14,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                long style)
   : MT_TrackerFrameBase(parent, id, title, pos, size, style),
     m_sBackgroundImage(wxEmptyString),
-    m_iNToTrack(3),
+    m_iNToTrack(1),
     m_iStartFrame(-1),
     m_iStopFrame(-1),
     m_iThreshFromCmdLine(-1),

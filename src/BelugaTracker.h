@@ -37,6 +37,7 @@ private:
     double m_dSigmaPosition;
     double m_dSigmaHeading;
     double m_dSigmaSpeed;
+    double m_dSigmaPositionMeas;
     double m_dSigmaHeadingMeas;
     
     double m_dPrevSigmaPosition;
