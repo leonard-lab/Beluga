@@ -7,6 +7,7 @@
 #include "MT_Tracking.h"
 
 #include "BelugaTracker.h"
+#include "BelugaServer.h"
 
 /**********************************************************************
  * GUI Frame Class
