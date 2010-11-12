@@ -5,6 +5,7 @@
 #include "MT_Core.h"
 #include "MT_GUI.h"
 #include "MT_Tracking.h"
+#include "MT_Robot.h"
 
 #include "BelugaTracker.h"
 
@@ -12,7 +13,7 @@
  * GUI Frame Class
  *********************************************************************/
 
-class BelugaTrackerFrame : public MT_TrackerFrameBase
+class BelugaTrackerFrame : public MT_RobotFrameBase
 {
 protected:
     BelugaTracker* m_pBelugaTracker;

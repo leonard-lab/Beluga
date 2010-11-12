@@ -38,4 +38,4 @@ include_directories(src)
 add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE ${APP_SRC})
 
 # sets up the app to build correctly using the right libraries, etc
-MT_tracking_app(${APP_NAME})
+MT_robot_app(${APP_NAME})
