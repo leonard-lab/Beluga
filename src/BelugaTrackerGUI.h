@@ -8,6 +8,7 @@
 #include "MT_Robot.h"
 
 #include "BelugaTracker.h"
+#include "BelugaServer.h"
 
 /**********************************************************************
  * GUI Frame Class

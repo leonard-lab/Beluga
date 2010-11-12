@@ -586,6 +586,12 @@ void BelugaTracker::doTracking(IplImage* frame)
                                                               m_iBlobValThresh,
                                                               ROI_frame);
 
+    /* make sure these pointers are updated */
+    m_pGSFrame = m_pGSThresholder->getGSFrame();
+    m_pDiffFrame = m_pGSThresholder->getDiffFrame();
+    m_pThreshFrame = m_pGSThresholder->getThreshFrame();
+
+
     /* Blobbing with George Young's Mixture-of-Gaussians blobber
      *
      * In a nutshell, this looks for a fixed number of ellipsoidal
