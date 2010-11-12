@@ -21,6 +21,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
     m_sNoteFromCommandLine(wxEmptyString),
     m_pServer(NULL)
 {
+
     /* nothing else to do here */
 }
 
@@ -48,7 +49,7 @@ void BelugaTrackerFrame::initUserData()
                               wxT("Note for data file."),
                               wxCMD_LINE_VAL_STRING);
                               
-
+    setTimer(100);
 }
 
 void BelugaTrackerFrame::handleCommandLineArguments(int argc, wxChar** argv)
@@ -133,6 +134,7 @@ void BelugaTrackerFrame::initTracker()
 
 #ifdef WITH_SERVER    
     m_pServer = new MT_Server;
+    m_pServer->enableDebugOutput();
     m_pServer->doInit();
     m_pServer->registerModule(new MT_SM_BelugaTracker(m_pServer,
                                                         m_pBelugaTracker));
@@ -142,6 +144,27 @@ void BelugaTrackerFrame::initTracker()
      * a placeholder function that sets m_pTracker to NULL! */
 }
 
+void BelugaTrackerFrame::onMenuRobotsConnect(wxCommandEvent& event)
+{
+    /*MT_RobotConnectDialog* dlg = new MT_RobotConnectDialog(&m_Robots, this);
+    registerDialogForXML(dlg);
+    dlg->Show(true);
+    */
+}
+
+void BelugaTrackerFrame::onMenuRobotsJoystick(wxCommandEvent& event)
+{
+    /*m_pJoyStickFrame->Show(true);
+    registerDialogForXML(m_pJoyStickFrame);
+    m_pJoyStickFrame->EnableEvents();*/
+}
+
+void BelugaTrackerFrame::onMenuRobotsCommand(wxCommandEvent& event)
+{
+    /*MT_RobotCommandDialog* dlg = new MT_RobotCommandDialog(&m_Robots, this);
+    registerDialogForXML(dlg);
+    dlg->Show(true);*/
+}
 
 /**********************************************************************
  * GUI App Class
