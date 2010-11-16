@@ -21,13 +21,13 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
     m_sNoteFromCommandLine(wxEmptyString),
     m_pServer(NULL)
 {
-
     /* nothing else to do here */
 }
 
 void BelugaTrackerFrame::initUserData()
 {
-    initTrackerFrameData();
+    MT_RobotFrameBase::initUserData();
+    
 
     m_CmdLineParser.AddOption(wxT("f"),
                               wxT("frames"),
@@ -142,28 +142,6 @@ void BelugaTrackerFrame::initTracker()
 
     /* note - do NOT call MT_TrackerBase::initTracker, which is
      * a placeholder function that sets m_pTracker to NULL! */
-}
-
-void BelugaTrackerFrame::onMenuRobotsConnect(wxCommandEvent& event)
-{
-    /*MT_RobotConnectDialog* dlg = new MT_RobotConnectDialog(&m_Robots, this);
-    registerDialogForXML(dlg);
-    dlg->Show(true);
-    */
-}
-
-void BelugaTrackerFrame::onMenuRobotsJoystick(wxCommandEvent& event)
-{
-    /*m_pJoyStickFrame->Show(true);
-    registerDialogForXML(m_pJoyStickFrame);
-    m_pJoyStickFrame->EnableEvents();*/
-}
-
-void BelugaTrackerFrame::onMenuRobotsCommand(wxCommandEvent& event)
-{
-    /*MT_RobotCommandDialog* dlg = new MT_RobotCommandDialog(&m_Robots, this);
-    registerDialogForXML(dlg);
-    dlg->Show(true);*/
 }
 
 /**********************************************************************

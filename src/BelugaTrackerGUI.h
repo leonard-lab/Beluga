@@ -38,9 +38,6 @@ public:
     virtual ~BelugaTrackerFrame(){if(m_pServer) delete m_pServer;};
 
    /* menu callbacks */
-    virtual void onMenuRobotsConnect(wxCommandEvent& event);
-    virtual void onMenuRobotsJoystick(wxCommandEvent& event);
-    virtual void onMenuRobotsCommand(wxCommandEvent& event);
 
     void initTracker();
     void initUserData();
