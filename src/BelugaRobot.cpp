@@ -1,8 +1,10 @@
 #include "BelugaRobot.h"
 
+const bool BELUGA_HANDSHAKING = false;
+
 Beluga::Beluga()
     : MT_RobotBase("Anonymous"),
-      m_COMPort("stderr"),
+      m_COMPort("stderr", BELUGA_HANDSHAKING),
       m_sPort("stderr"),
       m_bIsConnected(false)
 {
@@ -11,7 +13,7 @@ Beluga::Beluga()
       
 Beluga::Beluga(const char* onComPort, const char* name)
     : MT_RobotBase(onComPort, name),
-      m_COMPort(onComPort),
+      m_COMPort(onComPort, BELUGA_HANDSHAKING),
       m_sPort(onComPort),
       m_bIsConnected(false)
 {
@@ -122,13 +124,14 @@ void Beluga::SendCommand(const char* command)
     /* make sure the command ends with a ! */
     if(*(command + strlen(command)-1) == '!')
     {
-        sprintf(cmd, "%s", command);
+        sprintf(cmd, "%s%c", command, 10);
     }
     else
     {
-        sprintf(cmd, "%s!", command);
+        sprintf(cmd, "%s!%c", command, 10);
     }
     
+	printf("Sending %s\n", cmd);
     m_COMPort.SendCommand(cmd);
 }
 
@@ -151,9 +154,9 @@ const char* Beluga::getInfo() const
 void Beluga::JoyStickControl(std::vector<double> js_axes,
                          unsigned int js_buttons)
 {
-    double speed;
-    double vert;
-    double turn;
+    double speed = 0;
+    double vert = 0;
+    double turn = 0;
 
     static unsigned int which_cmd = 0;
 
@@ -163,8 +166,11 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
     double z = js_axes[3];
 
     speed = MT_DeadBandAndScale(y, m_dSpeedDeadBand, m_dMaxSpeed);
-    vert = MT_DeadBandAndScale(z, m_dSpeedDeadBand, m_dMaxVertSpeed);
     turn = MT_DeadBandAndScale(x, m_dTurnDeadBand, m_dMaxTurn);
+
+#ifndef _WIN32
+    vert = MT_DeadBandAndScale(z, m_dSpeedDeadBand, m_dMaxVertSpeed);
+#endif
 
     switch(which_cmd)
     {
