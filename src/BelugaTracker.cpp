@@ -883,7 +883,7 @@ void BelugaTracker::doGLDrawing(int flags)
             MT_DrawArrow(blobcenter,  // center of the base of the arrow
                          20.0,        // arrow length (pixels)
                          MT_DEG2RAD*m_vdBlobs_Orientation[i], // arrow angle
-                         MT_Primaries[i % MT_NPrimaries], // color
+                         MT_Primaries[(i+1) % MT_NPrimaries], // color
                          1.0 // fixes the arrow width
                 );    
         }
@@ -903,7 +903,7 @@ void BelugaTracker::doGLDrawing(int flags)
             MT_DrawArrow(blobcenter,
                          25.0, 
                          m_vdTracked_Heading[i],
-                         MT_Primaries[i % MT_NPrimaries],
+                         MT_Primaries[(i+1) % MT_NPrimaries],
                          1.0 
                 );    
         }
