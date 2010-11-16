@@ -36,7 +36,9 @@ set(APP_SRC
   src/BelugaTracker.cpp
   src/BelugaTracker.h
   src/BelugaServer.cpp
-  src/BelugaServer.h)
+  src/BelugaServer.h
+  src/BelugaRobot.cpp
+  src/BelugaRobot.h)
 
 # adds src to the header search path
 include_directories(src)

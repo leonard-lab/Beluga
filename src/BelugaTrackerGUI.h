@@ -7,6 +7,7 @@
 #include "MT_Tracking.h"
 #include "MT_Robot.h"
 
+#include "BelugaRobot.h"
 #include "BelugaTracker.h"
 #include "BelugaServer.h"
 
@@ -43,6 +44,7 @@ public:
     void initUserData();
 
     void doUserStep();
+    MT_RobotBase* getNewRobot(const char* config, const char* name);
 
     void handleCommandLineArguments(int argc, wxChar** argv);
 

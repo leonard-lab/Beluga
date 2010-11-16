@@ -1,6 +1,14 @@
 
 #include "BelugaTrackerGUI.h"
 
+const std::string RobotNames[] = {"Beluga 1",
+                                  "Beluga 2",
+                                  "N/A",
+                                  "N/A",
+                                  "N/A",
+                                  "N/A",
+                                  "N/A"};
+
 
 /**********************************************************************
  * GUI Frame Class
@@ -21,11 +29,12 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
     m_sNoteFromCommandLine(wxEmptyString),
     m_pServer(NULL)
 {
-    /* nothing else to do here */
+
 }
 
 void BelugaTrackerFrame::initUserData()
 {
+    
     MT_RobotFrameBase::initUserData();
     
 
@@ -48,7 +57,15 @@ void BelugaTrackerFrame::initUserData()
                               wxT("Note"),
                               wxT("Note for data file."),
                               wxCMD_LINE_VAL_STRING);
-                              
+
+    std::vector<std::string> botnames;
+    for(unsigned int i = 0; i < 7; i++)
+    {
+        botnames.push_back(RobotNames[i]);
+    }
+
+    m_Robots.SetRobotNames(botnames);
+    
     setTimer(100);
 }
 
@@ -92,6 +109,13 @@ void BelugaTrackerFrame::handleCommandLineArguments(int argc, wxChar** argv)
     }
 
     MT_TrackerFrameBase::handleCommandLineArguments(argc, argv);
+}
+
+MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* name)
+{
+    Beluga* thebot = new Beluga(config, name);
+    ReadDataGroupFromXML(m_XMLSettingsFile, thebot->GetParameters());
+    return thebot;
 }
 
 void BelugaTrackerFrame::doUserStep()
