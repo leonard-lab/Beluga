@@ -6,6 +6,7 @@ const double DEFAULT_MIN_BLOB_PERIMETER = 10;
 const double DEFAULT_MIN_BLOB_AREA = 10;        
 const double DEFAULT_MAX_BLOB_PERIMETER = 1000; 
 const double DEFAULT_MAX_BLOB_AREA = 1000;
+const unsigned int DEFAULT_SEARCH_AREA_PADDING = 100;
 
 /* default color to draw blobs */
 const MT_Color DEFAULT_BLOB_COLOR = MT_Red;
@@ -237,6 +238,7 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_iBlobValThresh(DEFAULT_BG_THRESH),
 	  m_iBlobAreaThreshLow(DEFAULT_MIN_BLOB_AREA),
 	  m_iBlobAreaThreshHigh(DEFAULT_MAX_BLOB_AREA),
+	  m_iSearchAreaPadding(DEFAULT_SEARCH_AREA_PADDING),
       m_iStartFrame(-1),
       m_iStopFrame(-1),
       m_pGSThresholder(            NULL                        ),
@@ -257,7 +259,8 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_dDt(0),
       m_iFrameCounter(0),
       m_iNObj(n_obj),
-      m_iFrameHeight(0)
+      m_iFrameHeight(0),
+	  m_iFrameWidth(0)
 {
     doInit(ProtoFrame);
 }
@@ -294,6 +297,9 @@ BelugaTracker::~BelugaTracker()
  * constructor.  It does memory allocation, etc. */
 void BelugaTracker::doInit(IplImage* ProtoFrame)
 {
+
+	m_SearchArea = cvRect(0,0,0,0);
+
     /* Not using the built-in tracked objects functions - setting
      * this pointer to NULL will ensure that the appropriate code is
      * disabled  */
@@ -339,6 +345,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
     /* grab the frame height */
     m_iFrameHeight = ProtoFrame->height;
+	m_iFrameWidth = ProtoFrame->width;
 
     /* sets up the frames that are available in the "view" menu */
     m_pTrackerFrameGroup = new MT_TrackerFrameGroup();
@@ -375,6 +382,10 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
                     &m_iBlobAreaThreshHigh,
                     MT_DATA_READWRITE,
                     0);
+	dg_blob->AddUInt("Search Area Padding",
+		             &m_iSearchAreaPadding,
+					 MT_DATA_READWRITE,
+					 0);
     dg_blob->AddDouble("Position Disturbance Sigma",
                        &m_dSigmaPosition,
                        MT_DATA_READWRITE,
@@ -411,8 +422,15 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     dr_tracked->AddDouble("Y", &m_vdTracked_Y);
     dr_tracked->AddDouble("Hdg", &m_vdTracked_Heading);
     dr_tracked->AddDouble("Spd", &m_vdTracked_Speed);
+
+	MT_DataReport* dr_blobs = new MT_DataReport("Blob Info");
+	dr_blobs->AddDouble("X", &m_vdBlobs_X);
+	dr_blobs->AddDouble("Y", &m_vdBlobs_Y);
+	dr_blobs->AddDouble("Area", &m_vdBlobs_Area);
+
     m_vDataReports.resize(0);
-    m_vDataReports.push_back(dr_tracked);
+    m_vDataReports.push_back(dr_blobs);
+	m_vDataReports.push_back(dr_tracked);
 
 }
 
@@ -604,6 +622,7 @@ void BelugaTracker::doTracking(IplImage* frame)
      */
 	m_pGYBlobber->m_iBlob_area_thresh_low = m_iBlobAreaThreshLow;
 	m_pGYBlobber->m_iBlob_area_thresh_high = m_iBlobAreaThreshHigh;
+	m_pGYBlobber->setSearchArea(m_SearchArea);
     std::vector<GYBlob> blobs = m_pGYBlobber->findBlobs(m_pThreshFrame);
 
     /* Matching step.
@@ -624,8 +643,8 @@ void BelugaTracker::doTracking(IplImage* frame)
      * measurement[j] with object[i].
      * 
      */
-    if(m_iFrameCounter > 1)
-    {
+    if(m_iFrameCounter > 1 && m_iNObj > 1)  /* if there's only one object, */
+    {                                       /* then this is unnecessary    */
         double dx, dy;
         for(unsigned int i = 0; i < m_iNObj; i++)
         {
@@ -658,6 +677,7 @@ void BelugaTracker::doTracking(IplImage* frame)
      * This is a loop over each object we're tracking. 
      */
     unsigned int j;
+	MT_BoundingBox object_limits;
     for(unsigned int i = 0; i< m_iNObj; i++)
     {
         /* The index of the optimal measurement as determined by the
@@ -763,6 +783,7 @@ void BelugaTracker::doTracking(IplImage* frame)
              */
             double th;
             bool a = false;
+			double th_meas;
             if(m_vdHistories_X[i].size() == N_hist)
             {
                 double dx = m_vdHistories_X[i].at(N_hist-1) -
@@ -803,13 +824,16 @@ void BelugaTracker::doTracking(IplImage* frame)
             {
                 /* looks like the orientation is opposite of what it
                    should be, so subtract 180 degrees. */
-                m_vdBlobs_Orientation[i] =
-                    m_vdBlobs_Orientation[i] - 180.0;
+                th_meas = m_vdBlobs_Orientation[i] - 180.0;
             }
+			else
+			{
+				th_meas = m_vdBlobs_Orientation[i];
+			}
 
             /* taking asin(sin(angle)) ensures that |angle| < pi,
              * i.e. we get the shortest-arc distance  */
-            double dth = asin(sin(MT_DEG2RAD*m_vdBlobs_Orientation[i]
+            double dth = asin(sin(MT_DEG2RAD*th_meas
                                     - cvGetReal2D(m_vpUKF[i]->x, 2, 0)));
 
             /* finally, set the measurement vector z */
@@ -848,10 +872,31 @@ void BelugaTracker::doTracking(IplImage* frame)
         m_vdTracked_Heading[i] = cvGetReal2D(x, 2, 0);
         m_vdTracked_Speed[i] = cvGetReal2D(x, 3, 0);
 
+	    object_limits.ShowX(m_vdTracked_X[i]);
+		object_limits.ShowY(m_vdTracked_Y[i]);
+
         /* If we wanted the predicted state, this would be how to get
            it */
         /* CvMat* xp = m_vpUKF[i]->x1; */
     }
+
+	if(object_limits.xmin == object_limits.xmax == 0 ||
+		object_limits.ymin == object_limits.ymax == 0)
+	{
+		object_limits.ShowX(0);
+		object_limits.ShowY(0);
+		object_limits.ShowX(m_iFrameWidth);
+		object_limits.ShowY(m_iFrameHeight);
+	}
+
+	double cx = 0.5*(object_limits.xmin + object_limits.xmax);
+	double cy = 0.5*(object_limits.ymin + object_limits.ymax);
+	double w = object_limits.xmax - object_limits.xmin + m_iSearchAreaPadding;
+	double h = object_limits.ymax - object_limits.ymin + m_iSearchAreaPadding;
+	m_SearchArea = cvRect(MT_CLAMP(cx - 0.5*w, 0, m_iFrameWidth),
+		                  MT_CLAMP(cy - 0.5*h, 0, m_iFrameHeight),
+						  MT_CLAMP(w, 0, m_iFrameWidth),
+						  MT_CLAMP(h, 0, m_iFrameHeight));
 
     /* write data to file */
     writeData();
@@ -912,6 +957,8 @@ void BelugaTracker::doGLDrawing(int flags)
                 );    
         }
     }
+
+	MT_DrawRectangle(m_SearchArea.x, m_iFrameHeight - m_SearchArea.y - m_SearchArea.height, m_SearchArea.width, m_SearchArea.height);
 
 }
 

@@ -24,6 +24,9 @@ private:
     unsigned int m_iBlobValThresh;
 	unsigned int m_iBlobAreaThreshLow;
 	unsigned int m_iBlobAreaThreshHigh;
+    
+    CvRect m_SearchArea;
+	unsigned int m_iSearchAreaPadding;
 
     /* only used to add to XDF */
     int m_iStartFrame;
@@ -72,6 +75,7 @@ private:
     std::vector<t_p_history> m_vdHistories_X;
     std::vector<t_p_history> m_vdHistories_Y;
 
+	unsigned int m_iFrameWidth;
     unsigned int m_iFrameHeight;
     
 public:
