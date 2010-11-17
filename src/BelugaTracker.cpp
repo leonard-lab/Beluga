@@ -235,6 +235,8 @@ bool CvMatIsOk(const CvMat* M, double max_val = 1e10)
 BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
     : MT_TrackerBase(ProtoFrame),
       m_iBlobValThresh(DEFAULT_BG_THRESH),
+	  m_iBlobAreaThreshLow(DEFAULT_MIN_BLOB_AREA),
+	  m_iBlobAreaThreshHigh(DEFAULT_MAX_BLOB_AREA),
       m_iStartFrame(-1),
       m_iStopFrame(-1),
       m_pGSThresholder(            NULL                        ),
@@ -365,12 +367,12 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
                      MT_DATA_READWRITE,      /* read-only or not */
                      0,                      /* minimum value */
                      255);                   /* maximum value */
-    dg_blob->AddInt("Min Blob Area",
-                    &(m_pGYBlobber->m_iBlob_area_thresh_low),
+    dg_blob->AddUInt("Min Blob Area",
+                    &m_iBlobAreaThreshLow,
                     MT_DATA_READWRITE,
                     0);
-    dg_blob->AddInt("Max Blob Area",
-                    &(m_pGYBlobber->m_iBlob_area_thresh_high),
+    dg_blob->AddUInt("Max Blob Area",
+                    &m_iBlobAreaThreshHigh,
                     MT_DATA_READWRITE,
                     0);
     dg_blob->AddDouble("Position Disturbance Sigma",
@@ -600,6 +602,8 @@ void BelugaTracker::doTracking(IplImage* frame)
      * positions, orientations, areas, etc. 
      * 
      */
+	m_pGYBlobber->m_iBlob_area_thresh_low = m_iBlobAreaThreshLow;
+	m_pGYBlobber->m_iBlob_area_thresh_high = m_iBlobAreaThreshHigh;
     std::vector<GYBlob> blobs = m_pGYBlobber->findBlobs(m_pThreshFrame);
 
     /* Matching step.

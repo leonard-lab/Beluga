@@ -22,6 +22,8 @@ private:
 
     /* blobber parameters */
     unsigned int m_iBlobValThresh;
+	unsigned int m_iBlobAreaThreshLow;
+	unsigned int m_iBlobAreaThreshHigh;
 
     /* only used to add to XDF */
     int m_iStartFrame;
