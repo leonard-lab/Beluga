@@ -13,7 +13,7 @@ Beluga::Beluga()
       
 Beluga::Beluga(const char* onComPort, const char* name)
     : MT_RobotBase(onComPort, name),
-      m_COMPort(onComPort, BELUGA_HANDSHAKING),
+      m_COMPort(onComPort, BELUGA_HANDSHAKING, MT_Baud4800),
       m_sPort(onComPort),
       m_bIsConnected(false)
 {
