@@ -160,8 +160,8 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 
     static unsigned int which_cmd = 0;
 
-    double x = js_axes[0];
-    double y = js_axes[1];
+    double x = -js_axes[0];
+    double y = -js_axes[1];
     double w = js_axes[2];
     double z = js_axes[3];
 
