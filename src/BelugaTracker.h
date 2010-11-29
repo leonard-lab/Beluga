@@ -19,6 +19,11 @@ private:
     IplImage* m_pGSFrame;      /* Grayscale version of current frame */
     IplImage* m_pDiffFrame;    /* Background subtracted frame */
     IplImage* m_pThreshFrame;  /* Thresholded frame */
+	IplImage* m_pHSVFrame;
+	IplImage* m_pHFrame;
+	IplImage* m_pSFrame;
+	IplImage* m_pVFrame;
+	void HSVSplit(IplImage* frame);
 
     /* blobber parameters */
     unsigned int m_iBlobValThresh;
@@ -95,7 +100,7 @@ public:
     void setStartStopFrames(int start_frame, int stop_frame)
     {m_iStartFrame = start_frame; m_iStopFrame = stop_frame;};
 
-    void doTrain(IplImage* frame){MT_TrackerBase::doTrain(frame); m_pGSThresholder->setSharedBackground(BG_frame);};
+    void doTrain(IplImage* frame);
 
     void initDataFile();
     void writeData();

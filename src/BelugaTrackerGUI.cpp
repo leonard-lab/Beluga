@@ -22,7 +22,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                long style)
   : MT_RobotFrameBase(parent, id, title, pos, size, style),
     m_sBackgroundImage(wxEmptyString),
-    m_iNToTrack(2),
+    m_iNToTrack(1),
     m_iStartFrame(-1),
     m_iStopFrame(-1),
     m_iThreshFromCmdLine(-1),

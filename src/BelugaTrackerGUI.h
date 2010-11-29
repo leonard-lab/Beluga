@@ -1,6 +1,10 @@
 #ifndef BELUGATRACKERGUI_H
 #define BELUGATRACKERGUI_H
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /* Include necessary MADTraC headers */
 #include "MT_Core.h"
 #include "MT_GUI.h"
