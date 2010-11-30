@@ -25,7 +25,17 @@ protected:
     BelugaTracker* m_pBelugaTracker;
     MT_Server* m_pServer;
 
+	double m_dGotoDist;
+	double m_dGotoMaxSpeed;
+	double m_dGotoTurningGain;
+
     int m_iNToTrack;
+	int m_iGrabbedTrackedObj;
+
+    bool m_bControlActive;
+	bool m_bGotoActive;
+	double m_dGotoX;
+	double m_dGotoY;
 
 public:
     BelugaTrackerFrame(wxFrame* parent,
@@ -42,10 +52,18 @@ public:
     void initTracker();
     void initUserData();
 
-    void doUserStep();
+	void doUserControl();
+	void doUserGLDrawing();
+
     MT_RobotBase* getNewRobot(const char* config, const char* name);
 
     void handleCommandLineArguments(int argc, wxChar** argv);
+	void updateRobotStatesFromTracker();
+
+	bool doKeyboardCallback(wxKeyEvent &event);
+	bool doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y);
+
+	void onMenuAssign(wxCommandEvent& event);
 
 };
 
