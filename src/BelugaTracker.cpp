@@ -972,6 +972,27 @@ void BelugaTracker::doTracking(IplImage* frame)
 
 }
 
+std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
+{
+	std::vector<double> r;
+	r.resize(0);
+
+	if(i >= m_iNObj || i >= m_vdTracked_X.size())
+	{
+		fprintf(stderr, "BelugaTracker Error:  State request out of range; returning empty state.\n");
+		return r;
+	}
+
+	r.resize(BELUGA_STATE_SIZE);
+	r[BELUGA_STATE_X] = m_vdTracked_X[i];
+	r[BELUGA_STATE_Y] = m_vdTracked_Y[i];
+	r[BELUGA_STATE_HEADING] = m_vdTracked_Heading[i];
+	r[BELUGA_STATE_SPEED] = m_vdTracked_Speed[i];
+	r[BELUGA_STATE_ORIENTATION] = m_vdBlobs_Orientation[i];
+
+	return r;
+}
+
 /* Drawing function - gets called by the GUI
  * All of the drawing is done with OpenGL */
 void BelugaTracker::doGLDrawing(int flags)

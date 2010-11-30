@@ -4,6 +4,8 @@
 #include "MT_Core.h"
 #include "MT_Tracking.h"
 
+#include "BelugaRobot.h"
+
 const double DEFAULT_SIGMA_POSITION = 4.0; /* pixels */
 const double DEFAULT_SIGMA_HEADING = 0.26; /* rad ~= 15 deg */
 const double DEFAULT_SIGMA_SPEED = 1.0; /* pixels/frame */
@@ -110,7 +112,9 @@ public:
 
     void doGLDrawing(int flags);
 
-    
+	std::vector<double> getBelugaState(unsigned int i);
+	double getBelugaX(unsigned int i){if(i >= m_vdTracked_X.size()){return 0;} else {return m_vdTracked_X[i];}};
+	double getBelugaY(unsigned int i){if(i >= m_vdTracked_Y.size()){return 0;} else {return m_iFrameHeight - m_vdTracked_Y[i];}};
 
 };
 
