@@ -25,12 +25,7 @@ protected:
     BelugaTracker* m_pBelugaTracker;
     MT_Server* m_pServer;
 
-    wxString m_sBackgroundImage;
     int m_iNToTrack;
-    int m_iStartFrame;
-    int m_iStopFrame;
-    int m_iThreshFromCmdLine;
-    wxString m_sNoteFromCommandLine;
 
 public:
     BelugaTrackerFrame(wxFrame* parent,
@@ -52,7 +47,6 @@ public:
 
     void handleCommandLineArguments(int argc, wxChar** argv);
 
-    void onNewCapture();
 };
 
 
