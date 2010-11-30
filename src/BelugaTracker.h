@@ -4,6 +4,8 @@
 #include "MT_Core.h"
 #include "MT_Tracking.h"
 
+#include "BelugaRobot.h"
+
 const double DEFAULT_SIGMA_POSITION = 4.0; /* pixels */
 const double DEFAULT_SIGMA_HEADING = 0.26; /* rad ~= 15 deg */
 const double DEFAULT_SIGMA_SPEED = 1.0; /* pixels/frame */
@@ -19,6 +21,11 @@ private:
     IplImage* m_pGSFrame;      /* Grayscale version of current frame */
     IplImage* m_pDiffFrame;    /* Background subtracted frame */
     IplImage* m_pThreshFrame;  /* Thresholded frame */
+	IplImage* m_pHSVFrame;
+	IplImage* m_pHFrame;
+	IplImage* m_pSFrame;
+	IplImage* m_pVFrame;
+	void HSVSplit(IplImage* frame);
 
     /* blobber parameters */
     unsigned int m_iBlobValThresh;
@@ -95,7 +102,7 @@ public:
     void setStartStopFrames(int start_frame, int stop_frame)
     {m_iStartFrame = start_frame; m_iStopFrame = stop_frame;};
 
-    void doTrain(IplImage* frame){MT_TrackerBase::doTrain(frame); m_pGSThresholder->setSharedBackground(BG_frame);};
+    void doTrain(IplImage* frame);
 
     void initDataFile();
     void writeData();
@@ -105,7 +112,9 @@ public:
 
     void doGLDrawing(int flags);
 
-    
+	std::vector<double> getBelugaState(unsigned int i);
+	double getBelugaX(unsigned int i){if(i >= m_vdTracked_X.size()){return 0;} else {return m_vdTracked_X[i];}};
+	double getBelugaY(unsigned int i){if(i >= m_vdTracked_Y.size()){return 0;} else {return m_iFrameHeight - m_vdTracked_Y[i];}};
 
 };
 

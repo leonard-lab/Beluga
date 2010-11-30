@@ -30,6 +30,26 @@ Beluga::Beluga(const char* onComPort, const char* name)
 }
 
 /* Beluga initialization */
+Beluga::~Beluga()
+{
+
+	SafeStop();
+
+}
+
+void Beluga::SafeStop()
+{
+	if(IsConnected())
+	{
+		double t0 = MT_getTimeSec();
+		SendSpeed(0);
+		while(MT_getTimeSec() - t0 < 0.1){};
+		SendVerticalSpeed(0);
+		while(MT_getTimeSec() - t0 < 0.2){};
+		SendTurn(0);
+	}
+}
+
 void Beluga::doCommonInit()
 {
     /* set default parameter values - these will get loaded from XML
@@ -44,6 +64,9 @@ void Beluga::doCommonInit()
     /* Adding these as an MT_DataGroup enables GUI adjustment and
      * persistence via XML.  The XML file is keyed on the robot name,
      * so the robot name needs to be unique */
+	m_vdState.resize(BELUGA_STATE_SIZE, 0.0),
+	m_vdControls.resize(BELUGA_CONTROL_SIZE, 0.0),
+
     m_pParameters = new MT_DataGroup(std::string(m_sName));
     m_pParameters->AddDouble("Max Speed",
                              &m_dMaxSpeed,
@@ -80,6 +103,56 @@ void Beluga::doCommonInit()
 
 /* function to construct a vertical speed command.  speed is a signed
  * double number */
+void Beluga::Update(std::vector<double> state)
+{
+	SetState(state);
+}
+
+void Beluga::SetState(std::vector<double> state)
+{
+	if(state.size() != BELUGA_STATE_SIZE)
+	{
+		return;
+	}
+
+	m_vdState = state;
+}
+
+std::vector<double> Beluga::GetState()
+{
+	return m_vdState;
+}
+
+double Beluga::GetX() const
+{
+	return m_vdState[BELUGA_STATE_X];
+}
+
+double Beluga::GetY() const
+{
+	return m_vdState[BELUGA_STATE_Y];
+}
+
+double Beluga::GetTheta() const
+{
+	return m_vdState[BELUGA_STATE_ORIENTATION];
+}
+
+void Beluga::SetControl(std::vector<double> u)
+{
+	if(u.size() != BELUGA_CONTROL_SIZE)
+	{
+		return;
+	}
+
+	m_vdControls = u;
+}
+
+std::vector<double> Beluga::GetControl()
+{
+	return m_vdControls;
+}
+
 void Beluga::SendVerticalSpeed(double speed)
 {
     /* The speed command starts with a % and is followed by 3 digits
@@ -207,6 +280,15 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 
 #ifndef _WIN32
     vert = MT_DeadBandAndScale(z, m_dSpeedDeadBand, m_dMaxVertSpeed);
+#else
+	if(js_buttons & BELUGA_UP_BUTTON)
+	{
+		vert = m_dVertSpeed;
+	}
+	if(js_buttons & BELUGA_DOWN_BUTTON)
+	{
+		vert = -m_dVertSpeed;
+	}
 #endif
 
     switch(which_cmd)
@@ -225,4 +307,26 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
     {
         which_cmd = 0;
     }
+}
+
+void Beluga::Control()
+{
+	static unsigned int which_cmd = 0;
+
+	switch(which_cmd)
+	{
+	case 0:
+		SendSpeed(m_vdControls[BELUGA_CONTROL_FWD_SPEED]);
+		break;
+	case 1:
+		SendVerticalSpeed(m_vdControls[BELUGA_CONTROL_VERT_SPEED]);
+		break;
+	case 2:
+		SendTurn(m_vdControls[BELUGA_CONTROL_STEERING]);
+		break;
+	}
+	if(++which_cmd == 3)
+	{
+		which_cmd = 0;
+	}
 }

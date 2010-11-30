@@ -1,6 +1,10 @@
 #ifndef BELUGATRACKERGUI_H
 #define BELUGATRACKERGUI_H
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /* Include necessary MADTraC headers */
 #include "MT_Core.h"
 #include "MT_GUI.h"
@@ -21,12 +25,17 @@ protected:
     BelugaTracker* m_pBelugaTracker;
     MT_Server* m_pServer;
 
-    wxString m_sBackgroundImage;
+	double m_dGotoDist;
+	double m_dGotoMaxSpeed;
+	double m_dGotoTurningGain;
+
     int m_iNToTrack;
-    int m_iStartFrame;
-    int m_iStopFrame;
-    int m_iThreshFromCmdLine;
-    wxString m_sNoteFromCommandLine;
+	int m_iGrabbedTrackedObj;
+
+    bool m_bControlActive;
+	bool m_bGotoActive;
+	double m_dGotoX;
+	double m_dGotoY;
 
 public:
     BelugaTrackerFrame(wxFrame* parent,
@@ -43,12 +52,19 @@ public:
     void initTracker();
     void initUserData();
 
-    void doUserStep();
+	void doUserControl();
+	void doUserGLDrawing();
+
     MT_RobotBase* getNewRobot(const char* config, const char* name);
 
     void handleCommandLineArguments(int argc, wxChar** argv);
+	void updateRobotStatesFromTracker();
 
-    void onNewCapture();
+	bool doKeyboardCallback(wxKeyEvent &event);
+	bool doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y);
+
+	void onMenuAssign(wxCommandEvent& event);
+
 };
 
 

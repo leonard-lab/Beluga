@@ -286,6 +286,23 @@ BelugaTracker::~BelugaTracker()
     cvReleaseMat(&m_pQ);
     cvReleaseMat(&m_pR);
 
+	if(m_pHSVFrame)
+	{
+		cvReleaseImage(&m_pHSVFrame);
+	}
+	if(m_pHFrame)
+	{
+		cvReleaseImage(&m_pHFrame);
+	}
+	if(m_pSFrame)
+	{
+		cvReleaseImage(&m_pSFrame);
+	}
+	if(m_pVFrame)
+	{
+		cvReleaseImage(&m_pVFrame);
+	}
+
     /* MT_UKFFree frees up memory used by the UKF */
     for(unsigned int i = 0; i < m_iNObj; i++)
     {
@@ -301,7 +318,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	m_SearchArea = cvRect(0,0,0,0);
 
     /* Not using the built-in tracked objects functions - setting
-     * this pointer to NULL will ensure that the appropriate code is
+     * this pointer to N ULL will ensure that the appropriate code is
      * disabled  */
     m_pTrackedObjects = NULL;
 
@@ -310,6 +327,15 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     m_pGSFrame = NULL;
     m_pDiffFrame = NULL;
     m_pThreshFrame = NULL;
+
+	m_pHSVFrame = NULL;
+	m_pHFrame = NULL;
+	m_pSFrame = NULL;
+	m_pVFrame = NULL;
+
+    /* grab the frame height */
+    m_iFrameHeight = ProtoFrame->height;
+	m_iFrameWidth = ProtoFrame->width;
 
     /* Call the base class's doInit method.
      * This initializes variables to safe values and
@@ -343,15 +369,16 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
         m_vdHistories_Y[i].resize(0);        
     }
 
-    /* grab the frame height */
-    m_iFrameHeight = ProtoFrame->height;
-	m_iFrameWidth = ProtoFrame->width;
 
     /* sets up the frames that are available in the "view" menu */
     m_pTrackerFrameGroup = new MT_TrackerFrameGroup();
     m_pTrackerFrameGroup->pushFrame(&m_pDiffFrame,      "Diff Frame");
     m_pTrackerFrameGroup->pushFrame(&m_pThreshFrame,    "Threshold Frame");
-
+	m_pTrackerFrameGroup->pushFrame(&m_pHSVFrame, "HSV");
+	m_pTrackerFrameGroup->pushFrame(&m_pHFrame, "H");
+	m_pTrackerFrameGroup->pushFrame(&m_pSFrame, "S");
+	m_pTrackerFrameGroup->pushFrame(&m_pVFrame, "V");
+	m_pTrackerFrameGroup->pushFrame(&m_pGSFrame, "GS");
 
     /* Data group and Data report setup.
      *
@@ -434,6 +461,32 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
 }
 
+void BelugaTracker::doTrain(IplImage* frame)
+{
+	printf("Training.\n");
+	m_iFrameWidth = frame->width;
+	m_iFrameHeight = frame->height;
+	CvSize fsize = cvSize(m_iFrameWidth, m_iFrameHeight);
+
+	MT_TrackerBase::doTrain(frame);
+
+	HSVSplit(frame);
+
+	cvCopy(m_pSFrame, BG_frame);
+
+	if(m_pGSThresholder)
+	{
+		delete m_pGSThresholder;
+	}
+
+	m_pGSThresholder = new MT_GSThresholder(BG_frame);
+    /* The thresholder manages these frames, but by grabbing pointers
+       to them we can pass them to the GUI. */
+    m_pGSFrame = m_pGSThresholder->getGSFrame();
+    m_pDiffFrame = m_pGSThresholder->getDiffFrame();
+    m_pThreshFrame = m_pGSThresholder->getThreshFrame();
+}
+
 /* This gets called by MT_TrackerBase::doInit.  I use it here more to
  * allocate other bits of memory - a lot of this could actually go
  * into doInit, but there's no real harm */
@@ -442,8 +495,21 @@ void BelugaTracker::createFrames()
     /* this makes sure that the BG_frame is created */
     MT_TrackerBase::createFrames();
 
+	if(m_pHSVFrame)
+	{
+		cvReleaseImage(&m_pHSVFrame);
+		cvReleaseImage(&m_pHFrame);
+		cvReleaseImage(&m_pSFrame);
+		cvReleaseImage(&m_pVFrame);
+	}
+	m_pHSVFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 3);
+	m_pHFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+	m_pSFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+	m_pVFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+
+	//m_pGSThresholder = NULL;
     /* Create the Thresholder and Blobber objects */
-    m_pGSThresholder = new MT_GSThresholder(BG_frame);
+    //m_pGSThresholder = new MT_GSThresholder(BG_frame);
     m_pGYBlobber = new GYBlobber(m_iNObj);
     /* Initialize the Hungarian Matcher */
     m_HungarianMatcher.doInit(m_iNObj);
@@ -463,12 +529,6 @@ void BelugaTracker::createFrames()
         m_vpUKF[i] = MT_UKFInit(4, 3, 0.1); /* 4 states, 3
                                         * measurements, 0.1 is a parameter */
     }
-
-    /* The thresholder manages these frames, but by grabbing pointers
-       to them we can pass them to the GUI. */
-    m_pGSFrame = m_pGSThresholder->getGSFrame();
-    m_pDiffFrame = m_pGSThresholder->getDiffFrame();
-    m_pThreshFrame = m_pGSThresholder->getThreshFrame();
 
 } /* endof createFrames */
 
@@ -526,6 +586,12 @@ void BelugaTracker::writeData()
     m_XDF.writeData("Tracked Y"        , m_vdTracked_Y); 
     m_XDF.writeData("Tracked Heading"  , m_vdTracked_Heading); 
     m_XDF.writeData("Tracked Speed"    , m_vdTracked_Speed); 
+}
+
+void BelugaTracker::HSVSplit(IplImage* frame)
+{
+	cvCvtColor(frame, m_pHSVFrame, CV_RGB2HSV);
+	cvSplit(m_pHSVFrame, m_pHFrame, m_pSFrame, m_pVFrame, NULL);
 }
 
 /* Main tracking function - gets called by MT_TrackerFrameBase every
@@ -601,15 +667,18 @@ void BelugaTracker::doTracking(IplImage* frame)
      * basically a list of pixels that are nonzero.  We don't
      * end up using the sparse image - instead we use the full
      * threshold image, which is pointed to by m_pThreshFrame.
-     */        
-    MT_SparseBinaryImage b = m_pGSThresholder->threshToBinary(frame,
+     */       
+	HSVSplit(frame);
+    MT_SparseBinaryImage b = m_pGSThresholder->threshToBinary(m_pSFrame,
                                                               m_iBlobValThresh,
-                                                              ROI_frame);
+                                                              ROI_frame,
+															  MT_THRESH_LIGHTER);
 
     /* make sure these pointers are updated */
     m_pGSFrame = m_pGSThresholder->getGSFrame();
     m_pDiffFrame = m_pGSThresholder->getDiffFrame();
     m_pThreshFrame = m_pGSThresholder->getThreshFrame();
+
 
 
     /* Blobbing with George Young's Mixture-of-Gaussians blobber
@@ -901,6 +970,27 @@ void BelugaTracker::doTracking(IplImage* frame)
     /* write data to file */
     writeData();
 
+}
+
+std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
+{
+	std::vector<double> r;
+	r.resize(0);
+
+	if(i >= m_iNObj || i >= m_vdTracked_X.size())
+	{
+		fprintf(stderr, "BelugaTracker Error:  State request out of range; returning empty state.\n");
+		return r;
+	}
+
+	r.resize(BELUGA_STATE_SIZE);
+	r[BELUGA_STATE_X] = m_vdTracked_X[i];
+	r[BELUGA_STATE_Y] = m_vdTracked_Y[i];
+	r[BELUGA_STATE_HEADING] = m_vdTracked_Heading[i];
+	r[BELUGA_STATE_SPEED] = m_vdTracked_Speed[i];
+	r[BELUGA_STATE_ORIENTATION] = m_vdBlobs_Orientation[i];
+
+	return r;
 }
 
 /* Drawing function - gets called by the GUI
