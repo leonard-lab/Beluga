@@ -49,6 +49,9 @@ void Beluga::doCommonInit()
     m_dTurnDeadBand = BELUGA_DEFAULT_TURN_DEADBAND;
     m_dVertSpeed = 0;
 
+	m_vdState.resize(BELUGA_STATE_SIZE, 0.0),
+	m_vdControls.resize(BELUGA_CONTROL_SIZE, 0.0),
+
     m_pParameters = new MT_DataGroup(std::string(m_sName));
     m_pParameters->AddDouble("Max Speed",
                              &m_dMaxSpeed,
@@ -81,6 +84,56 @@ void Beluga::doCommonInit()
                              0,
                              1.0);
 
+}
+
+void Beluga::Update(std::vector<double> state)
+{
+	SetState(state);
+}
+
+void Beluga::SetState(std::vector<double> state)
+{
+	if(state.size() != BELUGA_STATE_SIZE)
+	{
+		return;
+	}
+
+	m_vdState = state;
+}
+
+std::vector<double> Beluga::GetState()
+{
+	return m_vdState;
+}
+
+double Beluga::GetX() const
+{
+	return m_vdState[BELUGA_STATE_X];
+}
+
+double Beluga::GetY() const
+{
+	return m_vdState[BELUGA_STATE_Y];
+}
+
+double Beluga::GetTheta() const
+{
+	return m_vdState[BELUGA_STATE_ORIENTATION];
+}
+
+void Beluga::SetControl(std::vector<double> u)
+{
+	if(u.size() != BELUGA_CONTROL_SIZE)
+	{
+		return;
+	}
+
+	m_vdControls = u;
+}
+
+std::vector<double> Beluga::GetControl()
+{
+	return m_vdControls;
 }
 
 void Beluga::SendVerticalSpeed(double speed)
@@ -217,4 +270,26 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
     {
         which_cmd = 0;
     }
+}
+
+void Beluga::Control()
+{
+	static unsigned int which_cmd = 0;
+
+	switch(which_cmd)
+	{
+	case 0:
+		SendSpeed(m_vdControls[BELUGA_CONTROL_FWD_SPEED]);
+		break;
+	case 1:
+		SendVerticalSpeed(m_vdControls[BELUGA_CONTROL_VERT_SPEED]);
+		break;
+	case 2:
+		SendTurn(m_vdControls[BELUGA_CONTROL_STEERING]);
+		break;
+	}
+	if(++which_cmd == 3)
+	{
+		which_cmd = 0;
+	}
 }
