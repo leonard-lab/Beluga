@@ -77,7 +77,7 @@ void Beluga::SendVerticalSpeed(double speed)
     spd_cmd = MT_CLAMP(fabs(speed), 0, BELUGA_MAX_VERT_SPEED);
     spd_cmd += 100*d;
     
-    sprintf(cmd, "\%%%03d!", spd_cmd);
+    sprintf(cmd, "%%%03d!", spd_cmd);
     SendCommand(cmd);
     
 }
@@ -170,6 +170,15 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 
 #ifndef _WIN32
     vert = MT_DeadBandAndScale(z, m_dSpeedDeadBand, m_dMaxVertSpeed);
+#else
+	if(js_buttons & BELUGA_UP_BUTTON)
+	{
+		vert = m_dVertSpeed;
+	}
+	if(js_buttons & BELUGA_DOWN_BUTTON)
+	{
+		vert = -m_dVertSpeed;
+	}
 #endif
 
     switch(which_cmd)

@@ -14,6 +14,10 @@ const unsigned int BELUGA_SERVO_MAX = 137;
 
 const unsigned int BELUGA_MAX_COMMAND_LENGTH = 30;
 
+/* UP / DOWN buttons (windows only) */
+const unsigned int BELUGA_UP_BUTTON = 2;
+const unsigned int BELUGA_DOWN_BUTTON = 1;
+
 class Beluga : public MT_RobotBase
 {
 public:
