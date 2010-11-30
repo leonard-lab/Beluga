@@ -20,6 +20,26 @@ Beluga::Beluga(const char* onComPort, const char* name)
     doCommonInit();
 }
 
+Beluga::~Beluga()
+{
+
+	SafeStop();
+
+}
+
+void Beluga::SafeStop()
+{
+	if(IsConnected())
+	{
+		double t0 = MT_getTimeSec();
+		SendSpeed(0);
+		while(MT_getTimeSec() - t0 < 0.1){};
+		SendVerticalSpeed(0);
+		while(MT_getTimeSec() - t0 < 0.2){};
+		SendTurn(0);
+	}
+}
+
 void Beluga::doCommonInit()
 {
     m_dMaxSpeed = BELUGA_MAX_SPEED;

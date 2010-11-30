@@ -24,7 +24,7 @@ public:
     Beluga();
     Beluga(const char* onComPort, const char* name);
 
-    ~Beluga(){};
+    virtual ~Beluga();
 
     void JoyStickControl(std::vector<double> js_axes,
                          unsigned int js_buttons);
@@ -32,6 +32,8 @@ public:
     const char* getInfo() const;
 
     void SendCommand(const char* command);
+
+	void SafeStop();
 
     unsigned char IsConnected() const;
 
