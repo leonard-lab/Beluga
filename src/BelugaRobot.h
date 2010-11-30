@@ -14,6 +14,8 @@ const unsigned int BELUGA_SERVO_MAX = 137;
 
 const unsigned int BELUGA_MAX_COMMAND_LENGTH = 30;
 
+const unsigned char BELUGA_LINEFEED = 10;
+
 class Beluga : public MT_RobotBase
 {
 public:
