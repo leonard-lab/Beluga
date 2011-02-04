@@ -472,7 +472,7 @@ void BelugaTracker::doTrain(IplImage* frame)
 
 	HSVSplit(frame);
 
-	cvCopy(m_pSFrame, BG_frame);
+	cvCopy(m_pVFrame, BG_frame);
 
 	if(m_pGSThresholder)
 	{
@@ -669,17 +669,21 @@ void BelugaTracker::doTracking(IplImage* frame)
      * threshold image, which is pointed to by m_pThreshFrame.
      */       
 	HSVSplit(frame);
-    MT_SparseBinaryImage b = m_pGSThresholder->threshToBinary(m_pSFrame,
+    /*MT_SparseBinaryImage b = m_pGSThresholder->threshToBinary(m_pVFrame,
                                                               m_iBlobValThresh,
                                                               ROI_frame,
-															  MT_THRESH_LIGHTER);
+															  MT_THRESH_DARKER); */
 
     /* make sure these pointers are updated */
-    m_pGSFrame = m_pGSThresholder->getGSFrame();
-    m_pDiffFrame = m_pGSThresholder->getDiffFrame();
-    m_pThreshFrame = m_pGSThresholder->getThreshFrame();
-
-
+    m_pGSFrame = m_pVFrame; //m_pGSThresholder->getGSFrame();
+    m_pDiffFrame = m_pVFrame; //m_pGSThresholder->getDiffFrame();
+    //pThreshFrame = m_pGSThresholder->getThreshFrame();
+	cvThreshold(m_pVFrame, m_pThreshFrame, m_iBlobValThresh, 255, CV_THRESH_BINARY_INV);
+	if(ROI_frame)
+	{
+		cvAnd(m_pThreshFrame, ROI_frame, m_pThreshFrame);
+	}
+	cvSmooth(m_pThreshFrame, m_pThreshFrame, CV_MEDIAN, 5);
 
     /* Blobbing with George Young's Mixture-of-Gaussians blobber
      *
