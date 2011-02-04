@@ -40,7 +40,7 @@ x = [Cent_Guess(1) - W : Cent_Guess(1) + W];
 y = [Cent_Guess(2) - W  : Cent_Guess(2) + W];
 b = E(x, y);
 
-xc = y(1) + mean(mean(b.*repmat(y', [1 length(x)])));a
+xc = y(1) + mean(mean(b.*repmat(y', [1 length(x)])));
 yc = x(1) + mean(mean(b.*repmat(x, [length(y) 1])));
 
 plot(xc, yc, 'ro')
