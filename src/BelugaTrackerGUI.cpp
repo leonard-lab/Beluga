@@ -25,7 +25,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                const wxSize& size,     
                                long style)
   : MT_RobotFrameBase(parent, id, title, pos, size, style),
-    m_iNToTrack(2),
+    m_iNToTrack(1),
 	m_dGotoDist(50.0),
 	m_dGotoMaxSpeed(15.0),
 	m_dGotoTurningGain(25.0),

@@ -479,12 +479,12 @@ void BelugaTracker::doTrain(IplImage* frame)
 		delete m_pGSThresholder;
 	}
 
-	m_pGSThresholder = new MT_GSThresholder(BG_frame);
+	//m_pGSThresholder = new MT_GSThresholder(BG_frame);
     /* The thresholder manages these frames, but by grabbing pointers
        to them we can pass them to the GUI. */
-    m_pGSFrame = m_pGSThresholder->getGSFrame();
+	/*m_pGSFrame = m_pGSThresholder->getGSFrame();
     m_pDiffFrame = m_pGSThresholder->getDiffFrame();
-    m_pThreshFrame = m_pGSThresholder->getThreshFrame();
+    m_pThreshFrame = m_pGSThresholder->getThreshFrame();*/
 }
 
 /* This gets called by MT_TrackerBase::doInit.  I use it here more to
@@ -506,6 +506,10 @@ void BelugaTracker::createFrames()
 	m_pHFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 	m_pSFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 	m_pVFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+
+	m_pGSFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+    m_pDiffFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+    m_pThreshFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 
 	//m_pGSThresholder = NULL;
     /* Create the Thresholder and Blobber objects */
