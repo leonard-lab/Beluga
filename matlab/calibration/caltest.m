@@ -200,23 +200,34 @@ for ix = 1 : 12,
     SEAM_ANGLES(ix+1) = mean(S_t(dL(ix)+1 : dL(ix + 1)));
 end
 SEAM_ANGLES(end) = mean(S_t(dL(end) : end));
+g = exp(i*SEAM_ANGLES);
+SEAM_ANGLES = atan2(real(g), imag(g));
 
 CS = (seam_search_radius*exp(i*SEAM_ANGLES));
-CS = TANK_CENTER(1) + i*TANK_CENTER(2) + imag(CS) + i*real(CS);
+CS = TANK_CENTER(1) + i*TANK_CENTER(2) + CS;
 plot(CS, 'ro')
 
 h_unsharp = fspecial('unsharp');
 MBS = imfilter(MB, h_unsharp);
+h_avg = fspecial('average', 5);
+MBs = imfilter(MB, h_avg);
 
 s_px = cell(14,1);
 
+
+figure
+imshow(MB)
+hold on
 for ix = 1 : 14,
     a = SEAM_ANGLES(ix);
-    px = TANK_CENTER(1) + seam_search_radius*sin(a);
-    py = TANK_CENTER(2) + seam_search_radius*cos(a);
+    px = TANK_CENTER(1) + seam_search_radius*cos(a);
+    py = TANK_CENTER(2) + seam_search_radius*sin(a);
     p = [px py];
     
-    s_px{ix} = follow_seam(TANK_CENTER, a, p, MB); 
+    fprintf('Finding seam %d\n', ix)
+    s_px{ix} = follow_seam(TANK_CENTER, [TANK_CENTER_RADIUS 500], a, p, MB, MBs);
+    
+    plot(s_px{ix}(:,1), s_px{ix}(:,2), 'b.') 
 end
 
 figure
