@@ -23,7 +23,14 @@ MH = immultiply(H, MM);
 h = fspecial('gaussian', 3);
 MBF = imfilter(MB, h);
 
-E = edge(MBF, 'canny');
+h_unsharp = fspecial('unsharp');
+MBS = imfilter(MB, h_unsharp);
+h_avg = fspecial('average', 5);
+MBs = imfilter(MB, h_avg);
+
+E = edge(MBS, 'canny');
+
+
 
 figure(1)
 imagesc(MM, [0 1])
@@ -207,10 +214,7 @@ CS = (seam_search_radius*exp(i*SEAM_ANGLES));
 CS = TANK_CENTER(1) + i*TANK_CENTER(2) + CS;
 plot(CS, 'ro')
 
-h_unsharp = fspecial('unsharp');
-MBS = imfilter(MB, h_unsharp);
-h_avg = fspecial('average', 5);
-MBs = imfilter(MB, h_avg);
+
 
 s_px = cell(14,1);
 
