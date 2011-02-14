@@ -1,6 +1,8 @@
 clear all;  close all;
 
-I = imread('C2.bmp');
+image_file = 'C2.bmp';
+
+I = imread(image_file);
 H = rgb2hsv(I);
 
 ASK_THRESH = 1;
@@ -56,7 +58,8 @@ for cx = 1 : CC.NumObjects,
     end
 end
 
-save('TankMask.mat', 'TankMask');
+[~, basename, ~] = fileparts(image_file);
+save(sprintf('TankMask-%s.mat', basename), 'TankMask');
 
 % show the masked tank
 imshow(immultiply(H(:,:,3), TankMask))
