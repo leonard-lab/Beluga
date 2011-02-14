@@ -2,7 +2,9 @@ clear all;  close all;
 
 % set up - input file names
 image_file = 'BGD.bmp';
-mask_file = 'TankMask.mat';
+
+[~, image_file_basename, ~] = fileparts(image_file);
+mask_file = sprintf('TankMask-%s.mat', image_file_basename);
 
 % parameters - change to tweak performance
 filter_opts.smoothing_radius = 3;
