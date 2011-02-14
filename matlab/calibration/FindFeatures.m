@@ -1,7 +1,7 @@
 clear all;  close all;
 
 % set up - input file names
-image_file = 'C2.bmp';
+image_file = 'BGD.bmp';
 mask_file = 'TankMask.mat';
 
 % parameters - change to tweak performance
@@ -33,11 +33,17 @@ side_opts.contrast_thresh = 0.015;
 VarName_TankMask = 'TankMask';
 
 % debugging parameters
-SKIP_UI = 0;
+SKIP_UI = 1;
 if SKIP_UI,
     % if SKIP_UI is true, these must be set to reasonable values
+    
+    % these numbers work with BGD.bmp
     center_guess = [76 235];
     edge_guess = [278 480];
+    
+    % for C2.bmp
+    %center_guess = [70   421];
+    %edge_guess = [363   283];
 end
 SHOW_CENTER_LINES = 1;
 
@@ -221,10 +227,28 @@ hold on
 plot(TANK_CENTER(1) + i*TANK_CENTER(2) + TANK_CENTER_RADIUS*exp(i*linspace(0, 2*pi)), 'g-');
 hold off
 
-S_b = S_V < (mean(S_V) - (1/3)*(mean(S_V) - min(S_V)));
-S_t = sort(S_TH(S_b > 0));
+% detrending S_V - find best-fit sinusoidal trend
+%  - a sinusoidal trend is consistent with the illumination changing
+%    roughly linearly across the tank
+[S_TH, ix] = sort(S_TH);
+S_V = S_V(ix);
 
-pause
+S_V = smooth(S_V, 2*floor(length(S_V)/14/5/2) + 1);
+
+a0 = mean(S_V);
+Phi = [sin(S_TH) cos(S_TH) sin(2*S_TH) cos(2*S_TH)];
+Y = [S_V - a0];
+A = Phi\Y;
+S_V = S_V - (a0 + A(1)*sin(S_TH) + A(2)*cos(S_TH) ...
+    + A(3)*sin(2*S_TH) + A(4)*cos(2*S_TH));
+% remove any remaining linear trend
+S_V = detrend(S_V);
+
+
+%S_b = S_V < (mean(S_V) - (1/3)*(mean(S_V) - min(S_V)));
+%S_b = S_V < (mean(S_V) - 0.5*std(S_V));
+S_b = S_V < 0;
+S_t = sort(S_TH(S_b > 0));
 
 d = [diff(S_t)' 0];
 dL = [];
@@ -232,9 +256,9 @@ t_d = 0.5;
 while length(dL) ~= 13,
     dL = find(d > t_d*max(d));
     if(length(dL) < 14),
-        t_d = t_d + 0.1;
-    else
         t_d = t_d - 0.1;
+    else
+        t_d = t_d + 0.1;
     end
 end
 
