@@ -1,6 +1,6 @@
 clear all;  close all;
 
-I = imread('BGD.bmp');
+I = imread('C2.bmp');
 H = rgb2hsv(I);
 
 ASK_THRESH = 1;
@@ -18,7 +18,7 @@ if ASK_THRESH,
     drawn_rect = rbbox([init_pt(1,1) init_pt(1,2) 0 0]);
     
     G = H([drawn_rect(2) : drawn_rect(4)], [drawn_rect(1) : drawn_rect(3)], 3);
-    thresh = mean(G(:)) + std(G(:));
+    thresh = mean(G(:)) + 1.5*std(G(:));
 end 
 
 % threshold the hsv V channel for how "dark" the image is
