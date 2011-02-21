@@ -1,7 +1,7 @@
 clear all;  close all;
 
 % set up - input file names
-image_file = 'BGD.bmp';
+image_file = 'C1.bmp';
 
 [~, image_file_basename, ~] = fileparts(image_file);
 mask_file = sprintf('TankMask-%s.mat', image_file_basename);
@@ -35,7 +35,7 @@ side_opts.contrast_thresh = 0.015;
 VarName_TankMask = 'TankMask';
 
 % debugging parameters
-SKIP_UI = 1;
+SKIP_UI = 0;
 if SKIP_UI,
     % if SKIP_UI is true, these must be set to reasonable values
     

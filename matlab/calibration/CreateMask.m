@@ -1,6 +1,6 @@
 clear all;  close all;
 
-image_file = 'C2.bmp';
+image_file = 'C1.bmp';
 
 I = imread(image_file);
 H = rgb2hsv(I);
