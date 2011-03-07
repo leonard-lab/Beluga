@@ -25,23 +25,28 @@ outer_opts.thresh_factor = 0.1;
 outer_opts.gap = 50;
 outer_opts.min_length = 100;
 
-side_opts.num_peaks = 20;
-side_opts.thresh_factor = 0.1;
-side_opts.gap = 20;
-side_opts.min_length = 30;
+side_opts.num_peaks = 50;
+side_opts.thresh_factor = 0.01;
+side_opts.gap = 5;
+side_opts.min_length = 40;
 side_opts.contrast_thresh = 0.015;
+side_opts.edge_padding = 75;
 
 % set up - configuration (shouldn't need to be changed)
 VarName_TankMask = 'TankMask';
 
 % debugging parameters
-SKIP_UI = 0;
+SKIP_UI = 1;
 if SKIP_UI,
     % if SKIP_UI is true, these must be set to reasonable values
     
     % these numbers work with BGD.bmp
-    center_guess = [76 235];
-    edge_guess = [278 480];
+    %center_guess = [76 235];
+    %edge_guess = [278 480];
+    
+    % for C1.bmp
+    center_guess = [413 411];
+    edge_guess = [113 301];
     
     % for C2.bmp
     %center_guess = [70   421];
@@ -190,6 +195,38 @@ hold on
 plot(center_guess(2), center_guess(1), 'mo')
 plot(TANK_CENTER(1), TANK_CENTER(2), 'gs')
 hold off
+
+% Quadrant mapping: 
+%  We can figure out which camera this is by looking at where the
+%  center of the tank is in the frame.  The mapping is a reflection about
+%  the origin.  Let the quadrant of the center of the tank in the image and
+%  relative to the center of the image be given by (i, ii, iii, iv) and let
+%  the quadrant of the camera relative to the center of the tank be given
+%  by (I, II, III, IV).  The mapping is then, e.g. i -> IV (reflection
+%  about the origin).  We can figure out the first part by computing the
+%  sign of the coordinates of TANK_CENTER relative to the center of the
+%  image.
+%
+%  Note that the image coordinates are from the top left with ++ being down
+%  and right.  We rectify this by negating the y component of Q.
+%
+Q = TANK_CENTER - [frame_width/2; frame_height/2];
+Q = sign(Q);
+Q(2) = -Q(2);
+if Q(1) >= 0 && Q(2) >= 0,
+    % i -> III
+    QUADRANT = 'III';
+elseif Q(1) < 0 && Q(2) >= 0,
+    % ii -> IV
+    QUADRANT = 'IV';
+elseif Q(1) < 0 && Q(2) < 0,
+    % iii -> I
+    QUADRANT = 'I';
+elseif Q(1) >= 0 && Q(2) < 0,
+    % iv -> II
+    QUADRANT = 'II';
+end
+fprintf('This is the camera in quadrant %s\n', QUADRANT);
 
 clear lines_in Phi Y dx dy dr d c r1 r2 C ix
 
@@ -356,13 +393,14 @@ SS_Peaks = houghpeaks(SS_Mag, side_opts.num_peaks,...
 SS_Lines = houghlines(SS_E, SS_Theta, SS_Radius, SS_Peaks,...
     'FillGap', side_opts.gap, 'MinLength', side_opts.min_length);
 
-clear SS_Mag SS_Theta SS_Radius SS_Peaks
+%clear SS_Mag SS_Theta SS_Radius SS_Peaks
 
 MS = [];
 tx = TANK_CENTER(1);  ty = TANK_CENTER(2);
 mp = 0.5*(M(:,[2 3]) + M(:,[4 5]));
 mean_side_length = mean(M([2 : end-1], 7));
 [nm, ~] = size(M);
+b = side_opts.edge_padding;
 
 for ix = 1 : length(SS_Lines),
     r1 = SS_Lines(ix).point1;
@@ -370,6 +408,19 @@ for ix = 1 : length(SS_Lines),
     m = 0.5*(r1 + r2);
     
     a = atan2(m(2)-ty, m(1)-tx);
+    
+    d1 = norm([r1 - TANK_CENTER']);
+    d2 = norm([r2 - TANK_CENTER']);
+    r = abs(d1 - d2);
+    if(r < 20)
+        continue;
+    end
+    if (r1(1) < 100 && r2(1) < b) || (r1(1) > frame_width-b && r2(1) > frame_width - b)
+        continue;
+    end
+    if (r1(2) < 100 && r2(2) < b) || (r1(2) > frame_height-b && r2(2) > frame_height-b)
+        continue;
+    end
     
     d1 = (repmat(M(:, [2 3]), [1 2]) - repmat([r1 r2], [nm 1])).^2;
     d2 = (repmat(M(:, [4 5]), [1 2]) - repmat([r1 r2], [nm 1])).^2;
@@ -388,11 +439,11 @@ for ix = 1 : length(SS_Lines),
     dp1 = M(dx, [2 3]) - M(dx, [4 5]);
     dp2 = r1 - r2;
 
-    MS = [MS; a r1 r2 ix dx dm abs(dp1*dp2')/norm(dp1)/norm(dp2)];
+    MS = [MS; a r1 r2 ix dx dm abs(dp1*dp2')/norm(dp1)/norm(dp2) r];
     
     if SHOW_CENTER_LINES,
         hold on
-        plot([r1(1) r2(1)], [r1(2) r2(2)], 'b-x',...
+        plot([r1(1) r2(1)], [r1(2) r2(2)], 'y-x',...
             'MarkerEdgeColor', 'r');
         hold off
     end
