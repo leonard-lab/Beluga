@@ -2,8 +2,8 @@ function M = extend_lines(M, w, h)
 
 [nlines, n_e] = size(M);
 
-if n_e ~= 6,
-    error('extend_lines expects data with 6 cols');
+if n_e < 6,
+    error('extend_lines expects data with at least 6 cols');
 end
 
 if nlines > 2,

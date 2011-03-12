@@ -1,7 +1,7 @@
 clear all;  close all;
 
 % set up - input file names
-image_file = 'C1.bmp';
+image_file = 'Q1.bmp';
 
 [~, image_file_basename, ~] = fileparts(image_file);
 mask_file = sprintf('TankMask-%s.mat', image_file_basename);
@@ -11,9 +11,9 @@ filter_opts.smoothing_radius = 3;
 filter_opts.averaging_window = 5;
 
 center_opts.num_peaks = 40;
-center_opts.thresh_factor = 0.1;
+center_opts.thresh_factor = 0.01;
 center_opts.gap = 10;
-center_opts.min_length = 50;
+center_opts.min_length = 60;
 center_opts.max_dist = 40;
 
 seam_opts.search_size = 50;  % 2*n + 1 window around center
@@ -36,7 +36,7 @@ side_opts.edge_padding = 75;
 VarName_TankMask = 'TankMask';
 
 % debugging parameters
-SKIP_UI = 1;
+SKIP_UI = 0;
 if SKIP_UI,
     % if SKIP_UI is true, these must be set to reasonable values
     
@@ -79,7 +79,8 @@ I = imread(image_file);
 [frame_height, frame_width, frame_channels] = size(I);
 
 if frame_channels ~= 3,
-    error('Image file %s must be a color image', image_file);
+    %error('Image file %s must be a color image', image_file);
+    I = cat(3, I, I, I);
 end
 
 figure(1)
@@ -292,6 +293,9 @@ S_t = sort(S_TH(S_b > 0));
 d = [diff(S_t)' 0];
 dL = [];
 t_d = 0.5;
+
+pause
+
 while length(dL) ~= 13,
     dL = find(d > t_d*max(d));
     if(length(dL) < 14),
