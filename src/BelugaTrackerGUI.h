@@ -37,6 +37,8 @@ protected:
 	double m_dGotoX;
 	double m_dGotoY;
 
+    unsigned int m_uiaIndexMap[4];
+
 public:
     BelugaTrackerFrame(wxFrame* parent,
                          wxWindowID id = wxID_ANY,
@@ -47,7 +49,7 @@ public:
 
     virtual ~BelugaTrackerFrame(){if(m_pServer) delete m_pServer;};
 
-   /* menu callbacks */
+    void makeFileMenu(wxMenu* file_menu);
 
     void initTracker();
     void initUserData();
@@ -62,8 +64,10 @@ public:
 
 	bool doKeyboardCallback(wxKeyEvent &event);
 	bool doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y);
-
+    
+   /* menu callbacks */
 	void onMenuAssign(wxCommandEvent& event);
+    void onMenuFileCamSetup(wxCommandEvent& event);
 
 };
 

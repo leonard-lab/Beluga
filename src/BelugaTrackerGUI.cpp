@@ -1,6 +1,8 @@
 
 #include "BelugaTrackerGUI.h"
 
+#include "BelugaVideoSetupDialog.h"
+
 const std::string RobotNames[] = {"Beluga 1",
                                   "Beluga 2",
                                   "LifePreserver",
@@ -12,7 +14,11 @@ const std::string RobotNames[] = {"Beluga 1",
 
 const int NO_ROBOT = -1;
 
-const long ID_MENU_POP_ROBOT = MT_RFB_ID_HIGHEST + 10;
+enum
+{
+    ID_MENU_POP_ROBOT = MT_RFB_ID_HIGHEST + 10,
+    ID_MENU_FILE_CAM_SETUP
+};
 
 /**********************************************************************
  * GUI Frame Class
@@ -41,6 +47,11 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 
 void BelugaTrackerFrame::initUserData()
 {
+
+    for(unsigned int i = 0; i < 4; i++)
+    {
+        m_uiaIndexMap[i] = i;
+    }
     
     MT_RobotFrameBase::initUserData();
     
@@ -49,9 +60,18 @@ void BelugaTrackerFrame::initUserData()
                               wxT("Number of objects to track. Default is 3."),
                               wxCMD_LINE_VAL_NUMBER);
 
-	m_pPreferences->AddDouble("Goto Cutoff Distance", &m_dGotoDist, MT_DATA_READWRITE, 0);
-	m_pPreferences->AddDouble("Goto Max Speed", &m_dGotoMaxSpeed, MT_DATA_READWRITE, 0);
-	m_pPreferences->AddDouble("Goto Turning Gain", &m_dGotoTurningGain, MT_DATA_READWRITE, 0);
+	m_pPreferences->AddDouble("Goto Cutoff Distance",
+                              &m_dGotoDist,
+                              MT_DATA_READWRITE,
+                              0);
+	m_pPreferences->AddDouble("Goto Max Speed",
+                              &m_dGotoMaxSpeed,
+                              MT_DATA_READWRITE,
+                              0);
+	m_pPreferences->AddDouble("Goto Turning Gain",
+                              &m_dGotoTurningGain,
+                              MT_DATA_READWRITE,
+                              0);
 
     std::vector<std::string> botnames;
     for(unsigned int i = 0; i < 7; i++)
@@ -61,6 +81,19 @@ void BelugaTrackerFrame::initUserData()
     m_Robots.SetRobotNames(botnames);
     
     setTimer(100);
+}
+
+void BelugaTrackerFrame::makeFileMenu(wxMenu* file_menu)
+{
+    file_menu->Append(ID_MENU_FILE_CAM_SETUP,
+                      wxT("Configure Video Sources..."));
+    wxFrame::Connect(ID_MENU_FILE_CAM_SETUP,
+                     wxEVT_COMMAND_MENU_SELECTED,
+                     wxCommandEventHandler(BelugaTrackerFrame::onMenuFileCamSetup));
+
+    file_menu->AppendSeparator();
+
+    MT_RobotFrameBase::makeFileMenu(file_menu);
 }
 
 void BelugaTrackerFrame::handleCommandLineArguments(int argc, wxChar** argv)
@@ -300,6 +333,31 @@ void BelugaTrackerFrame::doUserGLDrawing()
 	{
 		MT_DrawCircle(m_dGotoX, getYMax() - m_dGotoY, MT_Green, m_dGotoDist);
 	}
+}
+
+void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
+{
+
+    for(unsigned int i = 0; i < 4; i++)
+    {
+        printf("Map in: %d -> %d\n", i, m_uiaIndexMap[i]);
+    }
+
+    doPause();
+    
+    std::vector<std::string> camList = m_pCapture->listOfAvailableCameras(4);
+    
+    Beluga_VideoSetupDialog* dlg = new Beluga_VideoSetupDialog(m_pCapture, camList, m_uiaIndexMap, this);
+    dlg->Show();
+    dlg->UpdateView();
+
+    int r = dlg->ShowModal();
+
+    for(unsigned int i = 0; i < 4; i++)
+    {
+        printf("Map out: %d -> %d\n", i, m_uiaIndexMap[i]);
+    }
+
 }
 
 /**********************************************************************
