@@ -6,25 +6,9 @@
 class wxFilePickerCtrl;
 class imageCanvas;
 
-class Beluga_VideoSetupCanvas : public MT_GLCanvasBase
-{
-protected:
-public:
-    Beluga_VideoSetupCanvas(wxWindow* parent,
-             wxWindowID id = wxID_ANY,
-             const wxPoint& pos = wxDefaultPosition,
-             const wxSize& size = wxDefaultSize);
-
-    bool doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y);
-    
-    void doGLDrawing();
-
-};
-
 class Beluga_VideoSetupDialog : public wxDialog
 {
 protected:
-    Beluga_VideoSetupCanvas* m_pCanvases[4];
     std::vector<std::string> m_vsNames;
     MT_Capture* m_pCapture;
 
@@ -34,7 +18,7 @@ protected:
 
     wxChoice* m_pChoices[4];
     wxFilePickerCtrl* m_pFilePickerCtrls[4];
-	imageCanvas* m_pImagePanels[4];
+	imageCanvas* m_pImageCanvases[4];
 
     void onDoneClicked(wxCommandEvent& event);
 
