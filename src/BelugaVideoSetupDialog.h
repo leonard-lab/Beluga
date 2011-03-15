@@ -4,6 +4,7 @@
 #include "MT_Tracking.h"
 
 class wxFilePickerCtrl;
+class imageCanvas;
 
 class Beluga_VideoSetupCanvas : public MT_GLCanvasBase
 {
@@ -33,6 +34,7 @@ protected:
 
     wxChoice* m_pChoices[4];
     wxFilePickerCtrl* m_pFilePickerCtrls[4];
+	imageCanvas* m_pImagePanels[4];
 
     void onDoneClicked(wxCommandEvent& event);
 

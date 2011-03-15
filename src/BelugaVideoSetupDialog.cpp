@@ -8,6 +8,46 @@
 #include "BelugaVideoSetupDialog.h"
 
 #include <wx/filepicker.h>
+#include <wx/image.h>
+
+class imageCanvas : public wxWindow
+{
+protected:
+	wxBitmap m_Bitmap;
+	int w, h;
+public:
+	imageCanvas(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size)
+		: wxWindow(parent, id, pos, size),
+		m_Bitmap(size.x, size.y),
+		w(size.x),
+		h(size.y)
+	{
+	};
+
+	~imageCanvas()
+	{
+	};
+
+	void OnPaint(wxPaintEvent& event)
+	{
+		wxPaintDC dc(this);
+		PrepareDC(dc);
+
+		dc.DrawBitmap(m_Bitmap, 0, 0);
+	};
+
+	void setImage(IplImage* image)
+	{
+		wxImage tmp = wxImage(image->width, image->height, (unsigned char*)image->imageData, true);
+		m_Bitmap = wxBitmap(tmp.Scale(w,h));
+	}
+
+	DECLARE_EVENT_TABLE()
+};
+
+BEGIN_EVENT_TABLE(imageCanvas, wxWindow)
+EVT_PAINT(imageCanvas::OnPaint)
+END_EVENT_TABLE()
 
 static const wxSize g_canvasSize = wxSize(320, 240);
 
@@ -24,7 +64,11 @@ enum
     ID_CANVAS_0,
     ID_CANVAS_1,
     ID_CANVAS_2,
-    ID_CANVAS_3
+    ID_CANVAS_3,
+	ID_PANEL_0,
+	ID_PANEL_1,
+	ID_PANEL_2,
+	ID_PANEL_3
 };
 
 Beluga_VideoSetupCanvas::Beluga_VideoSetupCanvas(wxWindow* parent,
@@ -96,6 +140,11 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
 
         m_pFilePickerCtrls[i] = new wxFilePickerCtrl(this,
                                                      ID_FILEPICKER_0+i);
+
+		m_pImagePanels[i] = new imageCanvas(this,
+			ID_PANEL_0+i,
+			wxDefaultPosition,
+			g_canvasSize);
                                                      
     }
 
@@ -130,12 +179,16 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
     vbox0->Add(grid0, 0, wxALL, 10);
 
     grid0->Add(vbox00);
-    grid0->Add(m_pCanvases[1]);
-    grid0->Add(m_pCanvases[0]);
+    /*grid0->Add(m_pCanvases[1]);
+    grid0->Add(m_pCanvases[0]);*/
+	grid0->Add(m_pImagePanels[1]);
+	grid0->Add(m_pImagePanels[0]);
     grid0->Add(vbox01);    
     grid0->Add(vbox10);
-    grid0->Add(m_pCanvases[2]);
-    grid0->Add(m_pCanvases[3]);    
+    /*grid0->Add(m_pCanvases[2]);
+    grid0->Add(m_pCanvases[3]);*/
+	grid0->Add(m_pImagePanels[2]);
+	grid0->Add(m_pImagePanels[3]);
     grid0->Add(vbox11);
 
     vbox0->Add(new wxButton(this,
@@ -209,7 +262,9 @@ void Beluga_VideoSetupDialog::UpdateView()
     for(unsigned int i = 0; i < 4; i++)
     {
         IplImage* f = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_pIndexMap[i]);
-        f = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_pIndexMap[i]);        
+        f = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_pIndexMap[i]);   
+
+		m_pImagePanels[i]->setImage(f);
 
         m_pCanvases[i]->setViewport(MT_Rectangle(0,
                                                  f->width,
@@ -218,7 +273,7 @@ void Beluga_VideoSetupDialog::UpdateView()
         //m_pCanvases[i]->lockCurrentViewportAsOriginal();
         m_pCanvases[i]->setImage(f);
         m_pCanvases[i]->doGLDrawing();
-        m_pCanvases[i]->Show();
+        //m_pCanvases[i]->Show();
         m_pCanvases[i]->Refresh(false);
         m_pCanvases[i]->Refresh(false);
     }
