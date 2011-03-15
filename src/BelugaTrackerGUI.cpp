@@ -40,9 +40,40 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
     m_pServer(NULL),
 	m_bGotoActive(false),
 	m_dGotoX(0),
-	m_dGotoY(0)
+	m_dGotoY(0),
+	m_bCamerasReady(false)
 {
+	for(unsigned int i = 0; i < 4; i++)
+	{
+		m_pSlaves[i] = NULL;
+	}
+}
 
+BelugaTrackerFrame::~BelugaTrackerFrame()
+{
+	if(m_pServer) delete m_pServer;
+}
+
+void BelugaTrackerFrame::doUserQuit()
+{
+	printf("Stopping.\n");
+	m_bCamerasReady = false;
+	doPause();
+	m_pTimer->Stop();
+    this->stopTimedEvents();
+
+	for(unsigned int i = 1; i < 4; i++)
+	{
+		if(m_pSlaves[i])
+		{
+			MT_CameraSlaveFrame* f = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
+			f->setImage(NULL);
+			f->prepareToClose();
+			f->Close(true);
+		}
+	}
+
+	MT_RobotFrameBase::doUserQuit();
 }
 
 void BelugaTrackerFrame::initUserData()
@@ -113,6 +144,26 @@ MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* na
     Beluga* thebot = new Beluga(config, name);
     ReadDataGroupFromXML(m_XMLSettingsFile, thebot->GetParameters());
     return thebot;
+}
+
+void BelugaTrackerFrame::doUserStep()
+{
+
+	if(m_bCamerasReady)
+	{
+		printf("US\n");
+		for(unsigned int i = 0; i < 4; i++)
+		{
+			if(!m_pSlaves[i])
+			{
+				continue;
+			}
+			m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
+			m_pSlaves[i]->setImage(m_pCameraFrames[i]);
+		}
+	}
+
+	MT_FrameBase::doUserStep();
 }
 
 void BelugaTrackerFrame::doUserControl()
@@ -250,7 +301,7 @@ bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x,
 			int imin = -1;
 			double dmin;
 			double d2, dx, dy;
-			for(unsigned int i = 0; i < m_iNToTrack; i++)
+			for(int i = 0; i < m_iNToTrack; i++)
 			{
 				dx = viewport_x - m_pBelugaTracker->getBelugaX(i);
 				dy = viewport_y - m_pBelugaTracker->getBelugaY(i);
@@ -348,6 +399,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
     std::vector<std::string> camList = m_pCapture->listOfAvailableCameras(4);
     
     Beluga_VideoSetupDialog* dlg = new Beluga_VideoSetupDialog(m_pCapture, camList, m_uiaIndexMap, this);
+	registerDialogForXML(dlg);
     dlg->Show();
     dlg->UpdateView();
 
@@ -358,6 +410,59 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
         printf("Map out: %d -> %d\n", i, m_uiaIndexMap[i]);
     }
 
+	// TODO this will break if called more than once
+	m_bCamerasReady = true;
+
+	m_pSlaves[0] = this;
+	m_pCameraFrames[0] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[0]);
+	this->setImage(m_pCameraFrames[0]);
+	for(unsigned int i = 1; i < 4; i++)
+	{
+		MT_CameraSlaveFrame* frame = new MT_CameraSlaveFrame(this);
+		m_pSlaves[i] = frame;
+		frame->doMasterInitialization();
+		frame->Show();
+		frame->Raise();
+
+		m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
+		frame->setImage(m_pCameraFrames[i]);
+
+		frame->EnableCloseButton(false);
+		/* prevents slave frames from being closed by themselves */
+		frame->Connect(wxID_ANY,
+			wxEVT_CLOSE_WINDOW,
+			wxCloseEventHandler(BelugaTrackerFrame::onChildClose),
+			this);
+	}
+
+	m_pSlaves[1]->SetTitle(wxT("View in Quadrant II"));
+	m_pSlaves[2]->SetTitle(wxT("View in Quadrant III"));
+	m_pSlaves[3]->SetTitle(wxT("View in Quadrant IV"));
+	registerDialogForXML(m_pSlaves[1]);
+	registerDialogForXML(m_pSlaves[2]);
+	registerDialogForXML(m_pSlaves[3]);
+
+	int framewidth_pixels = m_pCapture->getFrameWidth(m_uiaIndexMap[0]);
+	int frameheight_pixels = m_pCapture->getFrameHeight(m_uiaIndexMap[0]);
+	setSizeByClient(framewidth_pixels, frameheight_pixels);
+	setViewport(MT_Rectangle(0, framewidth_pixels+0.1, 0, frameheight_pixels+0.1));
+	lockCurrentViewportAsOriginal();
+
+	printf(" ++ %08lx\n", m_pSlaves[0]);
+	printf(" ++ %08lx\n", m_pSlaves[1]);
+	printf(" ++ %08lx\n", m_pSlaves[2]);
+	printf(" ++ %08lx\n", m_pSlaves[3]);
+
+	printf(" ++ %08lx\n", m_pCameraFrames[0]);
+	printf(" ++ %08lx\n", m_pCameraFrames[1]);
+	printf(" ++ %08lx\n", m_pCameraFrames[2]);
+	printf(" ++ %08lx\n", m_pCameraFrames[3]);
+
+}
+
+void BelugaTrackerFrame::onChildClose(wxCloseEvent& event)
+{
+	printf("Close event");
 }
 
 /**********************************************************************

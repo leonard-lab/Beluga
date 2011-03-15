@@ -37,23 +37,30 @@ protected:
 	double m_dGotoX;
 	double m_dGotoY;
 
+	bool m_bCamerasReady;
     unsigned int m_uiaIndexMap[4];
+
+	MT_FrameBase* m_pSlaves[4];
+	IplImage* m_pCameraFrames[4];
 
 public:
     BelugaTrackerFrame(wxFrame* parent,
                          wxWindowID id = wxID_ANY,
-                         const wxString& title = wxT("Tracker View"), 
+                         const wxString& title = wxT("View in Quadrant I"), 
                          const wxPoint& pos = wxDefaultPosition, 
                          const wxSize& size = wxSize(640,480),     
                          long style = MT_FIXED_SIZE_FRAME);
 
-    virtual ~BelugaTrackerFrame(){if(m_pServer) delete m_pServer;};
+    virtual ~BelugaTrackerFrame();
+
+	void doUserQuit();
 
     void makeFileMenu(wxMenu* file_menu);
 
     void initTracker();
     void initUserData();
 
+	void doUserStep();
 	void doUserControl();
 	void doUserGLDrawing();
 
@@ -68,6 +75,8 @@ public:
    /* menu callbacks */
 	void onMenuAssign(wxCommandEvent& event);
     void onMenuFileCamSetup(wxCommandEvent& event);
+
+	void onChildClose(wxCloseEvent& event);
 
 };
 
