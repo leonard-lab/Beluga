@@ -76,8 +76,6 @@ public:
 	void onMenuAssign(wxCommandEvent& event);
     void onMenuFileCamSetup(wxCommandEvent& event);
 
-	void onChildClose(wxCloseEvent& event);
-
 };
 
 

@@ -56,7 +56,6 @@ BelugaTrackerFrame::~BelugaTrackerFrame()
 
 void BelugaTrackerFrame::doUserQuit()
 {
-	printf("Stopping.\n");
 	m_bCamerasReady = false;
 	doPause();
 	m_pTimer->Stop();
@@ -69,7 +68,9 @@ void BelugaTrackerFrame::doUserQuit()
 			MT_CameraSlaveFrame* f = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
 			f->setImage(NULL);
 			f->prepareToClose();
-			f->Close(true);
+
+            m_pSlaves[i]->Destroy();
+            m_pSlaves[i] = NULL;
 		}
 	}
 
@@ -151,7 +152,6 @@ void BelugaTrackerFrame::doUserStep()
 
 	if(m_bCamerasReady)
 	{
-		printf("US\n");
 		for(unsigned int i = 0; i < 4; i++)
 		{
 			if(!m_pSlaves[i])
@@ -418,7 +418,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 	this->setImage(m_pCameraFrames[0]);
 	for(unsigned int i = 1; i < 4; i++)
 	{
-		MT_CameraSlaveFrame* frame = new MT_CameraSlaveFrame(this);
+		MT_CameraSlaveFrame* frame = new MT_CameraSlaveFrame(NULL);
 		m_pSlaves[i] = frame;
 		frame->doMasterInitialization();
 		frame->Show();
@@ -427,12 +427,8 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 		m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
 		frame->setImage(m_pCameraFrames[i]);
 
+        /* don't want the user to be able to close these */
 		frame->EnableCloseButton(false);
-		/* prevents slave frames from being closed by themselves */
-		frame->Connect(wxID_ANY,
-			wxEVT_CLOSE_WINDOW,
-			wxCloseEventHandler(BelugaTrackerFrame::onChildClose),
-			this);
 	}
 
 	m_pSlaves[1]->SetTitle(wxT("View in Quadrant II"));
@@ -447,22 +443,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 	setSizeByClient(framewidth_pixels, frameheight_pixels);
 	setViewport(MT_Rectangle(0, framewidth_pixels+0.1, 0, frameheight_pixels+0.1));
 	lockCurrentViewportAsOriginal();
-
-	printf(" ++ %08lx\n", m_pSlaves[0]);
-	printf(" ++ %08lx\n", m_pSlaves[1]);
-	printf(" ++ %08lx\n", m_pSlaves[2]);
-	printf(" ++ %08lx\n", m_pSlaves[3]);
-
-	printf(" ++ %08lx\n", m_pCameraFrames[0]);
-	printf(" ++ %08lx\n", m_pCameraFrames[1]);
-	printf(" ++ %08lx\n", m_pCameraFrames[2]);
-	printf(" ++ %08lx\n", m_pCameraFrames[3]);
-
-}
-
-void BelugaTrackerFrame::onChildClose(wxCloseEvent& event)
-{
-	printf("Close event");
+    resetZoom();
 }
 
 /**********************************************************************
