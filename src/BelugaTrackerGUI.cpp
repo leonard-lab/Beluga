@@ -389,11 +389,6 @@ void BelugaTrackerFrame::doUserGLDrawing()
 void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 {
 
-    for(unsigned int i = 0; i < 4; i++)
-    {
-        printf("Map in: %d -> %d\n", i, m_uiaIndexMap[i]);
-    }
-
     doPause();
     
     std::vector<std::string> camList = m_pCapture->listOfAvailableCameras(4);
@@ -405,17 +400,9 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 
     int r = dlg->ShowModal();
 
-    for(unsigned int i = 0; i < 4; i++)
-    {
-        printf("Map out: %d -> %d\n", i, m_uiaIndexMap[i]);
-    }
-
 	// TODO this will break if called more than once
 	m_bCamerasReady = true;
 
-	m_pSlaves[0] = this;
-	m_pCameraFrames[0] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[0]);
-	this->setImage(m_pCameraFrames[0]);
 	for(unsigned int i = 1; i < 4; i++)
 	{
 		MT_CameraSlaveFrame* frame = new MT_CameraSlaveFrame(NULL);
@@ -438,12 +425,22 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 	registerDialogForXML(m_pSlaves[2]);
 	registerDialogForXML(m_pSlaves[3]);
 
+	m_pSlaves[0] = this;
+	m_pCameraFrames[0] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[0]);
+
+    m_pCurrentFrame = m_pCameraFrames[0];
+	setImage(m_pCurrentFrame);
 	int framewidth_pixels = m_pCapture->getFrameWidth(m_uiaIndexMap[0]);
 	int frameheight_pixels = m_pCapture->getFrameHeight(m_uiaIndexMap[0]);
 	setSizeByClient(framewidth_pixels, frameheight_pixels);
-	setViewport(MT_Rectangle(0, framewidth_pixels+0.1, 0, frameheight_pixels+0.1));
+    setViewport(MT_BlankRectangle, true);
 	lockCurrentViewportAsOriginal();
-    resetZoom();
+
+    setTimer(10);
+    m_pTrackerControlFrame->enableButtons();
+
+    onNewCapture();
+
 }
 
 /**********************************************************************
