@@ -111,8 +111,41 @@ void BelugaTrackerFrame::initUserData()
         botnames.push_back(RobotNames[i]);
     }
     m_Robots.SetRobotNames(botnames);
+
+    m_pSetupInfo = new MT_DataGroup("Camera Setup Info");
+    m_pSetupInfo->AddString("Quadrant I Calibration",
+                            &m_sQuad1CalibrationPath);
+    m_pSetupInfo->AddString("Quadrant I Camera",
+                            &m_sQuad1Camera);
+    m_pSetupInfo->AddString("Quadrant II Calibration",
+                            &m_sQuad2CalibrationPath);
+    m_pSetupInfo->AddString("Quadrant II Camera",
+                            &m_sQuad2Camera);
+    m_pSetupInfo->AddString("Quadrant III Calibration",
+                            &m_sQuad3CalibrationPath);
+    m_pSetupInfo->AddString("Quadrant III Camera",
+                            &m_sQuad3Camera);
+    m_pSetupInfo->AddString("Quadrant IV Calibration",
+                            &m_sQuad4CalibrationPath);
+    m_pSetupInfo->AddString("Quadrant IV Camera",
+                            &m_sQuad4Camera);
+                            
     
     setTimer(100);
+}
+
+void BelugaTrackerFrame::writeUserXML()
+{
+    MT_RobotFrameBase::writeUserXML();
+
+    WriteDataGroupToXML(&m_XMLSettingsFile, m_pSetupInfo);
+}
+
+void BelugaTrackerFrame::readUserXML()
+{
+    MT_RobotFrameBase::readUserXML();
+
+    ReadDataGroupFromXML(m_XMLSettingsFile, m_pSetupInfo);
 }
 
 void BelugaTrackerFrame::makeFileMenu(wxMenu* file_menu)
@@ -392,13 +425,29 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
     doPause();
     
     std::vector<std::string> camList = m_pCapture->listOfAvailableCameras(4);
+
+    std::vector<std::string*> calibList;
+    calibList.resize(4);
+    calibList[0] = &m_sQuad1CalibrationPath;
+    calibList[1] = &m_sQuad2CalibrationPath;
+    calibList[2] = &m_sQuad3CalibrationPath;
+    calibList[3] = &m_sQuad4CalibrationPath;    
     
-    Beluga_VideoSetupDialog* dlg = new Beluga_VideoSetupDialog(m_pCapture, camList, m_uiaIndexMap, this);
+    Beluga_VideoSetupDialog* dlg = new Beluga_VideoSetupDialog(m_pCapture,
+                                                               camList,
+                                                               calibList,
+                                                               m_uiaIndexMap,
+                                                               this);
 	registerDialogForXML(dlg);
     dlg->Show();
     dlg->UpdateView();
 
     int r = dlg->ShowModal();
+
+    m_sQuad1Camera = camList[m_uiaIndexMap[0]];
+    m_sQuad2Camera = camList[m_uiaIndexMap[1]];
+    m_sQuad3Camera = camList[m_uiaIndexMap[2]];
+    m_sQuad4Camera = camList[m_uiaIndexMap[3]];
 
 	// TODO this will break if called more than once
 	m_bCamerasReady = true;

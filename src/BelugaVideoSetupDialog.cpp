@@ -8,6 +8,7 @@
 #include "BelugaVideoSetupDialog.h"
 
 #include <wx/filepicker.h>
+#include <wx/filefn.h>
 #include <wx/image.h>
 
 class imageCanvas : public wxWindow
@@ -70,6 +71,7 @@ enum
 
 Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
                                                  std::vector<std::string> names,
+                                                 std::vector<std::string*> calibPaths,
                                                  unsigned int* indexMap,
                                                  wxWindow* parent,
                                                  wxWindowID id)
@@ -81,9 +83,13 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
                wxDEFAULT_DIALOG_STYLE),
       m_pCapture(capture),
       m_vsNames(names),
+      m_vspCalibPaths(calibPaths),
       m_bCamerasStarted(false),
       m_pIndexMap(indexMap)
 {
+
+    m_sEntryWD = wxGetCwd();
+    
     wxArrayString choices = wxArrayString();
     choices.empty();
     for(unsigned int i = 0; i < 4; i++)
@@ -104,7 +110,18 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
                 wxCommandEventHandler(Beluga_VideoSetupDialog::onCameraSelected));
 
         m_pFilePickerCtrls[i] = new wxFilePickerCtrl(this,
-                                                     ID_FILEPICKER_0+i);
+                                                     ID_FILEPICKER_0+i,
+                                                     wxEmptyString,
+                                                     wxT("Select a Calibration File"),
+                                                     wxT("*.*"),
+                                                     wxDefaultPosition,
+                                                     wxDefaultSize,
+                                                     wxFLP_DEFAULT_STYLE | wxFLP_CHANGE_DIR);
+        Connect(ID_FILEPICKER_0+i,
+                wxEVT_COMMAND_FILEPICKER_CHANGED,
+                wxFileDirPickerEventHandler(Beluga_VideoSetupDialog::validateCalibration));
+        
+        m_pFilePickerCtrls[i]->SetPath(MT_StringToWxString(*m_vspCalibPaths[i]));
 
 		m_pImageCanvases[i] = new imageCanvas(this,
 			ID_PANEL_0+i,
@@ -183,8 +200,20 @@ void Beluga_VideoSetupDialog::onCameraSelected(wxCommandEvent& event)
     SwapCameras(quad_of_selecting, quad_of_selected);
 }
 
+void Beluga_VideoSetupDialog::validateCalibration(wxFileDirPickerEvent& event)
+{
+
+}
+
 void Beluga_VideoSetupDialog::onDoneClicked(wxCommandEvent& event)
 {
+    for(unsigned int i = 0; i < 4; i++)
+    {
+        *m_vspCalibPaths[i] = std::string(m_pFilePickerCtrls[i]->GetPath().mb_str());
+    }
+
+    wxSetWorkingDirectory(m_sEntryWD);
+    
     EndModal(wxID_OK);
 }
 

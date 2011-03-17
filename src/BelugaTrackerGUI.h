@@ -43,6 +43,16 @@ protected:
 	MT_FrameBase* m_pSlaves[4];
 	IplImage* m_pCameraFrames[4];
 
+    MT_DataGroup* m_pSetupInfo;
+    std::string m_sQuad1CalibrationPath;
+    std::string m_sQuad1Camera;
+    std::string m_sQuad2CalibrationPath;
+	std::string m_sQuad2Camera;
+    std::string m_sQuad3CalibrationPath;
+	std::string m_sQuad3Camera;
+    std::string m_sQuad4CalibrationPath;
+	std::string m_sQuad4Camera;
+
 public:
     BelugaTrackerFrame(wxFrame* parent,
                          wxWindowID id = wxID_ANY,
@@ -63,6 +73,9 @@ public:
 	void doUserStep();
 	void doUserControl();
 	void doUserGLDrawing();
+
+    void readUserXML();
+    void writeUserXML();
 
     MT_RobotBase* getNewRobot(const char* config, const char* name);
 
