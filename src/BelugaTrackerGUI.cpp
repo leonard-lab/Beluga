@@ -129,6 +129,14 @@ void BelugaTrackerFrame::initUserData()
                             &m_sQuad4CalibrationPath);
     m_pSetupInfo->AddString("Quadrant IV Camera",
                             &m_sQuad4Camera);
+    m_pSetupInfo->AddString("Quadrant I Mask",
+                            &m_sQuad1MaskPath);
+    m_pSetupInfo->AddString("Quadrant II Mask",
+                            &m_sQuad2MaskPath);
+    m_pSetupInfo->AddString("Quadrant III Mask",
+                            &m_sQuad3MaskPath);
+    m_pSetupInfo->AddString("Quadrant IV Mask",
+                            &m_sQuad4MaskPath);
                             
     
     setTimer(100);
@@ -431,11 +439,19 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
     calibList[0] = &m_sQuad1CalibrationPath;
     calibList[1] = &m_sQuad2CalibrationPath;
     calibList[2] = &m_sQuad3CalibrationPath;
-    calibList[3] = &m_sQuad4CalibrationPath;    
+    calibList[3] = &m_sQuad4CalibrationPath;
+
+    std::vector<std::string*> maskList;
+    maskList.resize(4);
+    maskList[0] = &m_sQuad1MaskPath;
+	maskList[1] = &m_sQuad2MaskPath;
+	maskList[2] = &m_sQuad3MaskPath;
+	maskList[3] = &m_sQuad4MaskPath;
     
     Beluga_VideoSetupDialog* dlg = new Beluga_VideoSetupDialog(m_pCapture,
                                                                camList,
                                                                calibList,
+                                                               maskList,
                                                                m_uiaIndexMap,
                                                                this);
 	registerDialogForXML(dlg);

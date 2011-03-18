@@ -53,6 +53,11 @@ protected:
     std::string m_sQuad4CalibrationPath;
 	std::string m_sQuad4Camera;
 
+    std::string m_sQuad1MaskPath;
+    std::string m_sQuad2MaskPath;
+    std::string m_sQuad3MaskPath;
+    std::string m_sQuad4MaskPath;    
+
 public:
     BelugaTrackerFrame(wxFrame* parent,
                          wxWindowID id = wxID_ANY,

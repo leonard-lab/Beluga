@@ -11,6 +11,8 @@
 #include <wx/filefn.h>
 #include <wx/image.h>
 
+#include "CalibrationDataFile.h"
+
 class imageCanvas : public wxWindow
 {
 protected:
@@ -59,10 +61,14 @@ enum
     ID_LISTBOX_1,
     ID_LISTBOX_2,
     ID_LISTBOX_3,
-    ID_FILEPICKER_0,
-    ID_FILEPICKER_1,
-    ID_FILEPICKER_2,
-    ID_FILEPICKER_3,    
+    ID_CALPICKER_0,
+    ID_CALPICKER_1,
+    ID_CALPICKER_2,
+    ID_CALPICKER_3,
+    ID_MASKPICKER_0,
+	ID_MASKPICKER_1,
+	ID_MASKPICKER_2,
+	ID_MASKPICKER_3,
 	ID_PANEL_0,
 	ID_PANEL_1,
 	ID_PANEL_2,
@@ -72,6 +78,7 @@ enum
 Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
                                                  std::vector<std::string> names,
                                                  std::vector<std::string*> calibPaths,
+                                                 std::vector<std::string*> maskPaths,
                                                  unsigned int* indexMap,
                                                  wxWindow* parent,
                                                  wxWindowID id)
@@ -84,6 +91,7 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
       m_pCapture(capture),
       m_vsNames(names),
       m_vspCalibPaths(calibPaths),
+      m_vspMaskPaths(maskPaths),
       m_bCamerasStarted(false),
       m_pIndexMap(indexMap)
 {
@@ -109,20 +117,35 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
                 wxEVT_COMMAND_CHOICE_SELECTED,
                 wxCommandEventHandler(Beluga_VideoSetupDialog::onCameraSelected));
 
-        m_pFilePickerCtrls[i] = new wxFilePickerCtrl(this,
-                                                     ID_FILEPICKER_0+i,
+        m_pCalibrationPickerCtrls[i] = new wxFilePickerCtrl(this,
+                                                     ID_CALPICKER_0+i,
                                                      wxEmptyString,
                                                      wxT("Select a Calibration File"),
                                                      wxT("*.*"),
                                                      wxDefaultPosition,
                                                      wxDefaultSize,
                                                      wxFLP_DEFAULT_STYLE | wxFLP_CHANGE_DIR);
-        Connect(ID_FILEPICKER_0+i,
+        Connect(ID_CALPICKER_0+i,
                 wxEVT_COMMAND_FILEPICKER_CHANGED,
                 wxFileDirPickerEventHandler(Beluga_VideoSetupDialog::validateCalibration));
         
-        m_pFilePickerCtrls[i]->SetPath(MT_StringToWxString(*m_vspCalibPaths[i]));
+        m_pCalibrationPickerCtrls[i]->SetPath(MT_StringToWxString(*m_vspCalibPaths[i]));
 
+        m_pMaskPickerCtrls[i] = new wxFilePickerCtrl(this,
+                                                     ID_MASKPICKER_0+i,
+                                                     wxEmptyString,
+                                                     wxT("Select a Mask File"),
+                                                     MT_FILTER_IMAGE_FILES,
+                                                     wxDefaultPosition,
+                                                     wxDefaultSize,
+                                                     wxFLP_DEFAULT_STYLE | wxFLP_CHANGE_DIR);
+        Connect(ID_MASKPICKER_0+i,
+                wxEVT_COMMAND_FILEPICKER_CHANGED,
+                wxFileDirPickerEventHandler(Beluga_VideoSetupDialog::validateMask));
+        
+        m_pMaskPickerCtrls[i]->SetPath(MT_StringToWxString(*m_vspMaskPaths[i]));
+        
+        
 		m_pImageCanvases[i] = new imageCanvas(this,
 			ID_PANEL_0+i,
 			wxDefaultPosition,
@@ -140,23 +163,32 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
         
     vbox00->Add(new wxStaticText(this, -1, wxT("Camera II")));
     vbox00->Add(m_pChoices[1]);
-    vbox00->Add(new wxStaticText(this, -1, wxT("Parameter File")));
-    vbox00->Add(m_pFilePickerCtrls[1]);
+    vbox00->Add(new wxStaticText(this, -1, wxT("Parameter File")), 0, wxTOP, 10);
+    vbox00->Add(m_pCalibrationPickerCtrls[1]);
+    vbox00->Add(new wxStaticText(this, -1, wxT("Mask Image")), 0, wxTOP, 10);
+    vbox00->Add(m_pMaskPickerCtrls[1]);
     
     vbox01->Add(new wxStaticText(this, -1, wxT("Camera I")));
     vbox01->Add(m_pChoices[0]);
-    vbox01->Add(new wxStaticText(this, -1, wxT("Parameter File")));
-    vbox01->Add(m_pFilePickerCtrls[0]);
+    vbox01->Add(new wxStaticText(this, -1, wxT("Parameter File")), 0, wxTOP, 10);
+    vbox01->Add(m_pCalibrationPickerCtrls[0]);
+    vbox01->Add(new wxStaticText(this, -1, wxT("Mask Image")), 0, wxTOP, 10);
+    vbox01->Add(m_pMaskPickerCtrls[0]);
     
     vbox10->Add(new wxStaticText(this, -1, wxT("Camera III")));
     vbox10->Add(m_pChoices[2]);
-    vbox10->Add(new wxStaticText(this, -1, wxT("Parameter File")));
-    vbox10->Add(m_pFilePickerCtrls[2]);
+    vbox10->Add(new wxStaticText(this, -1, wxT("Parameter File")), 0, wxTOP, 10);
+    vbox10->Add(m_pCalibrationPickerCtrls[2]);
+    vbox10->Add(new wxStaticText(this, -1, wxT("Mask Image")), 0, wxTOP, 10);
+	vbox10->Add(m_pMaskPickerCtrls[2]);
     
     vbox11->Add(new wxStaticText(this, -1, wxT("Camera IV")));
     vbox11->Add(m_pChoices[3]);
-    vbox11->Add(new wxStaticText(this, -1, wxT("Parameter File")));
-    vbox11->Add(m_pFilePickerCtrls[3]);
+    vbox11->Add(new wxStaticText(this, -1, wxT("Parameter File")), 0, wxTOP, 10);
+    vbox11->Add(m_pCalibrationPickerCtrls[3]);
+    vbox11->Add(new wxStaticText(this, -1, wxT("Mask Image")), 0, wxTOP, 10);
+	vbox11->Add(m_pMaskPickerCtrls[3]);
+    
 
     vbox0->Add(grid0, 0, wxALL, 10);
 
@@ -202,14 +234,38 @@ void Beluga_VideoSetupDialog::onCameraSelected(wxCommandEvent& event)
 
 void Beluga_VideoSetupDialog::validateCalibration(wxFileDirPickerEvent& event)
 {
+    wxString path = event.GetPath();
+    int i = event.GetId() - ID_CALPICKER_0;
+    Beluga_CalibrationDataFile calFile((const char*) path.mb_str());
+    if(!calFile.didLoadOK())
+    {
+        MT_ShowErrorDialog(this,
+                           wxT("Could not validate calibration file ")
+                           + path);
+        event.SetPath(MT_StringToWxString(*m_vspCalibPaths[i]));
+    }
+}
 
+void Beluga_VideoSetupDialog::validateMask(wxFileDirPickerEvent& event)
+{
+    wxString path = event.GetPath();
+    int i = event.GetId() - ID_MASKPICKER_0;
+
+    IplImage* m = cvLoadImage((const char*) path.mb_str(), CV_LOAD_IMAGE_UNCHANGED);
+    if(!m || m->nChannels != 1 || m->width != 640 || m->height != 480)
+    {
+        MT_ShowErrorDialog(this,
+                           wxT("Mask image must be a 640x480 grayscale image"));
+        event.SetPath(MT_StringToWxString(*m_vspMaskPaths[i]));
+    }
 }
 
 void Beluga_VideoSetupDialog::onDoneClicked(wxCommandEvent& event)
 {
     for(unsigned int i = 0; i < 4; i++)
     {
-        *m_vspCalibPaths[i] = std::string(m_pFilePickerCtrls[i]->GetPath().mb_str());
+        *m_vspCalibPaths[i] = std::string(m_pCalibrationPickerCtrls[i]->GetPath().mb_str());
+        *m_vspMaskPaths[i] = std::string(m_pMaskPickerCtrls[i]->GetPath().mb_str());
     }
 
     wxSetWorkingDirectory(m_sEntryWD);
