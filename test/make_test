@@ -1,0 +1,1 @@
+g++ test_CalibrationDataFile.cpp ../src/CalibrationDataFile.cpp -I ../src -I../../MADTraC/build/include ../../MADTraC/build/lib/libMT_Core.a -o test_Calibration

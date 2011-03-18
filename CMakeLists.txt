@@ -40,7 +40,9 @@ set(APP_SRC
   src/BelugaRobot.cpp
   src/BelugaRobot.h
   src/BelugaVideoSetupDialog.h
-  src/BelugaVideoSetupDialog.cpp)
+  src/BelugaVideoSetupDialog.cpp
+  src/CalibrationDataFile.h
+  src/CalibrationDataFile.cpp)
 
 # adds src to the header search path
 include_directories(src)
