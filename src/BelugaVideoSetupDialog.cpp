@@ -290,7 +290,13 @@ void Beluga_VideoSetupDialog::SwapCameras(int quad1, int quad2)
 void Beluga_VideoSetupDialog::StartCameras()
 {
     m_bCamerasStarted = true;
-    for(unsigned int i = 0; i < 4; i++)
+    int i = MT_MAX(m_pCapture->getNumInterfacesOpen()-1, 0);
+    if(i >= 3)
+    {
+        return;
+    }
+    
+    for(; i < 4; i++)
     {
         m_pCapture->initCaptureFromCameraNumber(i);
     }

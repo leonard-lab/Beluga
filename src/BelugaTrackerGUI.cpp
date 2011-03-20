@@ -465,17 +465,30 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
     m_sQuad3Camera = camList[m_uiaIndexMap[2]];
     m_sQuad4Camera = camList[m_uiaIndexMap[3]];
 
-	// TODO this will break if called more than once
 	m_bCamerasReady = true;
+
+    bool firstTime = false;
+    if(!m_pSlaves[0])
+    {
+        firstTime = true;
+    }
 
 	for(unsigned int i = 1; i < 4; i++)
 	{
-		MT_CameraSlaveFrame* frame = new MT_CameraSlaveFrame(NULL);
-		m_pSlaves[i] = frame;
-		frame->doMasterInitialization();
-		frame->Show();
-		frame->Raise();
-
+        MT_CameraSlaveFrame* frame;
+        if(!m_pSlaves[i])
+        {
+            frame = new MT_CameraSlaveFrame(NULL);
+            m_pSlaves[i] = frame;
+            frame->doMasterInitialization();
+            frame->Show();
+            frame->Raise();
+        }
+        else
+        {
+            frame = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
+        }
+        
 		m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
 		frame->setImage(m_pCameraFrames[i]);
 
@@ -483,14 +496,18 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 		frame->EnableCloseButton(false);
 	}
 
-	m_pSlaves[1]->SetTitle(wxT("View in Quadrant II"));
-	m_pSlaves[2]->SetTitle(wxT("View in Quadrant III"));
-	m_pSlaves[3]->SetTitle(wxT("View in Quadrant IV"));
-	registerDialogForXML(m_pSlaves[1]);
-	registerDialogForXML(m_pSlaves[2]);
-	registerDialogForXML(m_pSlaves[3]);
+    if(firstTime)
+    {
+        m_pSlaves[1]->SetTitle(wxT("View in Quadrant II"));
+        m_pSlaves[2]->SetTitle(wxT("View in Quadrant III"));
+        m_pSlaves[3]->SetTitle(wxT("View in Quadrant IV"));
+        registerDialogForXML(m_pSlaves[1]);
+        registerDialogForXML(m_pSlaves[2]);
+        registerDialogForXML(m_pSlaves[3]);
 
-	m_pSlaves[0] = this;
+        m_pSlaves[0] = this;
+    }
+    
 	m_pCameraFrames[0] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[0]);
 
     m_pCurrentFrame = m_pCameraFrames[0];
@@ -501,10 +518,13 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
     setViewport(MT_BlankRectangle, true);
 	lockCurrentViewportAsOriginal();
 
-    setTimer(10);
-    m_pTrackerControlFrame->enableButtons();
-
-    onNewCapture();
+    if(firstTime)
+    {
+        setTimer(10);
+        m_pTrackerControlFrame->enableButtons();
+    
+        onNewCapture();
+    }
 
 }
 
