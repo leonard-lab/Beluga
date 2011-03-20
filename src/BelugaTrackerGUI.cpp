@@ -166,7 +166,7 @@ void BelugaTrackerFrame::makeFileMenu(wxMenu* file_menu)
 
     file_menu->AppendSeparator();
 
-    MT_RobotFrameBase::makeFileMenu(file_menu);
+    MT_FrameBase::makeFileMenu(file_menu);
 }
 
 void BelugaTrackerFrame::handleCommandLineArguments(int argc, wxChar** argv)
