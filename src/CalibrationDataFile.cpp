@@ -22,7 +22,7 @@ static bool readAndValidateLine(FILE* f, int i, double* data)
         return false;
     }
 
-    for(unsigned int j = 0; j < row_lengths_expected[i]; j++)
+    for(int j = 0; j < row_lengths_expected[i]; j++)
     {
         data[j] = row_data[j];
     }

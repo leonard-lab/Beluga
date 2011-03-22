@@ -211,9 +211,9 @@ void rollHistories(std::vector<double>* X,
 bool CvMatIsOk(const CvMat* M, double max_val = 1e10)
 {
     double v;
-    for(unsigned int i = 0; i < M->rows; i++)
+    for(int i = 0; i < M->rows; i++)
     {
-        for(unsigned int j = 0; j < M->cols; j++)
+        for(int j = 0; j < M->cols; j++)
         {
             v = cvGetReal2D(M, i, j);
             if(MT_isnan(v) || fabs(v) > max_val)
@@ -304,7 +304,7 @@ BelugaTracker::~BelugaTracker()
 	}
 
     /* MT_UKFFree frees up memory used by the UKF */
-    for(unsigned int i = 0; i < m_iNObj; i++)
+    for(int i = 0; i < m_iNObj; i++)
     {
         MT_UKFFree(&m_vpUKF[i]);
     }
@@ -363,7 +363,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     /* there is an X and Y history for each object.  They need to be
        initially zero in length so that we can fill them up with real
        data as it becomes available. */
-    for(unsigned int i = 0; i < m_iNObj; i++)
+    for(int i = 0; i < m_iNObj; i++)
     {
         m_vdHistories_X[i].resize(0);
         m_vdHistories_Y[i].resize(0);        
@@ -528,7 +528,7 @@ void BelugaTracker::createFrames()
 
     /* Create the UKF objects */
     m_vpUKF.resize(m_iNObj);
-    for(unsigned int i = 0; i < m_iNObj; i++)
+    for(int i = 0; i < m_iNObj; i++)
     {
         m_vpUKF[i] = MT_UKFInit(4, 3, 0.1); /* 4 states, 3
                                         * measurements, 0.1 is a parameter */
@@ -644,7 +644,7 @@ void BelugaTracker::doTracking(IplImage* frame)
            and makes sure that it's internals are properly initialized -
            it's set up to handle the fact that the sizes of these
            matrices could have changed. */
-        for(unsigned int i = 0; i < m_iNObj; i++)
+        for(int i = 0; i < m_iNObj; i++)
         {
             MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
         }
@@ -723,9 +723,9 @@ void BelugaTracker::doTracking(IplImage* frame)
     if(m_iFrameCounter > 1 && m_iNObj > 1)  /* if there's only one object, */
     {                                       /* then this is unnecessary    */
         double dx, dy;
-        for(unsigned int i = 0; i < m_iNObj; i++)
+        for(int i = 0; i < m_iNObj; i++)
         {
-            for(unsigned int j = 0; j < m_iNObj; j++)
+            for(int j = 0; j < m_iNObj; j++)
             {
                 dx = (m_vdBlobs_X[j] - blobs[i].m_dXCentre);
                 dy = (m_vdBlobs_Y[j] - blobs[i].m_dYCentre);
@@ -739,7 +739,7 @@ void BelugaTracker::doTracking(IplImage* frame)
         /* on the first frame, there's no history to compare to, so
            we'll just keep the order given by the blobber, i.e. i = j. */
         m_viMatchAssignments.resize(m_iNObj);
-        for(unsigned int i = 0; i < m_iNObj; i++)
+        for(int i = 0; i < m_iNObj; i++)
         {
             m_viMatchAssignments[i] = i;
         }
@@ -755,7 +755,7 @@ void BelugaTracker::doTracking(IplImage* frame)
      */
     unsigned int j;
 	MT_BoundingBox object_limits;
-    for(unsigned int i = 0; i< m_iNObj; i++)
+    for(int i = 0; i< m_iNObj; i++)
     {
         /* The index of the optimal measurement as determined by the
            matching algorithm. */
@@ -985,7 +985,7 @@ std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
 	std::vector<double> r;
 	r.resize(0);
 
-	if(i >= m_iNObj || i >= m_vdTracked_X.size())
+	if((int) i >= m_iNObj || i >= m_vdTracked_X.size())
 	{
 		fprintf(stderr, "BelugaTracker Error:  State request out of range; returning empty state.\n");
 		return r;
