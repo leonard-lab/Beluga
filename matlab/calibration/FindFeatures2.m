@@ -13,7 +13,7 @@ if ASK_FOR_FILE,
         error('No valid image file selected.')
     end
 else
-    image_file = 'Q4.bmp';
+    image_file = 'Q3.bmp';
 end
 
 [~, image_file_basename, ~] = fileparts(image_file);
@@ -545,8 +545,8 @@ tx = TANK_CENTER(1);  ty = TANK_CENTER(2);
 r1_I = TANK_CENTER_RADIUS; 
 r2_I = BOTTOM_RADIUS;
 
-r1_W = 0.25;   % radius of center piece at bottom (this is a guess!)
-r2_W = 3.048;  % radius of tank (est, based on 20')
+r1_W = 0.24;   % radius of center piece at bottom (this is a guess!)
+r2_W = 6.547/2;  % radius of tank (est, based on pro-e model)
 
 % radial points at the inner and outer radius of the seams
 for sx = 1 : length(SEAM_ANGLES),
@@ -566,8 +566,8 @@ for sx = 1 : length(SEAM_ANGLES),
     
 end
 
-r3_W = r2_W - .05;  % radius to inside of corners at the top (guess)
-z3_W = 2.438;       % height to top of tank edge from bottom of inside of tank (est, based on 8')
+r3_W = r2_W - .1;  % radius to inside of corners at the top (guess)
+z3_W = 2.464;       % height to top of tank edge from bottom of inside of tank (est, based on pro-E model)
 
 % corners along the top inner edge
 [nm, ~] = size(M);
