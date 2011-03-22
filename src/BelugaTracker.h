@@ -18,29 +18,30 @@ class BelugaTracker : public MT_TrackerBase
 {
 private:
     /* frames */
-    IplImage* m_pGSFrame;      /* Grayscale version of current frame */
-    IplImage* m_pDiffFrame;    /* Background subtracted frame */
-    IplImage* m_pThreshFrame;  /* Thresholded frame */
-	IplImage* m_pHSVFrame;
-	IplImage* m_pHFrame;
-	IplImage* m_pSFrame;
-	IplImage* m_pVFrame;
-	void HSVSplit(IplImage* frame);
+	IplImage* m_pGSFrames[4];
+	IplImage* m_pHSVFrames[4];
+	IplImage* m_pHFrames[4];
+	IplImage* m_pSFrames[4];
+	IplImage* m_pVFrames[4];
+	IplImage* m_pThreshFrames[4];
+
+	void HSVSplit(IplImage* frame, int i);
 
     /* blobber parameters */
     unsigned int m_iBlobValThresh;
 	unsigned int m_iBlobAreaThreshLow;
 	unsigned int m_iBlobAreaThreshHigh;
     
-    CvRect m_SearchArea;
+    CvRect m_SearchArea[4];
 	unsigned int m_iSearchAreaPadding;
 
     /* only used to add to XDF */
     int m_iStartFrame;
     int m_iStopFrame;
 
-    MT_GSThresholder* m_pGSThresholder;
-    GYBlobber* m_pGYBlobber;
+    MT_GSThresholder* m_pGSThresholder[4];
+    GYBlobber* m_pGYBlobber[4];
+
     std::vector<MT_UKF_struct*> m_vpUKF;
     CvMat* m_pQ;
     CvMat* m_pR;
@@ -109,6 +110,7 @@ public:
 
     /* Main tracking functions */
     void doTracking(IplImage* frame);
+	void doTracking(IplImage* frames[4]);
 
     void doGLDrawing(int flags);
 

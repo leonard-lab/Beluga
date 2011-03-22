@@ -101,7 +101,8 @@ static void fish_measurement(const CvMat* x_k,
  */
 static void constrain_state(CvMat* x_k,
                             CvMat* X_p,
-                            IplImage* frame)
+                            double xmax,
+							double ymax)
 {
     double x = cvGetReal2D(x_k, 0, 0);
     double y = cvGetReal2D(x_k, 1, 0);
@@ -118,8 +119,8 @@ static void constrain_state(CvMat* x_k,
      *    a, if x < a,
      *    b, if x > b
      */
-    x = MT_CLAMP(x, 0, frame->width);
-    y = MT_CLAMP(y, 0, frame->height);
+    x = MT_CLAMP(x, 0, xmax);
+    y = MT_CLAMP(y, 0, ymax);
     spd = MT_CLAMP(spd, 0, 100);
 
     /* MT_isnan(x) returns true if x is NaN */
@@ -241,8 +242,8 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
 	  m_iSearchAreaPadding(DEFAULT_SEARCH_AREA_PADDING),
       m_iStartFrame(-1),
       m_iStopFrame(-1),
-      m_pGSThresholder(            NULL                        ),
-      m_pGYBlobber(NULL),
+//      m_pGSThresholder(            NULL                        ),
+ //     m_pGYBlobber(NULL),
       m_vpUKF(n_obj, NULL),
       m_dSigmaPosition(DEFAULT_SIGMA_POSITION),
       m_dSigmaHeading(DEFAULT_SIGMA_HEADING),
@@ -270,15 +271,22 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
  * de-allocate any memory that was allocated */
 BelugaTracker::~BelugaTracker()
 {
-    if(m_pGSThresholder)
+	/*
+    if(m_pGSThresholder[0])
     {
-        delete m_pGSThresholder;
+		for(int i = 0; i < 4; i++)
+		{
+			delete m_pGSThresholder[i];
+		}
     }
 
-    if(m_pGYBlobber)
+    if(m_pGYBlobber[0])
     {
-        delete m_pGYBlobber;
-    }
+		for(int i = 0; i < 4; i++)
+		{
+			delete m_pGYBlobber[i];
+		}
+    }*/
 
     /* cvReleaseMat deallocates matrices given to it */
     cvReleaseMat(&m_px0);
@@ -286,21 +294,17 @@ BelugaTracker::~BelugaTracker()
     cvReleaseMat(&m_pQ);
     cvReleaseMat(&m_pR);
 
-	if(m_pHSVFrame)
+	if(m_pGSFrames[0])
 	{
-		cvReleaseImage(&m_pHSVFrame);
-	}
-	if(m_pHFrame)
-	{
-		cvReleaseImage(&m_pHFrame);
-	}
-	if(m_pSFrame)
-	{
-		cvReleaseImage(&m_pSFrame);
-	}
-	if(m_pVFrame)
-	{
-		cvReleaseImage(&m_pVFrame);
+		for(int i = 0; i < 4; i++)
+		{
+			cvReleaseImage(&m_pGSFrames[i]);
+			cvReleaseImage(&m_pHSVFrames[i]);
+			cvReleaseImage(&m_pHFrames[i]);
+			cvReleaseImage(&m_pSFrames[i]);
+			cvReleaseImage(&m_pVFrames[i]);
+			cvReleaseImage(&m_pThreshFrames[i]);
+		}
 	}
 
     /* MT_UKFFree frees up memory used by the UKF */
@@ -315,7 +319,10 @@ BelugaTracker::~BelugaTracker()
 void BelugaTracker::doInit(IplImage* ProtoFrame)
 {
 
-	m_SearchArea = cvRect(0,0,0,0);
+	for(int i = 0; i < 4; i++)
+	{
+		m_SearchArea[i] = cvRect(0,0,0,0);
+	}
 
     /* Not using the built-in tracked objects functions - setting
      * this pointer to N ULL will ensure that the appropriate code is
@@ -324,14 +331,16 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
     /* It's always a good idea to initialize pointers to NULL so that
        other pieces of code can use e.g. if(p) to check for allocation */
-    m_pGSFrame = NULL;
-    m_pDiffFrame = NULL;
-    m_pThreshFrame = NULL;
+	for(int i = 0; i < 4; i++)
+	{
+		m_pGSFrames[i] = NULL;
+		m_pThreshFrames[i] = NULL;
 
-	m_pHSVFrame = NULL;
-	m_pHFrame = NULL;
-	m_pSFrame = NULL;
-	m_pVFrame = NULL;
+		m_pHSVFrames[i] = NULL;
+		m_pHFrames[i] = NULL;
+		m_pSFrames[i] = NULL;
+		m_pVFrames[i] = NULL;
+	}
 
     /* grab the frame height */
     m_iFrameHeight = ProtoFrame->height;
@@ -372,13 +381,13 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
     /* sets up the frames that are available in the "view" menu */
     m_pTrackerFrameGroup = new MT_TrackerFrameGroup();
-    m_pTrackerFrameGroup->pushFrame(&m_pDiffFrame,      "Diff Frame");
-    m_pTrackerFrameGroup->pushFrame(&m_pThreshFrame,    "Threshold Frame");
-	m_pTrackerFrameGroup->pushFrame(&m_pHSVFrame, "HSV");
-	m_pTrackerFrameGroup->pushFrame(&m_pHFrame, "H");
-	m_pTrackerFrameGroup->pushFrame(&m_pSFrame, "S");
-	m_pTrackerFrameGroup->pushFrame(&m_pVFrame, "V");
-	m_pTrackerFrameGroup->pushFrame(&m_pGSFrame, "GS");
+    //m_pTrackerFrameGroup->pushFrame(&m_pDiffFrames[0],      "Diff Frame");
+    m_pTrackerFrameGroup->pushFrame(&m_pThreshFrames[0],    "Threshold Frame");
+	m_pTrackerFrameGroup->pushFrame(&m_pHSVFrames[0], "HSV");
+	m_pTrackerFrameGroup->pushFrame(&m_pHFrames[0], "H");
+	m_pTrackerFrameGroup->pushFrame(&m_pSFrames[0], "S");
+	m_pTrackerFrameGroup->pushFrame(&m_pVFrames[0], "V");
+	m_pTrackerFrameGroup->pushFrame(&m_pGSFrames[0], "GS");
 
     /* Data group and Data report setup.
      *
@@ -470,14 +479,14 @@ void BelugaTracker::doTrain(IplImage* frame)
 
 	MT_TrackerBase::doTrain(frame);
 
-	HSVSplit(frame);
+	//HSVSplit(frame);
 
-	cvCopy(m_pVFrame, BG_frame);
+	//cvCopy(m_pVFrame, BG_frame);
 
-	if(m_pGSThresholder)
+	/*if(m_pGSThresholder)
 	{
 		delete m_pGSThresholder;
-	}
+	}*/
 
 	//m_pGSThresholder = new MT_GSThresholder(BG_frame);
     /* The thresholder manages these frames, but by grabbing pointers
@@ -495,26 +504,33 @@ void BelugaTracker::createFrames()
     /* this makes sure that the BG_frame is created */
     MT_TrackerBase::createFrames();
 
-	if(m_pHSVFrame)
+	if(m_pGSFrames[0])
 	{
-		cvReleaseImage(&m_pHSVFrame);
-		cvReleaseImage(&m_pHFrame);
-		cvReleaseImage(&m_pSFrame);
-		cvReleaseImage(&m_pVFrame);
+		for(int i = 0; i < 4; i++)
+		{
+			cvReleaseImage(&m_pGSFrames[i]);
+			cvReleaseImage(&m_pHSVFrames[i]);
+			cvReleaseImage(&m_pHFrames[i]);
+			cvReleaseImage(&m_pSFrames[i]);
+			cvReleaseImage(&m_pVFrames[i]);
+			cvReleaseImage(&m_pThreshFrames[i]);
+		}
 	}
-	m_pHSVFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 3);
-	m_pHFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
-	m_pSFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
-	m_pVFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 
-	m_pGSFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
-    m_pDiffFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
-    m_pThreshFrame = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+	for(int i = 0; i < 4; i++)
+	{
+		m_pGSFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+		m_pThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+		m_pHSVFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 3);
+		m_pHFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+		m_pSFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+		m_pVFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+	}
 
 	//m_pGSThresholder = NULL;
     /* Create the Thresholder and Blobber objects */
     //m_pGSThresholder = new MT_GSThresholder(BG_frame);
-    m_pGYBlobber = new GYBlobber(m_iNObj);
+    //m_pGYBlobber = new GYBlobber(m_iNObj);
     /* Initialize the Hungarian Matcher */
     m_HungarianMatcher.doInit(m_iNObj);
 
@@ -592,15 +608,24 @@ void BelugaTracker::writeData()
     m_XDF.writeData("Tracked Speed"    , m_vdTracked_Speed); 
 }
 
-void BelugaTracker::HSVSplit(IplImage* frame)
+void BelugaTracker::HSVSplit(IplImage* frame, int i)
 {
-	cvCvtColor(frame, m_pHSVFrame, CV_RGB2HSV);
-	cvSplit(m_pHSVFrame, m_pHFrame, m_pSFrame, m_pVFrame, NULL);
+	cvCvtColor(frame, m_pHSVFrames[i], CV_RGB2HSV);
+	cvSplit(m_pHSVFrames[i], 
+		m_pHFrames[i], 
+		m_pSFrames[i], 
+		m_pVFrames[i],
+		NULL);
 }
 
 /* Main tracking function - gets called by MT_TrackerFrameBase every
  * time step when the application is not paused. */
 void BelugaTracker::doTracking(IplImage* frame)
+{
+	std::cerr << "ERROR:  This function should never get called!  BelugaTracker::doTracking(IplImage* frame)\n";
+}
+
+void BelugaTracker::doTracking(IplImage* frames[4])
 {
     /* time-keeping, if necessary
      * NOTE this is not necessary for keeping track of frame rate */
@@ -650,6 +675,14 @@ void BelugaTracker::doTracking(IplImage* frame)
         }
     }
 
+	for(int i = 0; i < 4; i++)
+	{
+		HSVSplit(frames[i], i);
+	}
+
+	// below here will require rewriting 
+	return;
+
     /* Grayscale Thresholding
      *    - Takes as input the current frame, a threshold value, and
      *        optionally a mask image.
@@ -672,22 +705,22 @@ void BelugaTracker::doTracking(IplImage* frame)
      * end up using the sparse image - instead we use the full
      * threshold image, which is pointed to by m_pThreshFrame.
      */       
-	HSVSplit(frame);
+	//HSVSplit(frame);
     /*MT_SparseBinaryImage b = m_pGSThresholder->threshToBinary(m_pVFrame,
                                                               m_iBlobValThresh,
                                                               ROI_frame,
 															  MT_THRESH_DARKER); */
 
     /* make sure these pointers are updated */
-    m_pGSFrame = m_pVFrame; //m_pGSThresholder->getGSFrame();
-    m_pDiffFrame = m_pVFrame; //m_pGSThresholder->getDiffFrame();
+    //m_pGSFrame = m_pVFrame; //m_pGSThresholder->getGSFrame();
+    //m_pDiffFrame = m_pVFrame; //m_pGSThresholder->getDiffFrame();
     //pThreshFrame = m_pGSThresholder->getThreshFrame();
-	cvThreshold(m_pVFrame, m_pThreshFrame, m_iBlobValThresh, 255, CV_THRESH_BINARY_INV);
-	if(ROI_frame)
-	{
-		cvAnd(m_pThreshFrame, ROI_frame, m_pThreshFrame);
-	}
-	cvSmooth(m_pThreshFrame, m_pThreshFrame, CV_MEDIAN, 5);
+	//cvThreshold(m_pVFrame, m_pThreshFrame, m_iBlobValThresh, 255, CV_THRESH_BINARY_INV);
+	//if(ROI_frame)
+	//{
+	//	cvAnd(m_pThreshFrame, ROI_frame, m_pThreshFrame);
+	//}
+	//cvSmooth(m_pThreshFrame, m_pThreshFrame, CV_MEDIAN, 5);
 
     /* Blobbing with George Young's Mixture-of-Gaussians blobber
      *
@@ -697,10 +730,13 @@ void BelugaTracker::doTracking(IplImage* frame)
      * positions, orientations, areas, etc. 
      * 
      */
-	m_pGYBlobber->m_iBlob_area_thresh_low = m_iBlobAreaThreshLow;
+	/*m_pGYBlobber->m_iBlob_area_thresh_low = m_iBlobAreaThreshLow;
 	m_pGYBlobber->m_iBlob_area_thresh_high = m_iBlobAreaThreshHigh;
 	m_pGYBlobber->setSearchArea(m_SearchArea);
     std::vector<GYBlob> blobs = m_pGYBlobber->findBlobs(m_pThreshFrame);
+	*/
+
+	std::vector<GYBlob> blobs;
 
     /* Matching step.
      *
@@ -925,7 +961,7 @@ void BelugaTracker::doTracking(IplImage* frame)
 
             /* then constrain the state if necessary - see function
              * definition above */
-            constrain_state(m_vpUKF[i]->x, m_vpUKF[i]->x1, frame);            
+            constrain_state(m_vpUKF[i]->x, m_vpUKF[i]->x1, 640, 480);            
 
         }
         else  
@@ -970,7 +1006,7 @@ void BelugaTracker::doTracking(IplImage* frame)
 	double cy = 0.5*(object_limits.ymin + object_limits.ymax);
 	double w = object_limits.xmax - object_limits.xmin + m_iSearchAreaPadding;
 	double h = object_limits.ymax - object_limits.ymin + m_iSearchAreaPadding;
-	m_SearchArea = cvRect(MT_CLAMP(cx - 0.5*w, 0, m_iFrameWidth),
+	m_SearchArea[0] = cvRect(MT_CLAMP(cx - 0.5*w, 0, m_iFrameWidth),
 		                  MT_CLAMP(cy - 0.5*h, 0, m_iFrameHeight),
 						  MT_CLAMP(w, 0, m_iFrameWidth),
 						  MT_CLAMP(h, 0, m_iFrameHeight));
@@ -1056,7 +1092,7 @@ void BelugaTracker::doGLDrawing(int flags)
         }
     }
 
-	MT_DrawRectangle(m_SearchArea.x, m_iFrameHeight - m_SearchArea.y - m_SearchArea.height, m_SearchArea.width, m_SearchArea.height);
+	MT_DrawRectangle(m_SearchArea[0].x, m_iFrameHeight - m_SearchArea[0].y - m_SearchArea[0].height, m_SearchArea[0].width, m_SearchArea[0].height);
 
 }
 

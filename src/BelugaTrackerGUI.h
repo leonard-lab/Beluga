@@ -56,7 +56,10 @@ protected:
     std::string m_sQuad1MaskPath;
     std::string m_sQuad2MaskPath;
     std::string m_sQuad3MaskPath;
-    std::string m_sQuad4MaskPath;    
+    std::string m_sQuad4MaskPath;  
+
+	void acquireFrames();
+	void runTracker();
 
 public:
     BelugaTrackerFrame(wxFrame* parent,

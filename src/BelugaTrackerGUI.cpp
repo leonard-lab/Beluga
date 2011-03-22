@@ -190,7 +190,11 @@ MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* na
 
 void BelugaTrackerFrame::doUserStep()
 {
+	MT_RobotFrameBase::doUserStep();
+}
 
+void BelugaTrackerFrame::acquireFrames()
+{
 	if(m_bCamerasReady)
 	{
 		for(unsigned int i = 0; i < 4; i++)
@@ -200,11 +204,20 @@ void BelugaTrackerFrame::doUserStep()
 				continue;
 			}
 			m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
-			m_pSlaves[i]->setImage(m_pCameraFrames[i]);
+			if(i > 0)
+			{
+				m_pSlaves[i]->setImage(m_pCameraFrames[i]);
+			}
 		}
 	}
+}
 
-	MT_FrameBase::doUserStep();
+void BelugaTrackerFrame::runTracker()
+{
+	if(m_pCameraFrames[0])
+	{
+		m_pBelugaTracker->doTracking(m_pCameraFrames);
+	}
 }
 
 void BelugaTrackerFrame::doUserControl()
