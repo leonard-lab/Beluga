@@ -6,6 +6,8 @@
 
 #include <cv.h>
 
+/* this function just reads the points from an ascii file
+ * and stuffs them into OpenCV matrix objects */
 void readPoints(const char* filename,
                 CvMat** worldPoints,
                 CvMat** imagePoints,
@@ -58,6 +60,7 @@ void readPoints(const char* filename,
     
 }
 
+/* This function is just a pretty-printer for the results */
 void displayResults(CvMat* c, CvMat* k, CvMat* Rv, CvMat* R, CvMat* T)
 {
     if(c)
@@ -109,6 +112,7 @@ void displayResults(CvMat* c, CvMat* k, CvMat* Rv, CvMat* R, CvMat* T)
 
 int main(int argc, char** argv)
 {
+    
     if(argc < 2)
     {
         std::cout << "Usage:  " << argv[0] << " datafile\n";
@@ -119,16 +123,20 @@ int main(int argc, char** argv)
     CvMat* imagePoints;
     int numPoints = 0;
 
+    /* load the points from an ascii file, specified on the command line */
     readPoints(argv[1], &worldPoints, &imagePoints, &numPoints);
 
+    /* bail if there aren't at least 4 points */
     if(numPoints < 4)
     {
         return -1;
     }
 
-    CvMat* pointCounts = cvCreateMat(1, 1, CV_32SC1);
-    cvSetReal1D(pointCounts, 0, numPoints);
+    /***************** Set up ******************/
+    /* Here we just set up the necessary OpenCV
+     * Matrix structures */
 
+    /* Matrix allocations */
     CvMat* cameraMatrix = cvCreateMat(3, 3, CV_32FC1);
     CvMat* distCoeffs = cvCreateMat(5, 1, CV_32FC1);
     CvMat* Rv = cvCreateMat(1, 3, CV_32FC1);
@@ -136,8 +144,15 @@ int main(int argc, char** argv)
     CvMat* T = cvCreateMat(1, 3, CV_32FC1);
     CvMat* k = cvCreateMat(5, 1, CV_32FC1);
 
-    double fx = 472;//490.1;
-    double fy = 472;//492.1;
+    /* Camera matrix */
+    /* I think that since we already did the undistortion before
+     * finding feature points, we want to use "normal" numbers here:
+     * fx = fy = 3.5mm/7.4um (focal length of lens in terms of the
+     *                         size of one pixel on the CCD sensor)
+     * cx = 320, cy = 240 (coordinates of center pixel)
+     */
+    double fx = 472;
+    double fy = 472;
     double cx = 320;
     double cy = 240;
 
@@ -145,26 +160,26 @@ int main(int argc, char** argv)
     cvSetReal2D(cameraMatrix, 0, 0, fx);
     cvSetReal2D(cameraMatrix, 1, 1, fy);
     cvSetReal2D(cameraMatrix, 0, 2, cx);
-    cvSetReal2D(cameraMatrix, 1, 2, cy);    
-    
-    /*cvCalibrateCamera2(worldPoints,
-                       imagePoints,
-                       pointCounts,
-                       cvSize(640, 480),
-                       cameraMatrix,
-                       distCoeffs,
-                       Rv,
-                       T,
-                       CV_CALIB_USE_INTRINSIC_GUESS);*/
+    cvSetReal2D(cameraMatrix, 1, 2, cy);
 
-    cvZero(k);
+    /* Distortion parameters - all zero, since
+     *   we're already accounting for that */
+    cvZero(k);    
+
+    /**************** Calibration ***************/
+
     cvFindExtrinsicCameraParams2(worldPoints,
                                  imagePoints,
                                  cameraMatrix,
                                  k,
                                  Rv,
                                  T);
-    
+
+    /******************** Output ******************/
+
+    /* The output of the above is a vectorized version of
+     * the rotation parameters - this converts it back to a
+     * rotation matrix */
     cvRodrigues2(Rv, R);
     
     displayResults(cameraMatrix, k, Rv, R, T);
