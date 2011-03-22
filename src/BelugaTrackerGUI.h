@@ -40,7 +40,7 @@ protected:
 	bool m_bCamerasReady;
     unsigned int m_uiaIndexMap[4];
 
-	MT_FrameBase* m_pSlaves[4];
+	MT_CameraSlaveFrame* m_pSlaves[4];
 	IplImage* m_pCameraFrames[4];
 
     MT_DataGroup* m_pSetupInfo;

@@ -65,9 +65,9 @@ void BelugaTrackerFrame::doUserQuit()
 	{
 		if(m_pSlaves[i])
 		{
-			MT_CameraSlaveFrame* f = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
-			f->setImage(NULL);
-			f->prepareToClose();
+			//MT_CameraSlaveFrame* f = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
+			m_pSlaves[i]->setFrame(NULL);
+			m_pSlaves[i]->prepareToClose();
 
             m_pSlaves[i]->Destroy();
             m_pSlaves[i] = NULL;
@@ -206,7 +206,7 @@ void BelugaTrackerFrame::acquireFrames()
 			m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
 			if(i > 0)
 			{
-				m_pSlaves[i]->setImage(m_pCameraFrames[i]);
+				m_pSlaves[i]->setFrame(m_pCameraFrames[i]);
 			}
 		}
 	}
@@ -488,7 +488,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 
 	for(unsigned int i = 1; i < 4; i++)
 	{
-        MT_CameraSlaveFrame* frame;
+        MT_CameraSlaveFrame* frame = m_pSlaves[i];
         if(!m_pSlaves[i])
         {
             frame = new MT_CameraSlaveFrame(NULL);
@@ -497,13 +497,9 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
             frame->Show();
             frame->Raise();
         }
-        else
-        {
-            frame = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
-        }
-        
+
 		m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
-		frame->setImage(m_pCameraFrames[i]);
+		m_pSlaves[i]->setFrame(m_pCameraFrames[i]);
 
         /* don't want the user to be able to close these */
 		frame->EnableCloseButton(false);
@@ -518,7 +514,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
         registerDialogForXML(m_pSlaves[2]);
         registerDialogForXML(m_pSlaves[3]);
 
-        m_pSlaves[0] = this;
+        m_pSlaves[0] = NULL;
     }
     
 	m_pCameraFrames[0] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[0]);
