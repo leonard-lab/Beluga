@@ -15,9 +15,10 @@ ASK_THRESH = 1;
 ASK_FOR_FILE = 1;
 
 if ASK_FOR_FILE,
-    image_file = uigetfile(...
+    [image_file, image_path] = uigetfile(...
         {'*.jpg;*.png;*.bmp;*.tif', 'Image Files'; '*.*', 'All Files'}, ...
         'Select an input image', pwd);
+    image_file = fullfile(image_path, image_file);
     if sum(image_file) == 0 || exist(image_file, 'file') ~= 2,
         error('No valid image file selected.')
     end
