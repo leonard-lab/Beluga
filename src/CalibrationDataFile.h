@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include <cv.h>
+
 typedef struct CalibrationData
 {
     std::string info;
@@ -31,18 +33,40 @@ void copyCalibrationData(CalibrationData* dest, const CalibrationData& src);
 
 std::string calibrationDataToString(const CalibrationData& calibData);
 
+bool calibrationDataToOpenCVCalibration(const CalibrationData& calibData,
+                                        CvMat* cameraMatrix,
+                                        CvMat* distCoeffs,
+                                        CvMat* rvec,
+                                        CvMat* tvec,
+                                        CvMat* R = NULL);
+bool openCVCalibrationToCalibrationData(const CvMat* cameraMatrix,
+                                        const CvMat* distCoeffs,
+                                        const CvMat* rvec,
+                                        const CvMat* tvec,
+                                        CalibrationData* calibData);
+
+typedef enum
+{
+    CALIB_READ,
+    CALIB_WRITE
+} CalibrationLoadMode;
+
 class Beluga_CalibrationDataFile
 {
 public:
-    Beluga_CalibrationDataFile(const char* filename);
+    Beluga_CalibrationDataFile(const char* filename,
+                               CalibrationLoadMode mode = CALIB_READ);
     ~Beluga_CalibrationDataFile();
 
     bool didLoadOK() const;
     bool getCalibration(CalibrationData* calibData);
+    bool writeCalibration(const CalibrationData& calibData);
 
 private:
     bool m_bDidLoadOK;
     CalibrationData m_Data;
+    CalibrationLoadMode m_Mode;
+    std::string m_sFileName;
 
 };
 
