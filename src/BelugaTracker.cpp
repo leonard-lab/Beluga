@@ -1057,6 +1057,24 @@ std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
  * All of the drawing is done with OpenGL */
 void BelugaTracker::doGLDrawing(int flags)
 {
+
+	switch(flags)
+	{
+	case 1:
+		// Q2 Drawing
+		break;
+	case 2:
+		// Q3 Drawing
+		break;
+	case 3:
+		// Q4 Drawing
+		break;
+	default:
+		// Q1 Drawing
+		break;
+	}
+
+
     /* MT_R3 is a 3-vector class, used here for convenience */
     MT_R3 blobcenter;
 

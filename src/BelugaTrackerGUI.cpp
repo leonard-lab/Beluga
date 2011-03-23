@@ -312,7 +312,7 @@ void BelugaTrackerFrame::initTracker()
     for(unsigned int i = 1; i < 4; i++)
     {
         m_pSlaves[i]->setTracker(m_pTracker);
-        m_pSlaves[i]->setTrackerFrameGroup(m_pBelugaTracker->getAuxFrameGroup(i));
+        m_pSlaves[i]->setTrackerFrameGroup(m_pBelugaTracker->getAuxFrameGroup(i-1));
     }
 
     
