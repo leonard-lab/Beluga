@@ -199,16 +199,13 @@ void BelugaTrackerFrame::acquireFrames()
 	{
 		for(unsigned int i = 0; i < 4; i++)
 		{
-			if(!m_pSlaves[i])
-			{
-				continue;
-			}
 			m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
-			if(i > 0)
+			if(i > 0 && m_pSlaves[i])
 			{
 				m_pSlaves[i]->setFrame(m_pCameraFrames[i]);
 			}
 		}
+        m_pCurrentFrame = m_pCameraFrames[0];
 	}
 }
 
