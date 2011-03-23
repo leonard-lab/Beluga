@@ -201,9 +201,11 @@ Beluga_VideoSetupDialog::Beluga_VideoSetupDialog(MT_Capture* capture,
 	grid0->Add(m_pImageCanvases[3]);
     grid0->Add(vbox11);
 
-    vbox0->Add(new wxButton(this,
+	wxButton* doneButton = new wxButton(this,
                             wxID_OK,
-                            wxT("Done")),
+                            wxT("Done"));
+	doneButton->SetDefault();
+    vbox0->Add(doneButton,
                0,
                wxALIGN_RIGHT | wxRIGHT,
                10);
@@ -266,6 +268,13 @@ void Beluga_VideoSetupDialog::onDoneClicked(wxCommandEvent& event)
     {
         *m_vspCalibPaths[i] = std::string(m_pCalibrationPickerCtrls[i]->GetPath().mb_str());
         *m_vspMaskPaths[i] = std::string(m_pMaskPickerCtrls[i]->GetPath().mb_str());
+
+		Beluga_CalibrationDataFile f(m_vspCalibPaths[i]->c_str());
+		if(!f.didLoadOK())
+		{
+			MT_ShowErrorDialog(this, wxT("All calibration data files must be specified."));
+			return;
+		}
     }
 
     wxSetWorkingDirectory(m_sEntryWD);
