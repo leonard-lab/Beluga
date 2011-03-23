@@ -1,10 +1,10 @@
-// compile:  g++ OpenCVCalib.cpp `pkg-config opencv --cflags --libs` -o OpenCVCalib
-
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
 
 #include <cv.h>
+
+#include "CalibrationDataFile.h"
 
 /* this function just reads the points from an ascii file
  * and stuffs them into OpenCV matrix objects */
@@ -113,9 +113,9 @@ void displayResults(CvMat* c, CvMat* k, CvMat* Rv, CvMat* R, CvMat* T)
 int main(int argc, char** argv)
 {
     
-    if(argc < 2)
+    if(argc < 3)
     {
-        std::cout << "Usage:  " << argv[0] << " datafile\n";
+        std::cout << "Usage:  " << argv[0] << " datafile outputfile\n";
         return -1;
     }
 
@@ -183,6 +183,23 @@ int main(int argc, char** argv)
     cvRodrigues2(Rv, R);
     
     displayResults(cameraMatrix, k, Rv, R, T);
+
+    CalibrationData d;
+    openCVCalibrationToCalibrationData(cameraMatrix, k, Rv, T, &d);
+
+    // from previous calibration with checkerboard
+    d.f[0] = 490.09;
+    d.f[1] = 492.09;
+    d.c[0] = 320.01;
+    d.c[1] = 244.28;
+    d.k[0] = -0.3532;
+    d.k[1] = 0.1371;
+    d.k[2] = -0.0009;
+    d.k[3] = 0.0007;
+    d.k[4] = 0;
+
+    Beluga_CalibrationDataFile outFile(argv[2], CALIB_WRITE);
+    outFile.writeCalibration(d);
     
     return 0;
 }

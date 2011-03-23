@@ -1,0 +1,1 @@
+g++ OpenCVCalib.cpp ../../../src/CalibrationDataFile.cpp `pkg-config opencv --cflags` -I ../../../src -I../../../../MADTraC/build/include ../../../../MADTraC/build/lib/libMT_Core.a `pkg-config opencv --libs` -o OpenCVCalib 

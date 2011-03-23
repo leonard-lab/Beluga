@@ -4,9 +4,11 @@
 #include <iomanip>
 
 #include "MT/MT_Core/support/filesupport.h"
+#include "MT/MT_Core/support/mathsupport.h"
 
 static const std::string tag_line_start = "Camera calibration - ";
 static const std::string tag_line_middle = " rows w/lengths [";
+static const std::string tag_line_end = "] - created ";
 static const unsigned int num_rows_expected = 9;
 static const int row_lengths_expected[] = {-1, 2, 2, 1, 5, 3, 3, 3, 3};
 
@@ -138,21 +140,192 @@ std::string calibrationDataToString(const CalibrationData& calibData)
     return ss.str();
 }
 
-Beluga_CalibrationDataFile::Beluga_CalibrationDataFile(const char* filename)
-    : m_Data(),
-      m_bDidLoadOK(false)
+static bool validateOpenCVCalibration(const CvMat* cameraMatrix,
+                                      const CvMat* distCoeffs,
+                                      const CvMat* rvec,
+                                      const CvMat* tvec,
+                                      const CvMat* R)
 {
-    if(!MT_FileIsAvailable(filename, "r"))
+    if(!cameraMatrix || !distCoeffs || !rvec || !tvec)
     {
-        fprintf(stderr, "CalibrationDataFile Error:  Could not load %s", filename);
-        return;
+        fprintf(stderr, "OpenCV Calibration Validation Error:  NULL pointer\n");
+        return false;
     }
 
-    FILE* f = fopen(filename, "r");
+    if(cameraMatrix->rows != 3 || cameraMatrix->cols != 3)
+    {
+        fprintf(stderr,
+                "OpenCV Calibration Validation Error:  Wrong camera matrix format\n");
+        return false;
+    }
 
-    m_bDidLoadOK = validateAndRead(f, &m_Data);
+    if(!( (distCoeffs->rows == 5 && distCoeffs->cols == 1)
+          || (distCoeffs->cols == 5 && distCoeffs->rows == 1)))
+    {
+        fprintf(stderr,
+                "OpenCV Calibration Validation Error:  Wrong distortion coefficient format\n");
+        return false;
+    }
 
-    fclose(f);
+    if(!( (rvec->rows == 3 && rvec->cols == 1)
+          || (rvec->rows == 1 && rvec->cols == 3)))
+    {
+        fprintf(stderr,
+                "OpenCV Calibration Validation Error:  Wrong rotation vector format\n");
+        return false;
+    }
+
+    if(!( (tvec->rows == 3 && tvec->cols == 1)
+          || (tvec->rows == 1 && tvec->cols == 3)))
+    {
+        fprintf(stderr,
+                "OpenCV Calibration Validation Error:  Wrong translation vector format\n");
+        return false;
+    }
+
+    if(R && (R->rows != 3 || R->cols != 3))
+    {
+        fprintf(stderr,
+                "OpenCV Calibration Validation Error:  Wrong rotation matrix format\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool calibrationDataToOpenCVCalibration(const CalibrationData& calibData,
+                                        CvMat* cameraMatrix,
+                                        CvMat* distCoeffs,
+                                        CvMat* rvec,
+                                        CvMat* tvec,
+                                        CvMat* R)
+{
+    if(!validateOpenCVCalibration(cameraMatrix, distCoeffs, rvec, tvec, R))
+    {
+        return false;
+    }
+
+    cvZero(cameraMatrix);
+    cvSetReal2D(cameraMatrix, 0, 0, calibData.f[0]);
+    cvSetReal2D(cameraMatrix, 1, 1, calibData.f[1]);
+    cvSetReal2D(cameraMatrix, 0, 2, calibData.c[0]);
+    cvSetReal2D(cameraMatrix, 1, 2, calibData.c[1]);
+    cvSetReal2D(cameraMatrix, 0, 1, calibData.alpha);
+    cvSetReal2D(cameraMatrix, 2, 2, 1.0);
+
+    cvSetReal1D(distCoeffs, 0, calibData.k[0]);
+    cvSetReal1D(distCoeffs, 1, calibData.k[1]);
+    cvSetReal1D(distCoeffs, 2, calibData.k[2]);
+    cvSetReal1D(distCoeffs, 3, calibData.k[3]);
+    cvSetReal1D(distCoeffs, 4, calibData.k[4]);
+
+    CvMat* Rt = cvCreateMat(3, 3, CV_32FC1);
+
+    cvSetReal2D(Rt, 0, 0, calibData.R[0]);
+    cvSetReal2D(Rt, 0, 1, calibData.R[1]);
+    cvSetReal2D(Rt, 0, 2, calibData.R[2]);
+    cvSetReal2D(Rt, 1, 0, calibData.R[3]);
+    cvSetReal2D(Rt, 1, 1, calibData.R[4]);
+    cvSetReal2D(Rt, 1, 2, calibData.R[5]);
+    cvSetReal2D(Rt, 2, 0, calibData.R[6]);
+    cvSetReal2D(Rt, 2, 1, calibData.R[7]);
+    cvSetReal2D(Rt, 2, 2, calibData.R[8]);
+
+    if(R)
+    {
+        cvCopy(Rt, R);
+    }
+
+    cvRodrigues2(Rt, rvec);
+
+    cvSetReal1D(tvec, 0, calibData.T[0]);
+    cvSetReal1D(tvec, 1, calibData.T[1]);
+    cvSetReal1D(tvec, 2, calibData.T[2]);
+
+    cvReleaseMat(&Rt);
+
+    return true;
+}
+
+bool openCVCalibrationToCalibrationData(const CvMat* cameraMatrix,
+                                        const CvMat* distCoeffs,
+                                        const CvMat* rvec,
+                                        const CvMat* tvec,
+                                        CalibrationData* calibData)
+{
+    if(!validateOpenCVCalibration(cameraMatrix, distCoeffs, rvec, tvec, NULL))
+    {
+        return false;
+    }
+
+    if(!calibData)
+    {
+        return false;
+    }
+
+    calibData->f[0] = cvGetReal2D(cameraMatrix, 0, 0);
+    calibData->f[1] = cvGetReal2D(cameraMatrix, 1, 1);
+    calibData->c[0] = cvGetReal2D(cameraMatrix, 0, 2);
+    calibData->c[1] = cvGetReal2D(cameraMatrix, 1, 2);
+    calibData->alpha = cvGetReal2D(cameraMatrix, 0, 1);
+
+    calibData->k[0] = cvGetReal1D(distCoeffs, 0);
+    calibData->k[1] = cvGetReal1D(distCoeffs, 1);
+    calibData->k[2] = cvGetReal1D(distCoeffs, 2);
+    calibData->k[3] = cvGetReal1D(distCoeffs, 3);
+    calibData->k[4] = cvGetReal1D(distCoeffs, 4);
+
+    CvMat* Rt = cvCreateMat(3, 3, CV_32FC1);
+
+    cvRodrigues2(rvec, Rt);
+
+    calibData->R[0] = cvGetReal2D(Rt, 0, 0);
+    calibData->R[1] = cvGetReal2D(Rt, 0, 1);
+    calibData->R[2] = cvGetReal2D(Rt, 0, 2);    
+    calibData->R[3] = cvGetReal2D(Rt, 1, 0);
+    calibData->R[4] = cvGetReal2D(Rt, 1, 1);
+    calibData->R[5] = cvGetReal2D(Rt, 1, 2);    
+    calibData->R[6] = cvGetReal2D(Rt, 2, 0);
+    calibData->R[7] = cvGetReal2D(Rt, 2, 1);
+    calibData->R[8] = cvGetReal2D(Rt, 2, 2);
+
+    calibData->T[0] = cvGetReal1D(tvec, 0);
+    calibData->T[1] = cvGetReal1D(tvec, 1);
+    calibData->T[2] = cvGetReal1D(tvec, 2);    
+
+    return true;
+}
+
+Beluga_CalibrationDataFile::Beluga_CalibrationDataFile(const char* filename,
+    CalibrationLoadMode mode)
+    : m_Data(),
+      m_bDidLoadOK(false),
+      m_Mode(mode),
+      m_sFileName(filename)
+{
+    if(mode == CALIB_READ)
+    {
+        if(!MT_FileIsAvailable(filename, "r"))
+        {
+            fprintf(stderr, "CalibrationDataFile Error:  Could not load %s", filename);
+            return;
+        }
+
+        FILE* f = fopen(filename, "r");
+
+        m_bDidLoadOK = validateAndRead(f, &m_Data);
+
+        fclose(f);
+    }
+    else
+    {
+        if(!MT_FileIsAvailable(filename, "wa"))
+        {
+            fprintf(stderr, "CalibrationDataFile Error:  Could not load %s", filename);
+            return;
+        }
+        m_bDidLoadOK = true;
+    }
     
 }
 
@@ -167,7 +340,8 @@ bool Beluga_CalibrationDataFile::didLoadOK() const
 
 bool Beluga_CalibrationDataFile::getCalibration(CalibrationData* calibData)
 {
-    if(!calibData || !m_bDidLoadOK)
+
+    if(!calibData || !m_bDidLoadOK || (m_Mode != CALIB_READ))
     {
         return false;
     }
@@ -177,3 +351,46 @@ bool Beluga_CalibrationDataFile::getCalibration(CalibrationData* calibData)
     return true;
 }
 
+bool Beluga_CalibrationDataFile::writeCalibration(const CalibrationData& calibData)
+{
+    if(!m_bDidLoadOK || (m_Mode != CALIB_WRITE))
+    {
+        return false;
+    }
+
+    copyCalibrationData(&m_Data, calibData);
+
+    std::ofstream f(m_sFileName.c_str());
+
+    f << tag_line_start << num_rows_expected << tag_line_middle;
+    for(unsigned int i = 0; i < num_rows_expected; i++)
+    {
+        f << " " << row_lengths_expected[i];
+    }
+
+    if(m_Data.info.length() == 0 || m_Data.info.compare("N/A") == 0)
+    {        
+        time_t nowtime;
+        time(&nowtime);
+    
+        f << tag_line_end << ctime(&nowtime); // already includes newline (?)
+    }
+    else
+    {
+        f << tag_line_end << m_Data.info << std::endl;
+    }
+
+    f << m_Data.f[0] << " " << m_Data.f[1] << std::endl;
+    f << m_Data.c[0] << " " << m_Data.c[1] << std::endl;
+    f << m_Data.alpha << std::endl;
+    f << m_Data.k[0] << " " << m_Data.k[1] << " " << m_Data.k[2] << " "
+      << m_Data.k[3] << " " << m_Data.k[4] << std::endl;
+    f << m_Data.R[0] << " " << m_Data.R[1] << " " << m_Data.R[2] << std::endl;
+    f << m_Data.R[3] << " " << m_Data.R[4] << " " << m_Data.R[5] << std::endl;
+    f << m_Data.R[6] << " " << m_Data.R[7] << " " << m_Data.R[8] << std::endl;
+    f << m_Data.T[0] << " " << m_Data.T[1] << " " << m_Data.T[2] << std::endl;
+    
+    f.close();
+
+    return true;
+}
