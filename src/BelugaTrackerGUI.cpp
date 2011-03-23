@@ -47,6 +47,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	{
 		m_pSlaves[i] = NULL;
 	}
+	m_pBelugaTracker = NULL;
 }
 
 BelugaTrackerFrame::~BelugaTrackerFrame()
@@ -301,6 +302,15 @@ void BelugaTrackerFrame::initTracker()
     m_pBelugaTracker = new BelugaTracker(m_pCurrentFrame, m_iNToTrack);
     m_pTracker = (MT_TrackerBase *) m_pBelugaTracker;
 
+	m_pBelugaTracker->setMasks(m_sQuad1MaskPath.c_str(),
+			m_sQuad2MaskPath.c_str(),
+			m_sQuad3MaskPath.c_str(),
+			m_sQuad4MaskPath.c_str());
+	m_pBelugaTracker->setCalibrations(m_sQuad1CalibrationPath.c_str(),
+			m_sQuad2CalibrationPath.c_str(),
+			m_sQuad3CalibrationPath.c_str(),
+			m_sQuad4CalibrationPath.c_str());
+
 #ifdef WITH_SERVER    
     m_pServer = new MT_Server;
     // m_pServer->enableDebugOutput();
@@ -546,6 +556,18 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
     
         onNewCapture();
     }
+
+	if(m_pBelugaTracker)
+	{
+		m_pBelugaTracker->setMasks(m_sQuad1MaskPath.c_str(),
+			m_sQuad2MaskPath.c_str(),
+			m_sQuad3MaskPath.c_str(),
+			m_sQuad4MaskPath.c_str());
+		m_pBelugaTracker->setCalibrations(m_sQuad1CalibrationPath.c_str(),
+			m_sQuad2CalibrationPath.c_str(),
+			m_sQuad3CalibrationPath.c_str(),
+			m_sQuad4CalibrationPath.c_str());
+	}
 
 }
 

@@ -1,5 +1,7 @@
 #include "BelugaTracker.h"
 
+#include "CalibrationDataFile.h"
+
 /* default parameter values */
 const unsigned int DEFAULT_BG_THRESH = 60;
 const double DEFAULT_MIN_BLOB_PERIMETER = 10;   
@@ -307,6 +309,26 @@ BelugaTracker::~BelugaTracker()
 		}
 	}
 
+	if(m_pMasks[0])
+	{
+		cvReleaseImage(&m_pMasks[0]);
+		cvReleaseImage(&m_pMasks[1]);
+		cvReleaseImage(&m_pMasks[2]);
+		cvReleaseImage(&m_pMasks[3]);
+	}
+
+	if(m_pCameraMatrices[0])
+	{
+		for(int i = 0; i < 4; i++)
+		{
+			cvReleaseMat(&m_pCameraMatrices[i]);
+			cvReleaseMat(&m_pDistortionCoeffs[i]);
+			cvReleaseMat(&m_pRotationVectors[i]);
+			cvReleaseMat(&m_pRotationMatrices[i]);
+			cvReleaseMat(&m_pTranslationVectors[i]);
+		}
+	}
+
     for(int i = 0; i < 3; i++)
     {
         delete m_pAuxFrameGroups[i];
@@ -345,6 +367,14 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_pHFrames[i] = NULL;
 		m_pSFrames[i] = NULL;
 		m_pVFrames[i] = NULL;
+
+		m_pMasks[i] = NULL;
+
+		m_pCameraMatrices[i] = NULL;
+		m_pDistortionCoeffs[i] = NULL;
+		m_pRotationVectors[i] = NULL;
+		m_pRotationMatrices[i] = NULL;
+		m_pTranslationVectors[i] = NULL;
 	}
 
     /* grab the frame height */
@@ -622,6 +652,98 @@ void BelugaTracker::writeData()
     m_XDF.writeData("Tracked Y"        , m_vdTracked_Y); 
     m_XDF.writeData("Tracked Heading"  , m_vdTracked_Heading); 
     m_XDF.writeData("Tracked Speed"    , m_vdTracked_Speed); 
+}
+
+void BelugaTracker::setMasks(const char* maskfile1,
+		const char* maskfile2,
+		const char* maskfile3,
+		const char* maskfile4)
+{
+	if(!maskfile1 || !maskfile2 || !maskfile3 || !maskfile4)
+	{
+		return;
+	}
+
+	const char* files[4] = {maskfile1, maskfile2, maskfile3, maskfile4};
+
+	for(int i = 0; i < 4; i++)
+	{
+		if(m_pMasks[i])
+		{
+			cvReleaseImage(&m_pMasks[i]);
+		}
+
+		m_pMasks[i] = cvLoadImage(files[i], CV_LOAD_IMAGE_GRAYSCALE);
+		if(m_pMasks[i] == 0)
+		{
+			fprintf(stderr, "BelugaTracker Error:  Unable to load mask file %s\n", files[i]);
+		}
+		else
+		{
+			if(m_pMasks[i]->width != m_pGSFrames[i]->width || m_pMasks[i]->height != m_pGSFrames[i]->height)
+			{
+				fprintf(stderr, "BelugaTracker Error:  Mask file %s has the wrong size\n", files[i]);
+				m_pMasks[i] = NULL;
+			}
+		}
+	}
+}
+
+void BelugaTracker::setCalibrations(const char* calibfile1,
+		const char* calibfile2,
+		const char* calibfile3,
+		const char* calibfile4)
+{
+	if(!calibfile1 || !calibfile2 || !calibfile3 || !calibfile4)
+	{
+		return;
+	}
+
+	const char* files[4] = {calibfile1, calibfile2, calibfile3, calibfile4};
+
+	for(int i = 0; i < 4; i++)
+	{
+		Beluga_CalibrationDataFile f(files[i]);
+		if(!f.didLoadOK())
+		{
+			fprintf(stderr, "BelugaTracker Error:  Unable to load calibration %s", files[i]);
+		}
+		else
+		{
+			CalibrationData d;
+			f.getCalibration(&d);
+
+			if(!m_pCameraMatrices[i])
+			{
+				m_pCameraMatrices[i] = cvCreateMat(3, 3, CV_32FC1);
+				m_pDistortionCoeffs[i] = cvCreateMat(5, 1, CV_32FC1);
+				m_pRotationVectors[i] = cvCreateMat(3, 1, CV_32FC1);
+				m_pRotationMatrices[i] = cvCreateMat(3, 3, CV_32FC1);
+				m_pTranslationVectors[i] = cvCreateMat(3, 1, CV_32FC1);
+			}
+
+			if(!calibrationDataToOpenCVCalibration(d,
+				m_pCameraMatrices[i],
+				m_pDistortionCoeffs[i],
+				m_pRotationVectors[i],
+				m_pTranslationVectors[i],
+				m_pRotationMatrices[i]))
+			{
+				fprintf(stderr, "BelugaTracker Error:  Unable to copy calibration from %s", files[i]);
+				cvReleaseMat(&m_pCameraMatrices[i]);
+				cvReleaseMat(&m_pDistortionCoeffs[i]);
+				cvReleaseMat(&m_pRotationVectors[i]);
+				cvReleaseMat(&m_pRotationMatrices[i]);
+				cvReleaseMat(&m_pTranslationVectors[i]);
+				m_pCameraMatrices[i] = NULL;
+				m_pDistortionCoeffs[i] = NULL;
+				m_pRotationVectors[i] = NULL;
+				m_pTranslationVectors[i] = NULL;
+				m_pRotationMatrices[i] = NULL;
+			}
+
+		}
+	}
 }
 
 void BelugaTracker::HSVSplit(IplImage* frame, int i)

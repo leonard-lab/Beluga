@@ -25,6 +25,14 @@ private:
 	IplImage* m_pVFrames[4];
 	IplImage* m_pThreshFrames[4];
 
+	IplImage* m_pMasks[4];
+
+	CvMat* m_pCameraMatrices[4];
+	CvMat* m_pDistortionCoeffs[4];
+	CvMat* m_pRotationVectors[4];
+	CvMat* m_pRotationMatrices[4];
+	CvMat* m_pTranslationVectors[4];
+
 	void HSVSplit(IplImage* frame, int i);
 
     /* blobber parameters */
@@ -109,6 +117,15 @@ public:
 
     void initDataFile();
     void writeData();
+
+	void setMasks(const char* maskfile1,
+		const char* maskfile2,
+		const char* maskfile3,
+		const char* maskfile4);
+	void setCalibrations(const char* calibfile1,
+		const char* calibfile2,
+		const char* calibfile3,
+		const char* calibfile4);
 
     MT_TrackerFrameGroup* getAuxFrameGroup(int i){return m_pAuxFrameGroups[i];};
 
