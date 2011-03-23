@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <iomanip>
+#include <time.h>
 
 #include "MT/MT_Core/support/filesupport.h"
 #include "MT/MT_Core/support/mathsupport.h"
