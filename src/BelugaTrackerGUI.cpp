@@ -290,6 +290,13 @@ void BelugaTrackerFrame::doUserControl()
 
 void BelugaTrackerFrame::initTracker()
 {
+
+    if(!m_pSlaves[1])
+    {
+        MT_ShowErrorDialog(this, wxT("Initialize the video sources first."));
+        return;
+    }
+    
     /* TODO: ask for number of objects to track */
     m_pBelugaTracker = new BelugaTracker(m_pCurrentFrame, m_iNToTrack);
     m_pTracker = (MT_TrackerBase *) m_pBelugaTracker;
@@ -302,6 +309,13 @@ void BelugaTrackerFrame::initTracker()
                                                         m_pBelugaTracker));
 #endif /* WITH_SERVER */    
 
+    for(unsigned int i = 1; i < 4; i++)
+    {
+        m_pSlaves[i]->setTracker(m_pTracker);
+        m_pSlaves[i]->setTrackerFrameGroup(m_pBelugaTracker->getAuxFrameGroup(i));
+    }
+
+    
     /* note - do NOT call MT_TrackerBase::initTracker, which is
      * a placeholder function that sets m_pTracker to NULL! */
 
@@ -497,6 +511,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 
 		m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
 		m_pSlaves[i]->setFrame(m_pCameraFrames[i]);
+        m_pSlaves[i]->setIndex(i);
 
         /* don't want the user to be able to close these */
 		frame->EnableCloseButton(false);

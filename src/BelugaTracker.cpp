@@ -307,6 +307,11 @@ BelugaTracker::~BelugaTracker()
 		}
 	}
 
+    for(int i = 0; i < 3; i++)
+    {
+        delete m_pAuxFrameGroups[i];
+    }
+
     /* MT_UKFFree frees up memory used by the UKF */
     for(int i = 0; i < m_iNObj; i++)
     {
@@ -388,6 +393,17 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	m_pTrackerFrameGroup->pushFrame(&m_pSFrames[0], "S");
 	m_pTrackerFrameGroup->pushFrame(&m_pVFrames[0], "V");
 	m_pTrackerFrameGroup->pushFrame(&m_pGSFrames[0], "GS");
+
+    for(unsigned int i = 0; i < 3; i++)
+    {
+        m_pAuxFrameGroups[i] = new MT_TrackerFrameGroup();
+        m_pAuxFrameGroups[i]->pushFrame(&m_pThreshFrames[i+1], "Threshold Frame");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pHSVFrames[i+1], "HSV");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pHFrames[i+1], "H");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pSFrames[i+1], "S");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pVFrames[i+1], "V");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pGSFrames[i+1], "GS");        
+    }
 
     /* Data group and Data report setup.
      *

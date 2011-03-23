@@ -85,6 +85,8 @@ private:
 
 	unsigned int m_iFrameWidth;
     unsigned int m_iFrameHeight;
+
+    MT_TrackerFrameGroup* m_pAuxFrameGroups[3];
     
 public:
     /* constructor */
@@ -107,6 +109,8 @@ public:
 
     void initDataFile();
     void writeData();
+
+    MT_TrackerFrameGroup* getAuxFrameGroup(int i){return m_pAuxFrameGroups[i];};
 
     /* Main tracking functions */
     void doTracking(IplImage* frame);
