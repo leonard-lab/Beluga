@@ -383,6 +383,8 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_pRotationVectors[i] = NULL;
 		m_pRotationMatrices[i] = NULL;
 		m_pTranslationVectors[i] = NULL;
+
+		m_vBlobs[i].resize(0);
 	}
 
     /* grab the frame height */
@@ -841,6 +843,13 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			cvAnd(m_pThreshFrames[i], m_pMasks[i], m_pThreshFrames[i]);
 		}
 
+		m_vBlobs[i] = m_YABlobber.FindBlobs(m_pThreshFrames[i],
+			5,
+			m_iBlobAreaThreshLow,
+			NO_MAX,
+			m_iBlobAreaThreshHigh);
+
+
 	}
 
 	// below here will require rewriting 
@@ -1204,6 +1213,7 @@ std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
  * All of the drawing is done with OpenGL */
 void BelugaTracker::doGLDrawing(int flags)
 {
+	unsigned int Q = flags;
 
 	switch(flags)
 	{
@@ -1217,10 +1227,10 @@ void BelugaTracker::doGLDrawing(int flags)
 		// Q4 Drawing
 		break;
 	default:
+		Q = 0;
 		// Q1 Drawing
 		break;
 	}
-
 
     /* MT_R3 is a 3-vector class, used here for convenience */
     MT_R3 blobcenter;
@@ -1232,21 +1242,21 @@ void BelugaTracker::doGLDrawing(int flags)
        variable */
     if(m_bShowBlobs)
     {
-        for (unsigned int i = 0; i < m_vdBlobs_X.size(); i++)
+        for (unsigned int i = 0; i < m_vBlobs[Q].size(); i++)
         {
 
             /* note that we have to subtract y from the frame_height
                to account for the window coordinates originating from the
                bottom left but the image coordinates originating from
                the top left */
-            blobcenter.setx(m_vdBlobs_X[i]);
-            blobcenter.sety(m_iFrameHeight - m_vdBlobs_Y[i]);
+            blobcenter.setx(m_vBlobs[Q].at(i).COMx);
+            blobcenter.sety(m_iFrameHeight - m_vBlobs[Q].at(i).COMy);
             blobcenter.setz( 0 );
 
             /* draws an arrow using OpenGL */
             MT_DrawArrow(blobcenter,  // center of the base of the arrow
                          20.0,        // arrow length (pixels)
-                         MT_DEG2RAD*m_vdBlobs_Orientation[i], // arrow angle
+                         MT_DEG2RAD*m_vBlobs[Q].at(i).orientation, // arrow angle
                          MT_Primaries[(i+1) % MT_NPrimaries], // color
                          1.0 // fixes the arrow width
                 );    

@@ -45,6 +45,9 @@ private:
 	unsigned int m_iVThresh;
 	unsigned int m_iHThresh;
     
+	YABlobber m_YABlobber;
+	std::vector<YABlob> m_vBlobs[4];
+
     CvRect m_SearchArea[4];
 	unsigned int m_iSearchAreaPadding;
 
