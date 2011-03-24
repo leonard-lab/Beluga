@@ -67,7 +67,7 @@ void BelugaTrackerFrame::doUserQuit()
 		if(m_pSlaves[i])
 		{
 			//MT_CameraSlaveFrame* f = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
-			m_pSlaves[i]->setFrame(NULL);
+			m_pSlaves[i]->setImage(NULL);
 			m_pSlaves[i]->prepareToClose();
 
             m_pSlaves[i]->Destroy();
@@ -203,7 +203,7 @@ void BelugaTrackerFrame::acquireFrames()
 			m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
 			if(i > 0 && m_pSlaves[i])
 			{
-				m_pSlaves[i]->setFrame(m_pCameraFrames[i]);
+				m_pSlaves[i]->setCurrentFrame(m_pCameraFrames[i]);
 			}
 		}
         m_pCurrentFrame = m_pCameraFrames[0];
@@ -520,7 +520,8 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
         }
 
 		m_pCameraFrames[i] = m_pCapture->getFrame(MT_FC_NEXT_FRAME, m_uiaIndexMap[i]);
-		m_pSlaves[i]->setFrame(m_pCameraFrames[i]);
+		m_pSlaves[i]->setCurrentFrame(m_pCameraFrames[i]);
+		m_pSlaves[i]->setImage(m_pCameraFrames[i]);
         m_pSlaves[i]->setIndex(i);
 
         /* don't want the user to be able to close these */
