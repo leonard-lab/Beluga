@@ -10,6 +10,9 @@ const double DEFAULT_MAX_BLOB_PERIMETER = 1000;
 const double DEFAULT_MAX_BLOB_AREA = 1000;
 const unsigned int DEFAULT_SEARCH_AREA_PADDING = 100;
 
+const unsigned int DEFAULT_V_THRESH = 40;
+const unsigned int DEFAULT_H_THRESH = 130;
+
 /* default color to draw blobs */
 const MT_Color DEFAULT_BLOB_COLOR = MT_Red;
 
@@ -241,6 +244,8 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_iBlobValThresh(DEFAULT_BG_THRESH),
 	  m_iBlobAreaThreshLow(DEFAULT_MIN_BLOB_AREA),
 	  m_iBlobAreaThreshHigh(DEFAULT_MAX_BLOB_AREA),
+	  m_iVThresh(DEFAULT_V_THRESH),
+	  m_iHThresh(DEFAULT_H_THRESH),
 	  m_iSearchAreaPadding(DEFAULT_SEARCH_AREA_PADDING),
       m_iStartFrame(-1),
       m_iStopFrame(-1),
@@ -296,17 +301,18 @@ BelugaTracker::~BelugaTracker()
     cvReleaseMat(&m_pQ);
     cvReleaseMat(&m_pR);
 
-	if(m_pGSFrames[0])
+	if(m_pHSVFrames[0])
 	{
 		for(int i = 0; i < 4; i++)
 		{
-			cvReleaseImage(&m_pGSFrames[i]);
+			//cvReleaseImage(&m_pGSFrames[i]);
 			cvReleaseImage(&m_pHSVFrames[i]);
 			cvReleaseImage(&m_pHFrames[i]);
 			cvReleaseImage(&m_pSFrames[i]);
 			cvReleaseImage(&m_pVFrames[i]);
 			cvReleaseImage(&m_pThreshFrames[i]);
 		}
+		cvReleaseImage(&m_pTempFrame1);
 	}
 
 	if(m_pMasks[0])
@@ -369,6 +375,8 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_pVFrames[i] = NULL;
 
 		m_pMasks[i] = NULL;
+
+		m_pTempFrame1 = NULL;
 
 		m_pCameraMatrices[i] = NULL;
 		m_pDistortionCoeffs[i] = NULL;
@@ -451,6 +459,8 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     /* set up the parameter groups for parameter modification, etc. */
     /* first group is for blob tracking parameters */
     MT_DataGroup* dg_blob = new MT_DataGroup("Blob Tracking Parameters");
+	dg_blob->AddUInt("HSV V Threshold", &m_iVThresh, MT_DATA_READWRITE, 0, 255);
+	dg_blob->AddUInt("HSV H Threshold", &m_iHThresh, MT_DATA_READWRITE, 0, 255);
     dg_blob->AddUInt("Difference Threshold", /* parameter name */
                      &m_iBlobValThresh,      /* pointer to variable */
                      MT_DATA_READWRITE,      /* read-only or not */
@@ -550,28 +560,30 @@ void BelugaTracker::createFrames()
     /* this makes sure that the BG_frame is created */
     MT_TrackerBase::createFrames();
 
-	if(m_pGSFrames[0])
+	if(m_pHSVFrames[0])
 	{
 		for(int i = 0; i < 4; i++)
 		{
-			cvReleaseImage(&m_pGSFrames[i]);
+			//cvReleaseImage(&m_pGSFrames[i]);
 			cvReleaseImage(&m_pHSVFrames[i]);
 			cvReleaseImage(&m_pHFrames[i]);
 			cvReleaseImage(&m_pSFrames[i]);
 			cvReleaseImage(&m_pVFrames[i]);
 			cvReleaseImage(&m_pThreshFrames[i]);
 		}
+		cvReleaseImage(&m_pTempFrame1);
 	}
 
 	for(int i = 0; i < 4; i++)
 	{
-		m_pGSFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+		//m_pGSFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 		m_pThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 		m_pHSVFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 3);
 		m_pHFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 		m_pSFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 		m_pVFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 	}
+	m_pTempFrame1 = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 
 	//m_pGSThresholder = NULL;
     /* Create the Thresholder and Blobber objects */
@@ -680,7 +692,7 @@ void BelugaTracker::setMasks(const char* maskfile1,
 		}
 		else
 		{
-			if(m_pMasks[i]->width != m_pGSFrames[i]->width || m_pMasks[i]->height != m_pGSFrames[i]->height)
+			if(m_pMasks[i]->width != m_pHSVFrames[i]->width || m_pMasks[i]->height != m_pHSVFrames[i]->height)
 			{
 				fprintf(stderr, "BelugaTracker Error:  Mask file %s has the wrong size\n", files[i]);
 				m_pMasks[i] = NULL;
@@ -816,6 +828,19 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 	for(int i = 0; i < 4; i++)
 	{
 		HSVSplit(frames[i], i);
+
+		/* just for display */
+		m_pGSFrames[i] = m_pVFrames[i];
+
+		cvThreshold(m_pVFrames[i], m_pThreshFrames[i], m_iVThresh, 255, CV_THRESH_BINARY_INV);
+		cvThreshold(m_pHFrames[i], m_pTempFrame1, m_iHThresh, 255, CV_THRESH_BINARY);
+		cvAnd(m_pTempFrame1, m_pThreshFrames[i], m_pThreshFrames[i]);
+		cvSmooth(m_pThreshFrames[i], m_pThreshFrames[i], CV_MEDIAN, 3);
+		if(m_pMasks[i])
+		{
+			cvAnd(m_pThreshFrames[i], m_pMasks[i], m_pThreshFrames[i]);
+		}
+
 	}
 
 	// below here will require rewriting 

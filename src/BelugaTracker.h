@@ -27,6 +27,8 @@ private:
 
 	IplImage* m_pMasks[4];
 
+	IplImage* m_pTempFrame1;
+
 	CvMat* m_pCameraMatrices[4];
 	CvMat* m_pDistortionCoeffs[4];
 	CvMat* m_pRotationVectors[4];
@@ -39,6 +41,9 @@ private:
     unsigned int m_iBlobValThresh;
 	unsigned int m_iBlobAreaThreshLow;
 	unsigned int m_iBlobAreaThreshHigh;
+
+	unsigned int m_iVThresh;
+	unsigned int m_iHThresh;
     
     CvRect m_SearchArea[4];
 	unsigned int m_iSearchAreaPadding;
