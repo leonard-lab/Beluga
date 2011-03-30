@@ -44,7 +44,6 @@ void readPoints(const char* filename,
     w.resize(w.size()-3);
 
     *numPoints = i;
-    std::cout << "Found " << img.size()/2 << " points, i = " << i << ".\n";
 
     *worldPoints = cvCreateMat(*numPoints, 3, CV_32FC1);
     *imagePoints = cvCreateMat(*numPoints, 2, CV_32FC1);
@@ -115,8 +114,18 @@ int main(int argc, char** argv)
     
     if(argc < 3)
     {
-        std::cout << "Usage:  " << argv[0] << " datafile outputfile\n";
+        std::cout << "Usage:  " << argv[0] << " datafile outputfile [-v]\n";
         return -1;
+    }
+
+    bool verbose = 0;
+
+    if(argc == 4)
+    {
+        if(!strncmp(argv[3], "-v", MIN(3, strlen(argv[3]))))
+        {
+            verbose = 1;
+        }
     }
 
     CvMat* worldPoints;
@@ -181,8 +190,11 @@ int main(int argc, char** argv)
      * the rotation parameters - this converts it back to a
      * rotation matrix */
     cvRodrigues2(Rv, R);
-    
-    displayResults(cameraMatrix, k, Rv, R, T);
+
+    if(verbose)
+    {
+        displayResults(cameraMatrix, k, Rv, R, T);
+    }
 
     CalibrationData d;
     openCVCalibrationToCalibrationData(cameraMatrix, k, Rv, T, &d);
