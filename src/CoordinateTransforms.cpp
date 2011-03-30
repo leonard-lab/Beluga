@@ -70,8 +70,78 @@ double calculateRpFromRs(double rs, double d, double h)
 }
 
 CTWithWater::CTWithWater(const CalibrationData& calibrationData, double water_depth)
-    : m_dWaterDepth(water_depth)
+    : m_dWaterDepth(water_depth),
+      m_CameraMatrix(NULL),    
+      m_DistCoeffs(NULL),      
+      m_Rv(NULL),              
+      m_R(NULL),               
+      m_T(NULL),               
+      m_CameraWorld(NULL),     
+      m_S(NULL),               
+      m_CameraMatrixNorm(NULL),
+      m_DistCoeffsNorm(NULL)  
 {
+    allocMatrices();
+    setCalibration(calibrationData);
+}
+
+CTWithWater::CTWithWater(double water_depth)
+    : m_dWaterDepth(water_depth),
+      m_CameraMatrix(NULL),    
+      m_DistCoeffs(NULL),      
+      m_Rv(NULL),              
+      m_R(NULL),               
+      m_T(NULL),               
+      m_CameraWorld(NULL),     
+      m_S(NULL),               
+      m_CameraMatrixNorm(NULL),
+      m_DistCoeffsNorm(NULL)  
+{
+    allocMatrices();
+}
+
+CTWithWater::CTWithWater()
+    : m_dWaterDepth(0),
+      m_CameraMatrix(NULL),    
+      m_DistCoeffs(NULL),      
+      m_Rv(NULL),              
+      m_R(NULL),               
+      m_T(NULL),               
+      m_CameraWorld(NULL),     
+      m_S(NULL),               
+      m_CameraMatrixNorm(NULL),
+      m_DistCoeffsNorm(NULL)  
+{
+    allocMatrices();
+}
+
+CTWithWater::~CTWithWater()
+{
+    if(m_CameraMatrix)
+    {
+        cvReleaseMat(&m_CameraMatrix);
+        cvReleaseMat(&m_DistCoeffs);
+        cvReleaseMat(&m_Rv);
+        cvReleaseMat(&m_R);
+        cvReleaseMat(&m_T);
+
+        cvReleaseMat(&m_CameraWorld);
+
+        cvReleaseMat(&m_S);
+    
+        cvReleaseMat(&m_CameraMatrixNorm);
+        cvReleaseMat(&m_DistCoeffsNorm);
+    }
+}
+
+void CTWithWater::allocMatrices()
+{
+    if(m_CameraMatrix)
+    {
+        fprintf(stdout, "CTWithWater warning:  attempt to re-allocate matrices stopped.\n");
+        return;
+    }
+    
     m_CameraMatrix = cvCreateMat(3, 3, CV_32FC1);
     m_DistCoeffs = cvCreateMat(5, 1, CV_32FC1);
     m_Rv = cvCreateMat(1, 3, CV_32FC1);
@@ -85,26 +155,25 @@ CTWithWater::CTWithWater(const CalibrationData& calibrationData, double water_de
     m_CameraMatrixNorm = cvCreateMat(3, 3, CV_32FC1);
     m_DistCoeffsNorm = cvCreateMat(5, 1, CV_32FC1);
 
-    setCalibration(calibrationData);
-}
-
-CTWithWater::~CTWithWater()
-{
-    cvReleaseMat(&m_CameraMatrix);
-    cvReleaseMat(&m_DistCoeffs);
-    cvReleaseMat(&m_Rv);
-    cvReleaseMat(&m_R);
-    cvReleaseMat(&m_T);
-
-    cvReleaseMat(&m_CameraWorld);
-
-    cvReleaseMat(&m_S);
+    cvSetIdentity(m_CameraMatrix);
+    cvZero(m_DistCoeffs);
+    cvZero(m_Rv);
+    cvSetIdentity(m_R);
+    cvZero(m_T);
+    cvZero(m_CameraWorld);
+    cvZero(m_S);
+    cvSetIdentity(m_CameraMatrixNorm);
+    cvZero(m_DistCoeffsNorm);
     
-    cvReleaseMat(&m_CameraMatrixNorm);
-    cvReleaseMat(&m_DistCoeffsNorm);    
 }
 
 void CTWithWater::setCalibration(const CalibrationData& calibrationData)
+{
+    setCalibrationAndWaterDepth(calibrationData, m_dWaterDepth);
+}
+
+void CTWithWater::setCalibrationAndWaterDepth(const CalibrationData& calibrationData,
+                                               double water_depth)
 {
     calibrationDataToOpenCVCalibration(calibrationData,
                                        m_CameraMatrix,
@@ -116,8 +185,6 @@ void CTWithWater::setCalibration(const CalibrationData& calibrationData)
     /* CameraWorld = -R^T T */
     cvGEMM(m_R, m_T, -1.0, NULL, 0, m_CameraWorld, CV_GEMM_A_T);
 
-    m_dCameraZ = cvGetReal1D(m_CameraWorld, 2);
-    m_dCameraHeightAboveWater = m_dCameraZ - m_dWaterDepth;
 
     cvSetIdentity(m_CameraMatrixNorm);
     /* TODO: These should really be read in from the calibration */
@@ -126,6 +193,15 @@ void CTWithWater::setCalibration(const CalibrationData& calibrationData)
     cvSetReal2D(m_CameraMatrixNorm, 0, 2, 320.0);
     cvSetReal2D(m_CameraMatrixNorm, 1, 2, 240.0);
     cvZero(m_DistCoeffsNorm);
+
+    setWaterDepth(water_depth);
+}
+
+void CTWithWater::setWaterDepth(double water_depth)
+{
+    m_dWaterDepth = water_depth;
+    m_dCameraZ = cvGetReal1D(m_CameraWorld, 2);
+    m_dCameraHeightAboveWater = m_dCameraZ - m_dWaterDepth;
 }
 
 void CTWithWater::worldToImage(double x, double y, double z,
