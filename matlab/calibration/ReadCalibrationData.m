@@ -85,6 +85,8 @@ end
 R = [R1; R2; R3];
 T = T';
 
+fclose(f);
+
 function p = read_parameters(ix, lines, row_lengths)
 
 [p, nr, err_msg] = sscanf(lines{ix}, '%f ');
