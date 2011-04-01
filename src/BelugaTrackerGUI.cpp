@@ -465,8 +465,17 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 {
 
     doPause();
-    
+
     std::vector<std::string> camList = m_pCapture->listOfAvailableCameras(4);
+
+	if(camList.size() < 4)
+	{
+		MT_ShowErrorDialog(this, 
+			wxT("Unable to get list of cameras.  "
+			"Make sure the right drivers are installed "
+			"and that the caemras are available in SmartView."));
+		return;
+	}
 
     std::vector<std::string*> calibList;
     calibList.resize(4);
@@ -481,7 +490,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 	maskList[1] = &m_sQuad2MaskPath;
 	maskList[2] = &m_sQuad3MaskPath;
 	maskList[3] = &m_sQuad4MaskPath;
-    
+
     Beluga_VideoSetupDialog* dlg = new Beluga_VideoSetupDialog(m_pCapture,
                                                                camList,
                                                                calibList,
