@@ -13,7 +13,7 @@ if ASK_FOR_FILE,
         error('No valid image file selected.')
     end
 else
-    image_file = 'Q3.bmp';
+    image_file = 'Q4.bmp';
 end
 
 [~, image_file_basename, ~] = fileparts(image_file);
@@ -534,6 +534,35 @@ for ax = 1 : 14,
     SEAM_ANGLES_W = [SEAM_ANGLES_W; k*2*pi/14];
 end
 
+SAo = [];
+ix = 1;
+while(ix < 14),
+    if abs(SA(ix+1) - SA(ix)) < 1.5*2*pi/14/2,
+        disp('a')
+        SAo = [SAo; 0.5*(SA(ix+1)+SA(ix))];
+        ix = ix + 2;
+    elseif abs(SA(ix+1) - SA(ix)) > 1.25*2*pi/14,
+        disp('b')
+        SAo = [SAo; SA(ix); 0.5*(SA(ix+1)+SA(ix))];
+        ix = ix + 1;
+    else
+        disp('c')
+        SAo = [SAo; SA(ix)];
+        ix = ix + 1;
+    end
+end
+SAo = [SAo; SA(end)];
+
+% C1 = tx + i*ty + 50*exp(i*SA);
+% C2 = tx + i*ty + 50*exp(i*SAo);
+% figure(3)
+% clf
+% imshow(MV)
+% hold on
+% plot(real(C1), imag(C1), 'rs', real(C2), imag(C2), 'bo')
+
+SA = SAo;
+
 %% output data
 % _I -> image (in pixels),  _W -> world (in meters)
 
@@ -612,9 +641,13 @@ plot(KNOWN_POINTS_I(:,1), KNOWN_POINTS_I(:,2), 'bs', 'MarkerSize', 5)
 subplot(1,2,2)
 
 c1 = r2_W*exp(i*linspace(0, 2*pi));
+o1 = [zeros(length(SA),1)];
+b1 = r2_W*exp(i*SA);
+z1 = [zeros(length(SA),2) z3_W*ones(length(SA),1)];
 plot3(KNOWN_POINTS_W(:,1), KNOWN_POINTS_W(:, 2), KNOWN_POINTS_W(:,3), 'bs', ...
     real(c1), imag(c1), zeros(size(c1)), 'k-', ...
-    real(c1), imag(c1), z3_W*ones(size(c1)), 'k-');
+    real(c1), imag(c1), z3_W*ones(size(c1)), 'k-',...
+    real([o1 b1 b1])', imag([o1 b1 b1])', z1', 'r-');
 axis equal
 
 D = [KNOWN_POINTS_I KNOWN_POINTS_W];

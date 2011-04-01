@@ -1,0 +1,63 @@
+README for beluga cgi
+Dan Swain - dan.t.swain@gmail.com - 3/31/11
+
+* How to set up your server and permissions
+
+1.  You should be running apache with support for php (at
+least version 4) enabled.  Other http servers may work, but I haven't
+tested them.  Note that on OS X, php may not be enabled by default --
+you can enable it by editing /etc/apache2/httpd.conf and uncommenting
+the line
+
+LoadModule php5_module    libexec/apache2/libphp5.so
+
+You'll have to restart apache:
+
+sudo /usr/sbin/apachectl restart
+
+2.  You should make sure that the +ExecCGI option is enabled for
+whatever directory you want to run the php code from.  If you want to
+use your user web directory on OS X (~/Sites), edit
+/private/etc/apache2/users/<yourusername>.conf so that the Options
+line contains "+ExecCGI".  This change may not take effect until you
+restart apache.
+
+3.  Either copy the php file into a directory that apache can access
+or symlink to this directory from that directory.  As an example, I
+have this file in ~/src/Beluga/cgi, and have symlinked it to my
+~/Sites directory as follows:
+
+cd ~/Sites
+ln -s ~/src/Beluga/cgi beluga
+
+Then http://localhost/~dan/beluga/beluga.php points to the cgi script.
+
+4. Make sure all necessary files exist and have the right
+permissions.  The output files must exist and be writable by the user
+that is running your webserver.  You can do this by first "touch"ing
+the file to make sure it exists, then setting its group to the same as
+the webserver, and setting the group write flag.
+
+Example: If apache is running under user group _www (this is true for
+OS X) and there are four robots, you can do this (in the same folder
+that the script is in):
+
+touch cmd_robot_0
+touch cmd_robot_1
+touch cmd_robot_2
+touch cmd_robot_3
+sudo chgrp _www cmd_robot_*
+chmod g+w cmd_robot_*
+
+5.  You can test by putting a string of space-separated numbers in the
+positions_to_cgi file and either loading the script in your browser or
+using the urlread function in matlab.  E.g.
+
+In Terminal, in the same directory as the cgi:
+echo "1 2 3 4 5 6 7 8" > positions_to_cgi
+
+In Matlab:
+urlread('http://localhost/~dan/beluga/beluga.php?robot=0&go_x=3.14&go_y=42')
+
+Should spit out "1 2 3 4 5 6 7 8" in Matlab, and put "3.140000
+42.000000" in cmd_robot_0.
