@@ -6,6 +6,8 @@
 
 #include "BelugaRobot.h"
 
+#include "CoordinateTransforms.h"
+
 const double DEFAULT_SIGMA_POSITION = 4.0; /* pixels */
 const double DEFAULT_SIGMA_HEADING = 0.26; /* rad ~= 15 deg */
 const double DEFAULT_SIGMA_SPEED = 1.0; /* pixels/frame */
@@ -34,6 +36,9 @@ private:
 	CvMat* m_pRotationVectors[4];
 	CvMat* m_pRotationMatrices[4];
 	CvMat* m_pTranslationVectors[4];
+
+    double m_dWaterDepth;
+    CTWithWater m_CoordinateTransforms[4];
 
 	void HSVSplit(IplImage* frame, int i);
 
