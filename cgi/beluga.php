@@ -23,9 +23,9 @@ $position_fmt = "%d ";                // printf-style format for output
 $n_robots = 4;                        // number of robots being used
 
 /* grab input variables */
-$robot = $_GET["robot"];
-$x = $_GET["go_x"];
-$y = $_GET["go_y"];
+$robot = (isset($_GET["robot"]) ? $_GET["robot"] : "");
+$x = (isset($_GET["go_x"]) ? $_GET["go_x"] : "");
+$y = (isset($_GET["go_y"]) ? $_GET["go_y"] : "");
 
 /* if robot was not specified, we can't write a command */
 if(strlen($robot))
