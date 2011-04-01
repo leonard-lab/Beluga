@@ -21,6 +21,7 @@ class BelugaTracker : public MT_TrackerBase
 private:
     /* frames */
 	IplImage* m_pGSFrames[4];
+	IplImage* m_pUndistortedFrames[4];
 	IplImage* m_pHSVFrames[4];
 	IplImage* m_pHFrames[4];
 	IplImage* m_pSFrames[4];
@@ -36,6 +37,9 @@ private:
 	CvMat* m_pRotationVectors[4];
 	CvMat* m_pRotationMatrices[4];
 	CvMat* m_pTranslationVectors[4];
+
+	IplImage* m_pUndistortMapX;
+	IplImage* m_pUndistortMapY;
 
     double m_dWaterDepth;
     CTWithWater m_CoordinateTransforms[4];
@@ -53,7 +57,8 @@ private:
 	YABlobber m_YABlobber;
 	std::vector<YABlob> m_vBlobs[4];
 
-    CvRect m_SearchArea[4];
+	std::vector<CvRect> m_SearchArea[4];
+	std::vector<std::vector<unsigned int>> m_SearchIndexes[4];
 	unsigned int m_iSearchAreaPadding;
 
     /* only used to add to XDF */
@@ -98,10 +103,11 @@ private:
 
     std::vector<double> m_vdTracked_X;
     std::vector<double> m_vdTracked_Y;
+	std::vector<double> m_vdTracked_Z;
     std::vector<double> m_vdTracked_Heading;
     std::vector<double> m_vdTracked_Speed;
 
-    std::vector<t_p_history> m_vdHistories_X;
+	std::vector<t_p_history> m_vdHistories_X;
     std::vector<t_p_history> m_vdHistories_Y;
 
 	unsigned int m_iFrameWidth;

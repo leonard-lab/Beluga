@@ -233,6 +233,84 @@ bool CvMatIsOk(const CvMat* M, double max_val = 1e10)
     return true;
 }
 
+CvRect searchRectAtPointWithSize(double x_center, double y_center, double size)
+{
+	return cvRect(x_center-0.5*size, y_center-0.5*size, size, size);
+}
+
+bool cvRectsIntersect(const CvRect& a, const CvRect& b)
+{
+	return a.x < (b.x+b.width) && (a.x+a.width) > b.x &&
+		a.y < (b.y+b.height) && (a.y+a.height) > b.y;
+}
+
+CvRect unionOfCvRects(const CvRect& a, const CvRect&b)
+{
+	int xmin = MT_MIN(a.x, b.x);
+	int xmax = MT_MAX(a.x+a.width, b.x+b.width);
+	int ymin = MT_MIN(a.y, b.y);
+	int ymax = MT_MAX(a.y+a.height, b.y+b.height);
+
+	return cvRect(xmin, ymin, xmax-xmin, ymax-ymin);
+}
+
+std::vector<unsigned int> unionOfIndexSets(const std::vector<unsigned int>& a,
+										   const std::vector<unsigned int>& b)
+{
+	std::vector<unsigned int> result;
+	result.reserve(a.size()+b.size());
+	result.insert(result.end(), a.begin(), a.end());
+	result.insert(result.end(), b.begin(), b.end());
+	return result;
+}
+
+void combineSearchAreas(std::vector<CvRect>* searchAreas, 
+						std::vector<std::vector<unsigned int>>* searchIndexes)
+{
+	if(searchAreas->size() <= 1)
+	{
+		return;
+	}
+
+	std::vector<CvRect> inAreas = *searchAreas;
+	std::vector<std::vector<unsigned int>> inIndexes = *searchIndexes;
+
+	std::vector<CvRect> outAreas;
+	std::vector<std::vector<unsigned int>> outIndexes;
+	int num_joined = 0;
+
+	do
+	{
+		outAreas.resize(0);
+		outIndexes.resize(0);
+		num_joined = 0;
+
+		for(unsigned int i = 0; i < inAreas.size(); i++)
+		{
+			for(unsigned int j = i+1; j < inAreas.size(); j++)
+			{
+				if(cvRectsIntersect(inAreas[i], inAreas[j]))
+				{
+					num_joined++;
+					outAreas.push_back(unionOfCvRects(inAreas[i], inAreas[j]));
+					outIndexes.push_back(unionOfIndexSets(inIndexes[i], inIndexes[j]));
+				}
+				else
+				{
+					outAreas.push_back(inAreas[i]);
+					outIndexes.push_back(inIndexes[i]);
+				}
+			}
+		}
+
+		inAreas = outAreas;
+		inIndexes = outIndexes;
+	} while(num_joined > 0);
+
+	*searchAreas = inAreas;
+	*searchIndexes = inIndexes;
+
+}
 
 /**********************************************************************
  * Tracker Class
@@ -309,6 +387,7 @@ BelugaTracker::~BelugaTracker()
 		for(int i = 0; i < 4; i++)
 		{
 			//cvReleaseImage(&m_pGSFrames[i]);
+			cvReleaseImage(&m_pUndistortedFrames[i]);
 			cvReleaseImage(&m_pHSVFrames[i]);
 			cvReleaseImage(&m_pHFrames[i]);
 			cvReleaseImage(&m_pSFrames[i]);
@@ -338,6 +417,12 @@ BelugaTracker::~BelugaTracker()
 		}
 	}
 
+	if(m_pUndistortMapX)
+	{
+		cvReleaseImage(&m_pUndistortMapX);
+		cvReleaseImage(&m_pUndistortMapY);
+	}
+
     for(int i = 0; i < 3; i++)
     {
         delete m_pAuxFrameGroups[i];
@@ -357,7 +442,8 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
 	for(int i = 0; i < 4; i++)
 	{
-		m_SearchArea[i] = cvRect(0,0,0,0);
+		m_SearchArea[i].resize(0);
+		m_SearchIndexes[i].resize(0);
 	}
 
     /* Not using the built-in tracked objects functions - setting
@@ -390,6 +476,9 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_vBlobs[i].resize(0);
 	}
 
+	m_pUndistortMapX = NULL;
+	m_pUndistortMapY = NULL;
+
     /* grab the frame height */
     m_iFrameHeight = ProtoFrame->height;
 	m_iFrameWidth = ProtoFrame->width;
@@ -412,6 +501,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     m_viMatchAssignments.resize(m_iNObj);
     m_vdTracked_X.resize(m_iNObj);
     m_vdTracked_Y.resize(m_iNObj);
+    m_vdTracked_Z.resize(m_iNObj);
     m_vdTracked_Heading.resize(m_iNObj);
     m_vdTracked_Speed.resize(m_iNObj);
 
@@ -430,6 +520,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     /* sets up the frames that are available in the "view" menu */
     m_pTrackerFrameGroup = new MT_TrackerFrameGroup();
     //m_pTrackerFrameGroup->pushFrame(&m_pDiffFrames[0],      "Diff Frame");
+	m_pTrackerFrameGroup->pushFrame(&m_pUndistortedFrames[0], "Undistorted");
     m_pTrackerFrameGroup->pushFrame(&m_pThreshFrames[0],    "Threshold Frame");
 	m_pTrackerFrameGroup->pushFrame(&m_pHSVFrames[0], "HSV");
 	m_pTrackerFrameGroup->pushFrame(&m_pHFrames[0], "H");
@@ -440,6 +531,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     for(unsigned int i = 0; i < 3; i++)
     {
         m_pAuxFrameGroups[i] = new MT_TrackerFrameGroup();
+		m_pAuxFrameGroups[i]->pushFrame(&m_pUndistortedFrames[i+1], "Undistorted");
         m_pAuxFrameGroups[i]->pushFrame(&m_pThreshFrames[i+1], "Threshold Frame");
         m_pAuxFrameGroups[i]->pushFrame(&m_pHSVFrames[i+1], "HSV");
         m_pAuxFrameGroups[i]->pushFrame(&m_pHFrames[i+1], "H");
@@ -571,6 +663,7 @@ void BelugaTracker::createFrames()
 		for(int i = 0; i < 4; i++)
 		{
 			//cvReleaseImage(&m_pGSFrames[i]);
+			cvReleaseImage(&m_pUndistortedFrames[i]);
 			cvReleaseImage(&m_pHSVFrames[i]);
 			cvReleaseImage(&m_pHFrames[i]);
 			cvReleaseImage(&m_pSFrames[i]);
@@ -580,9 +673,17 @@ void BelugaTracker::createFrames()
 		cvReleaseImage(&m_pTempFrame1);
 	}
 
+	if(m_pUndistortMapX)
+	{
+		cvReleaseImage(&m_pUndistortMapX);
+		cvReleaseImage(&m_pUndistortMapY);
+	}
+
 	for(int i = 0; i < 4; i++)
 	{
 		//m_pGSFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+		m_pUndistortedFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
+			IPL_DEPTH_8U, 3);
 		m_pThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
                                            IPL_DEPTH_8U, 1);
 		m_pHSVFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
@@ -595,6 +696,9 @@ void BelugaTracker::createFrames()
                                       IPL_DEPTH_8U, 1);
 	}
 	m_pTempFrame1 = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+
+	m_pUndistortMapX = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
+	m_pUndistortMapY = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
 
 	//m_pGSThresholder = NULL;
     /* Create the Thresholder and Blobber objects */
@@ -770,6 +874,14 @@ void BelugaTracker::setCalibrations(const char* calibfile1,
 
 		}
 	}
+
+	if(m_pCameraMatrices[0])
+	{
+		cvInitUndistortMap(m_pCameraMatrices[0], 
+			m_pDistortionCoeffs[0],
+			m_pUndistortMapX,
+			m_pUndistortMapY);
+	}
 }
 
 void BelugaTracker::HSVSplit(IplImage* frame, int i)
@@ -839,9 +951,66 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         }
     }
 
+	std::vector<std::vector<double>> measX;
+	std::vector<std::vector<double>> measY;
+	std::vector<std::vector<double>> measZ;
+
+	measX.resize(m_iNObj);
+	measY.resize(m_iNObj);
+	measZ.resize(m_iNObj);
+	for(int i = 0; i < m_iNObj; i++)
+	{
+		measX[i].resize(0);
+		measY[i].resize(0);
+		measZ[i].resize(0);
+	}
+
+	/* determine search rectangles */
 	for(int i = 0; i < 4; i++)
 	{
-		HSVSplit(frames[i], i);
+        m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
+
+		m_SearchIndexes[i].resize(0);
+		m_SearchArea[i].resize(0);
+		std::vector<unsigned int> search_indexes_this_rect;
+		search_indexes_this_rect.resize(1);
+
+		for(int j = 0; j < m_iNObj; j++)
+		{
+			search_indexes_this_rect[0] = j;
+
+			if(m_vdHistories_X[j].size() == 0)
+			{
+				m_SearchIndexes[i].push_back(search_indexes_this_rect);
+				m_SearchArea[i].push_back(cvRect(0, 0, m_iFrameWidth, m_iFrameHeight));
+				continue;
+			}
+
+			double x = m_vdTracked_X[j];
+			double y = m_vdTracked_Y[j];
+			double z = m_vdTracked_Z[j];
+			double u = 0;
+			double v = 0;
+ 
+			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
+
+			if(u > -(double)m_iSearchAreaPadding && u < (double)(m_iFrameWidth+m_iSearchAreaPadding)
+				&& v > -(double)m_iSearchAreaPadding && v < (double)(m_iFrameHeight+m_iSearchAreaPadding))
+			{
+				m_SearchIndexes[i].push_back(search_indexes_this_rect);
+				m_SearchArea[i].push_back(searchRectAtPointWithSize(u,v,m_iSearchAreaPadding));
+			}
+		}
+
+	    combineSearchAreas(&m_SearchArea[i], &m_SearchIndexes[i]);
+	}
+
+	for(int i = 0; i < 4; i++)
+	{
+		cvRemap(frames[i], m_pUndistortedFrames[i], m_pUndistortMapX, m_pUndistortMapY);
+		HSVSplit(m_pUndistortedFrames[i], i);
+
+		//HSVSplit(frames[i], i);
 
 		/* just for display */
 		m_pGSFrames[i] = m_pVFrames[i];
@@ -866,8 +1035,70 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			m_iBlobAreaThreshHigh);
 
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
+	}
+
+/*	for(int i = 0; m_iNObj; i++)
+	{
+		for(unsigned int j = 0; j < 4; j++)
+		{
+			double x = m_vdTracked_X[j];
+			double y = m_vdTracked_Y[j];
+			double z = m_vdTracked_Z[j];
+			double u = 0;
+			double v = 0;
+ 
+			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
+
+			if(u > -(double)m_iSearchAreaPadding && u < (double)(m_iFrameWidth+m_iSearchAreaPadding)
+				&& v > -(double)m_iSearchAreaPadding && v < (double)(m_iFrameHeight+m_iSearchAreaPadding))
+			{
+				uInFrame.push_back(u);
+				vInFrame.push_back(v);
+				jInFrame.push_back(j);
+			}
+			
+		} 
+*/
+
+		/* if we have any tracking history, see if any of the positions are
+		 * in this frame */
+/*		std::vector<double> uInFrame;
+		std::vector<double> vInFrame;
+		std::vector<unsigned int> jInFrame;
+		uInFrame.resize(0);  vInFrame.resize(0);
+		for(int j = 0; j < m_iNObj; j++)
+		{
+			double x = m_vdTracked_X[j];
+			double y = m_vdTracked_Y[j];
+			double z = m_vdTracked_Z[j];
+			double u = 0;
+			double v = 0;
+ 
+			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
+
+			if(u > -(double)m_iSearchAreaPadding && u < (double)(m_iFrameWidth+m_iSearchAreaPadding)
+				&& v > -(double)m_iSearchAreaPadding && v < (double)(m_iFrameHeight+m_iSearchAreaPadding))
+			{
+				uInFrame.push_back(u);
+				vInFrame.push_back(v);
+				jInFrame.push_back(j);
+			}
+		}
+
+		for(unsigned int j = 0; j < uInFrame.size(); j++)
+		{
+			for(unsigned int k = 0; k < m_vBlobs.size(); k++)
+			{
+				double dx = fabs(uInFrame[j] - m_vBlobs[k].COMx);
+				double dy = fabs(vInFrame[j] - m_vBlobs[k].COMy);
+				if(MT_MAX(dx, dy) <  2.0*((double)m_iSearchAreaPadding))
+				{
+				}
+			}
+		}
 
 	}
+*/
 
 	// below here will require rewriting 
 	return;
@@ -1195,10 +1426,10 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 	double cy = 0.5*(object_limits.ymin + object_limits.ymax);
 	double w = object_limits.xmax - object_limits.xmin + m_iSearchAreaPadding;
 	double h = object_limits.ymax - object_limits.ymin + m_iSearchAreaPadding;
-	m_SearchArea[0] = cvRect(MT_CLAMP(cx - 0.5*w, 0, m_iFrameWidth),
+/*	m_SearchArea[0] = cvRect(MT_CLAMP(cx - 0.5*w, 0, m_iFrameWidth),
 		                  MT_CLAMP(cy - 0.5*h, 0, m_iFrameHeight),
 						  MT_CLAMP(w, 0, m_iFrameWidth),
-						  MT_CLAMP(h, 0, m_iFrameHeight));
+						  MT_CLAMP(h, 0, m_iFrameHeight));*/
 
     /* write data to file */
     writeData();
@@ -1300,7 +1531,15 @@ void BelugaTracker::doGLDrawing(int flags)
         }
     }
 
-	MT_DrawRectangle(m_SearchArea[0].x, m_iFrameHeight - m_SearchArea[0].y - m_SearchArea[0].height, m_SearchArea[0].width, m_SearchArea[0].height);
+	for(unsigned int i = 0; i < m_SearchArea[Q].size(); i++)
+	{
+		MT_DrawRectangle(m_SearchArea[Q][i].x, 
+			m_iFrameHeight - m_SearchArea[Q][i].y - m_SearchArea[Q][i].height,
+			m_SearchArea[Q][i].width, 
+			m_SearchArea[Q][i].height);
+	}
+
+	//
 
 }
 
