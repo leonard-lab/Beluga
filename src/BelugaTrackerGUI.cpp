@@ -140,7 +140,7 @@ void BelugaTrackerFrame::initUserData()
                             &m_sQuad4MaskPath);
                             
     
-    setTimer(100);
+    setTimer(67);
 }
 
 void BelugaTrackerFrame::writeUserXML()
@@ -292,6 +292,11 @@ void BelugaTrackerFrame::doUserControl()
 void BelugaTrackerFrame::initTracker()
 {
 
+	if(m_pTracker)
+	{
+		return;
+	}
+
     if(!m_pSlaves[1])
     {
         MT_ShowErrorDialog(this, wxT("Initialize the video sources first."));
@@ -329,7 +334,7 @@ void BelugaTrackerFrame::initTracker()
     /* note - do NOT call MT_TrackerBase::initTracker, which is
      * a placeholder function that sets m_pTracker to NULL! */
 
-	setTimer(100);
+	setTimer(67);
 }
 
 void BelugaTrackerFrame::updateRobotStatesFromTracker()
