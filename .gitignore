@@ -1,2 +1,7 @@
 *.asv
 matlab/calibration/TankMask*
+cmd_robot_*
+cgi/is_*
+cgi/positions_*
+tmp_*
+test/*.dat
