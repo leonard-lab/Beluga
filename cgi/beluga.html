@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>Beluga Pod</title>
+
+<style type="text/css">
+div.canvas {
+    border:solid;
+    border-width:1px;
+    background-color:#DFDFCF;
+    width:400px;
+    height:400px;
+}
+
+img.dot {
+    position:absolute;
+    left:-20px;
+    top:-20px;
+    width:15px;
+    height:15px;
+}
+
+</style>
+
+<script type="text/javascript">
+
+var dotHalfWidth = 7;
+var dotHalfHeight = 7;
+var goX = -100;
+var goY = -100;
+var go = 0;
+var T = 100;
+
+function getPos(obj)
+{
+	var output = new Object();
+	var mytop=0, myleft=0;
+	while(obj)
+    {
+		mytop+= obj.offsetTop;
+		myleft+= obj.offsetLeft;
+		obj= obj.offsetParent;
+	}
+	output.left = myleft;
+	output.top = mytop;
+	return output;
+}
+
+function getXMLHttp()
+{
+    var xmlhttp;
+    if(window.XMLHttpRequest)
+    {
+        xmlhttp = new XMLHttpRequest();
+    }
+    else
+    {
+        xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+
+    return xmlhttp;
+}
+
+function moveDot(dot_name, x, y)
+{
+    var cPos = getPos(document.getElementById("canvasDiv"));
+    x = (x + cPos.left - dotHalfWidth);
+    y = (y + cPos.top - dotHalfHeight);
+
+    var dot = document.getElementById(dot_name);
+    dot.style.left = x;
+    dot.style.top = y;
+
+    //document.getElementById("d1").innerHTML = x + ", " + y;
+}
+
+function doUpdate()
+{
+    var cmd = "beluga.php";
+    if(goX > 0 && goY > 0)
+    {
+        cmd = cmd + "?robot=0&go_x=" + goX + "&go_y=" + goY;
+    }
+
+    var req = getXMLHttp();
+    req.open("GET", cmd, false);
+    req.send();
+
+    var coords = req.responseText.split(" ");
+
+    moveDot("dot1", parseFloat(coords[0]), parseFloat(coords[1]));
+
+    if(go)
+    {
+        setTimeout(doUpdate, T);
+    }
+}
+
+function onCanvasClick(e)
+{
+    var posx = 0;
+	var posy = 0;
+	if (!e) var e = window.event;
+	if (e.pageX || e.pageY) 	{
+		posx = e.pageX;
+		posy = e.pageY;
+	}
+	else if (e.clientX || e.clientY) 	{
+		posx = e.clientX + document.body.scrollLeft
+			+ document.documentElement.scrollLeft;
+		posy = e.clientY + document.body.scrollTop
+			+ document.documentElement.scrollTop;
+	}
+
+    with(document.getElementById("dot2").style)
+    {
+         left = posx - dotHalfWidth;
+         top = posy - dotHalfHeight;
+    }
+
+    var cPos = getPos(document.getElementById("canvasDiv"));
+    goX = posx - cPos.left;
+    goY = posy - cPos.top;
+   
+}
+
+function onButtonClick()
+{
+    if(go > 0)
+    {
+        go = 0;
+        document.getElementById("goButton").innerHTML = "Go";
+    }
+    else
+    {
+        go = 1;
+        setTimeout(doUpdate, T);
+        document.getElementById("goButton").innerHTML = "Stop";        
+    }
+}
+
+</script>
+
+</head>
+
+<body>
+
+<img src="red_dot.png" id="dot1" class="dot">
+<img src="green_dot.png" id="dot2" class="dot">
+
+Welcome to Beluga Pod.
+
+<div id="canvasDiv" class="canvas" onclick="onCanvasClick()"></div>
+
+<button type="button" id="goButton" onclick="onButtonClick()">Go</button>
+
+<br/>
+<div id="d1"></div>
+
+
+</body> </html>
