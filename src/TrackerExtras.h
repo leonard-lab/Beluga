@@ -4,20 +4,6 @@
 #include <cv.h>
 #include <vector>
 
-void fish_dynamics(const CvMat* x_k,
-                          const CvMat* u_k,
-                          const CvMat* v_k,
-                          CvMat* x_kplus1);
-
-void fish_measurement(const CvMat* x_k,
-                             const CvMat* n_k,
-                             CvMat* z_k);
-
-void constrain_state(CvMat* x_k,
-                            CvMat* X_p,
-                            double xmax,
-							double ymax);
-
 void rollHistories(std::vector<double>* X,
                    std::vector<double>* Y,
                    double x,

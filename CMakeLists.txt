@@ -46,7 +46,9 @@ set(APP_SRC
   src/CoordinateTransforms.h
   src/CoordinateTransforms.cpp
   src/TrackerExtras.h
-  src/TrackerExtras.cpp)
+  src/TrackerExtras.cpp
+  src/BelugaDynamics.h
+  src/BelugaDynamics.cpp)
 
 # adds src to the header search path
 include_directories(src)

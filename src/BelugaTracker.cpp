@@ -3,6 +3,7 @@
 #include "CalibrationDataFile.h"
 
 #include "TrackerExtras.h"
+#include "BelugaDynamics.h"
 
 /* default parameter values */
 const unsigned int DEFAULT_BG_THRESH = 60;
@@ -855,12 +856,12 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         if(valid_meas)
         {
             /* UKF prediction step, note we use function pointers to
-               the fish_dynamics and fish_measurement functions defined
+               the beluga_dynamics and beluga_measurement functions defined
                above.  The final parameter would be for the control input
                vector, which we don't use here so we pass a NULL pointer */
             MT_UKFPredict(m_vpUKF[i],
-                          &fish_dynamics,
-                          &fish_measurement,
+                          &beluga_dynamics,
+                          &beluga_measurement,
                           NULL);
 
 		}
@@ -891,13 +892,13 @@ void BelugaTracker::doTracking(IplImage* frames[4])
          *   It wasn't strictly necessary to use the matching for
          *   this, but it keeps the trajectories aligned when we look
          *   at the raw data. */
-        m_vdBlobs_X[i] = blobs[j].m_dXCentre;
-        m_vdBlobs_Y[i] = blobs[j].m_dYCentre;
-        m_vdBlobs_Area[i] = blobs[j].m_dArea;
-        m_vdBlobs_Orientation[i] = blobs[j].m_dOrientation;
-        m_vdBlobs_MajorAxis[i] = blobs[j].m_dMajorAxis;
-        m_vdBlobs_MinorAxis[i] = blobs[j].m_dMinorAxis;
-        m_vdBlobs_Speed[i] = 0;  /* not getting speed from the blobs */
+//        m_vdBlobs_X[i] = blobs[j].m_dXCentre;
+//        m_vdBlobs_Y[i] = blobs[j].m_dYCentre;
+//        m_vdBlobs_Area[i] = blobs[j].m_dArea;
+//        m_vdBlobs_Orientation[i] = blobs[j].m_dOrientation;
+//        m_vdBlobs_MajorAxis[i] = blobs[j].m_dMajorAxis;
+//        m_vdBlobs_MinorAxis[i] = blobs[j].m_dMinorAxis;
+//        m_vdBlobs_Speed[i] = 0;  /* not getting speed from the blobs */
 
         /* update the position histories - see definition of
            rollHistories */
@@ -931,12 +932,12 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         if(valid_meas)
         {
             /* UKF prediction step, note we use function pointers to
-               the fish_dynamics and fish_measurement functions defined
+               the beluga_dynamics and beluga_measurement functions defined
                above.  The final parameter would be for the control input
                vector, which we don't use here so we pass a NULL pointer */
             MT_UKFPredict(m_vpUKF[i],
-                          &fish_dynamics,
-                          &fish_measurement,
+                          &beluga_dynamics,
+                          &beluga_measurement,
                           NULL);
 
             /* Angle Madness
