@@ -32,8 +32,9 @@ void beluga_dynamics(const CvMat* x_k,
      * Note that x_k is a 4x1 matrix here */
     double x = cvGetReal2D(x_k, 0, 0);
     double y = cvGetReal2D(x_k, 1, 0);
-    double hdg = cvGetReal2D(x_k, 2, 0); /* heading [rad] */
-    double spd = cvGetReal2D(x_k, 3, 0); /* speed */
+	double z = cvGetReal2D(x_k, 2, 0);
+    double hdg = cvGetReal2D(x_k, 3, 0); /* heading [rad] */
+    double spd = cvGetReal2D(x_k, 4, 0); /* speed */
 
     /* position(t + 1) = position(t) + dT*velocity */
     x += dT*spd*cos(hdg);
@@ -42,8 +43,9 @@ void beluga_dynamics(const CvMat* x_k,
     /* works just like cvGetReal2D */
     cvSetReal2D(x_kplus1, 0, 0, x);
     cvSetReal2D(x_kplus1, 1, 0, y);
-    cvSetReal2D(x_kplus1, 2, 0, hdg);
-    cvSetReal2D(x_kplus1, 3, 0, fabs(spd));
+    cvSetReal2D(x_kplus1, 2, 0, z);
+    cvSetReal2D(x_kplus1, 3, 0, hdg);
+    cvSetReal2D(x_kplus1, 4, 0, fabs(spd));
 
     /* this allows v_k to be a NULL pointer, in which case
      * this step is skipped */
@@ -64,9 +66,23 @@ void beluga_measurement(const CvMat* x_k,
                              const CvMat* n_k,
                              CvMat* z_k)
 {
-    cvSetReal2D(z_k, 0, 0, cvGetReal2D(x_k, 0, 0));
-    cvSetReal2D(z_k, 1, 0, cvGetReal2D(x_k, 1, 0));
-    cvSetReal2D(z_k, 2, 0, cvGetReal2D(x_k, 2, 0));
+	unsigned int nrows = z_k->rows;
+	unsigned int nmeas = (nrows-1)/3;
+	if( (3*nmeas) != (nrows-1))
+	{
+		fprintf(stderr, "beluga_measurement error:  "
+			"Number of rows in z is incorrect.  Must be 3*n+1.\n");
+		return;
+	}
+
+	/* measurement should be (x, y, theta) repeated nmeas times then z */
+	for(unsigned int i = 0; i < nmeas; i++)
+	{
+		cvSetReal2D(z_k, 3*i+0, 0, cvGetReal2D(x_k, 0, 0));
+		cvSetReal2D(z_k, 3*i+1, 0, cvGetReal2D(x_k, 1, 0));
+		cvSetReal2D(z_k, 3*i+2, 0, cvGetReal2D(x_k, 3, 0));
+	}
+    cvSetReal2D(z_k, nrows-1, 0, cvGetReal2D(x_k, 2, 0));
 
     /* as above, skip this step when n_k is null */
     if(n_k)
@@ -89,26 +105,29 @@ void beluga_measurement(const CvMat* x_k,
  */
 void constrain_state(CvMat* x_k,
                             CvMat* X_p,
-                            double xmax,
-							double ymax)
+							double tank_radius,
+							double water_depth)
 {
     double x = cvGetReal2D(x_k, 0, 0);
     double y = cvGetReal2D(x_k, 1, 0);
-    double hdg = cvGetReal2D(x_k, 2, 0);
-    double spd = cvGetReal2D(x_k, 3, 0);
+    double z = cvGetReal2D(x_k, 2, 0);
+    double hdg = cvGetReal2D(x_k, 3, 0);
+    double spd = cvGetReal2D(x_k, 4, 0);
 
     double x_p = cvGetReal2D(X_p, 0, 0);
     double y_p = cvGetReal2D(X_p, 1, 0);
-    double hdg_p = cvGetReal2D(X_p, 2, 0);
-    double spd_p = cvGetReal2D(X_p, 3, 0);
+    double z_p = cvGetReal2D(X_p, 2, 0);
+    double hdg_p = cvGetReal2D(X_p, 3, 0);
+    double spd_p = cvGetReal2D(X_p, 4, 0);
 
-    /* MT_CLAMP(x, a, b) =
-     *    x, if a <= x <= b,
-     *    a, if x < a,
-     *    b, if x > b
-     */
-    x = MT_CLAMP(x, 0, xmax);
-    y = MT_CLAMP(y, 0, ymax);
+	if(x*x + y*y > tank_radius)
+	{
+		double phi = atan2(y, x);
+		x = 0.95*tank_radius*cos(phi);
+		y = 0.95*tank_radius*sin(phi);
+	}
+
+    z = MT_CLAMP(y, 0, water_depth);
     spd = MT_CLAMP(spd, 0, 100);
 
     /* MT_isnan(x) returns true if x is NaN */
@@ -132,6 +151,17 @@ void constrain_state(CvMat* x_k,
         else
         {
             y = 0;
+        }
+    }
+    if(MT_isnan(z))
+    {
+        if(!MT_isnan(z_p))
+        {
+            z = z_p;
+        }
+        else
+        {
+            z = water_depth;
         }
     }
     if(MT_isnan(hdg))
@@ -159,6 +189,7 @@ void constrain_state(CvMat* x_k,
     
     cvSetReal2D(x_k, 0, 0, x);
     cvSetReal2D(x_k, 1, 0, y);
-    cvSetReal2D(x_k, 2, 0, hdg);
-    cvSetReal2D(x_k, 3, 0, fabs(spd));
+    cvSetReal2D(x_k, 2, 0, z);
+    cvSetReal2D(x_k, 3, 0, hdg);
+    cvSetReal2D(x_k, 4, 0, fabs(spd));
 }

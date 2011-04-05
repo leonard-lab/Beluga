@@ -111,8 +111,8 @@ private:
 
 	std::vector<std::vector<double> > m_vvdMeas_X;
 	std::vector<std::vector<double> > m_vvdMeas_Y;
-	std::vector<std::vector<double> > m_vvdMeas_Z;
 	std::vector<std::vector<double> > m_vvdMeas_Hdg;
+	std::vector<std::vector<unsigned int> > m_vviMeas_Cam;
 
 	std::vector<t_p_history> m_vdHistories_X;
     std::vector<t_p_history> m_vdHistories_Y;
