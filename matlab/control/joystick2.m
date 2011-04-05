@@ -1,7 +1,9 @@
 % this code uses the joystick to control the beluga in the horizontal plane
 % and buttons vor vertical control
 opencom;
+%multcom;
 pause(2);
+%result = [];
 
 joy = vrjoystick(1);
 upcmd = zeros(1,2);
@@ -54,6 +56,10 @@ while 1
 %      servo(servocmd,s);
 %      pause(.1)
      
-     sentence(upcmd(1),upcmd(2),fwdcmd(1),fwdcmd(2),servocmd,s)
-    pause(0.3);
+    %d1 = sentence(upcmd(1),upcmd(2),fwdcmd(1),fwdcmd(2),servocmd,s1)
+    %pause(0.1);
+    %d2 = sentence(upcmd(1),upcmd(2),fwdcmd(1),fwdcmd(2),servocmd,s17)
+    sentence(upcmd(1),upcmd(2),fwdcmd(1),fwdcmd(2),servocmd,s)
+    pause(0.1);
+    %result = [result [d1; d2]];
 end
