@@ -58,7 +58,7 @@ private:
 	std::vector<YABlob> m_vBlobs[4];
 
 	std::vector<CvRect> m_SearchArea[4];
-	std::vector<std::vector<unsigned int>> m_SearchIndexes[4];
+	std::vector<std::vector<unsigned int> > m_SearchIndexes[4];
 	unsigned int m_iSearchAreaPadding;
 
     /* only used to add to XDF */

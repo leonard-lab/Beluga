@@ -44,7 +44,9 @@ set(APP_SRC
   src/CalibrationDataFile.h
   src/CalibrationDataFile.cpp
   src/CoordinateTransforms.h
-  src/CoordinateTransforms.cpp)
+  src/CoordinateTransforms.cpp
+  src/TrackerExtras.h
+  src/TrackerExtras.cpp)
 
 # adds src to the header search path
 include_directories(src)
