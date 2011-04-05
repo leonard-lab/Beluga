@@ -214,6 +214,22 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     m_vdTracked_X.resize(m_iNObj);
     m_vdTracked_Y.resize(m_iNObj);
     m_vdTracked_Z.resize(m_iNObj);
+	m_vvdMeas_X.resize(m_iNObj);
+	m_vvdMeas_Y.resize(m_iNObj);
+	m_vvdMeas_Z.resize(m_iNObj);
+	m_vvdMeas_Hdg.resize(m_iNObj);
+	for(int i = 0; i < 4; i++)
+	{
+		m_vdaTracked_XC[i].resize(m_iNObj);
+		m_vdaTracked_YC[i].resize(m_iNObj);
+	}
+	for(int i = 0; i < m_iNObj; i++)
+	{
+		m_vvdMeas_X[i].resize(0);
+		m_vvdMeas_Y[i].resize(0);
+		m_vvdMeas_Z[i].resize(0);
+		m_vvdMeas_Hdg[i].resize(0);
+	}
     m_vdTracked_Heading.resize(m_iNObj);
     m_vdTracked_Speed.resize(m_iNObj);
 
@@ -706,6 +722,9 @@ void BelugaTracker::doTracking(IplImage* frames[4])
  
 			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
 
+			m_vdaTracked_XC[i][j] = u;
+			m_vdaTracked_YC[i][j] = v;
+
 			if(u > -(double)m_iSearchAreaPadding && u < (double)(m_iFrameWidth+m_iSearchAreaPadding)
 				&& v > -(double)m_iSearchAreaPadding && v < (double)(m_iFrameHeight+m_iSearchAreaPadding))
 			{
@@ -717,6 +736,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 	    combineSearchAreas(&m_SearchArea[i], &m_SearchIndexes[i]);
 	}
 
+	/* image processing and blob finding */
 	for(int i = 0; i < 4; i++)
 	{
 		cvRemap(frames[i], m_pUndistortedFrames[i], m_pUndistortMapX, m_pUndistortMapY);
@@ -741,7 +761,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		}
 
 		m_vBlobs[i] = m_YABlobber.FindBlobs(m_pThreshFrames[i],
-			5,
+			5, /* min perimeter */
 			m_iBlobAreaThreshLow,
 			NO_MAX,
 			m_iBlobAreaThreshHigh);
@@ -749,169 +769,107 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
 	}
 
-/*	for(int i = 0; m_iNObj; i++)
+	/* measurement association */
+	for(int i = 0; i < m_iNObj; i++)
 	{
-		for(unsigned int j = 0; j < 4; j++)
+		m_vvdMeas_X[i].resize(0);
+		m_vvdMeas_Y[i].resize(0);
+		m_vvdMeas_Z[i].resize(0);
+		m_vvdMeas_Hdg[i].resize(0);
+	}
+	for(int i = 0; i < 4; i++)
+	{
+		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
 		{
-			double x = m_vdTracked_X[j];
-			double y = m_vdTracked_Y[j];
-			double z = m_vdTracked_Z[j];
-			double u = 0;
-			double v = 0;
- 
-			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
-
-			if(u > -(double)m_iSearchAreaPadding && u < (double)(m_iFrameWidth+m_iSearchAreaPadding)
-				&& v > -(double)m_iSearchAreaPadding && v < (double)(m_iFrameHeight+m_iSearchAreaPadding))
+			/* blobs in search area */
+			std::vector<YABlob> blobs_this_rect;
+			blobs_this_rect.resize(0);
+			for(unsigned int k = 0; k < m_vBlobs[i].size(); k++)
 			{
-				uInFrame.push_back(u);
-				vInFrame.push_back(v);
-				jInFrame.push_back(j);
-			}
-			
-		} 
-*/
-
-		/* if we have any tracking history, see if any of the positions are
-		 * in this frame */
-/*		std::vector<double> uInFrame;
-		std::vector<double> vInFrame;
-		std::vector<unsigned int> jInFrame;
-		uInFrame.resize(0);  vInFrame.resize(0);
-		for(int j = 0; j < m_iNObj; j++)
-		{
-			double x = m_vdTracked_X[j];
-			double y = m_vdTracked_Y[j];
-			double z = m_vdTracked_Z[j];
-			double u = 0;
-			double v = 0;
- 
-			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
-
-			if(u > -(double)m_iSearchAreaPadding && u < (double)(m_iFrameWidth+m_iSearchAreaPadding)
-				&& v > -(double)m_iSearchAreaPadding && v < (double)(m_iFrameHeight+m_iSearchAreaPadding))
-			{
-				uInFrame.push_back(u);
-				vInFrame.push_back(v);
-				jInFrame.push_back(j);
-			}
-		}
-
-		for(unsigned int j = 0; j < uInFrame.size(); j++)
-		{
-			for(unsigned int k = 0; k < m_vBlobs.size(); k++)
-			{
-				double dx = fabs(uInFrame[j] - m_vBlobs[k].COMx);
-				double dy = fabs(vInFrame[j] - m_vBlobs[k].COMy);
-				if(MT_MAX(dx, dy) <  2.0*((double)m_iSearchAreaPadding))
+				if(pointInCvRect(m_vBlobs[i][k].COMx, m_vBlobs[i][k].COMy, m_SearchArea[i][j]))
 				{
+					blobs_this_rect.push_back(m_vBlobs[i][k]);
 				}
 			}
+
+			for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
+			{
+				double d2;
+				double d2min = 1e10;
+				int mmin = -1;
+				/* i'th camera, j'th rectangle, k'th index */
+				unsigned int n = m_SearchIndexes[i][j][k];
+				double xk = m_vdaTracked_XC[i][n];
+				double yk = m_vdaTracked_YC[i][n];
+				for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
+				{
+					d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
+						+ (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
+					if(d2 < d2min)
+					{
+						mmin = m;
+						d2min = d2;
+					}
+				}
+
+				if(mmin >= 0)
+				{
+					m_vvdMeas_X[n].push_back(blobs_this_rect[mmin].COMx);
+					m_vvdMeas_Y[n].push_back(blobs_this_rect[mmin].COMy);
+					m_vvdMeas_Hdg[n].push_back(blobs_this_rect[mmin].orientation);
+				}
+
+			}
+
+		}
+	}
+
+	/* filtering */
+	for(int i =0; i < m_iNObj; i++)
+	{
+		printf("Got %d Meas's for Object %d: ", m_vvdMeas_X[i].size(), i);
+		for(unsigned int j = 0; j < m_vvdMeas_X[i].size(); j++)
+		{
+			printf("(%f, %f, %f) ", m_vvdMeas_X[i][j], m_vvdMeas_Y[i][j], m_vvdMeas_Hdg[i][j]);
+		}
+		printf("\n");
+
+
+        bool valid_meas = m_iFrameCounter > 1;
+
+        /* if any state is NaN, reset the UKF
+         * This shouldn't happen anymore, but it's a decent safety
+         * check.  It could probably be omitted if we want to
+         * optimize for speed... */
+        if(m_iFrameCounter > 1 &&
+           (!CvMatIsOk(m_vpUKF[i]->x) ||
+            !CvMatIsOk(m_vpUKF[i]->P)))
+        {
+            MT_UKFFree(&(m_vpUKF[i]));
+            m_vpUKF[i] = MT_UKFInit(4, 3, 0.1);
+            MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
+            valid_meas = false;
+        }
+
+        /* if we're going to accept this measurement */
+        if(valid_meas)
+        {
+            /* UKF prediction step, note we use function pointers to
+               the fish_dynamics and fish_measurement functions defined
+               above.  The final parameter would be for the control input
+               vector, which we don't use here so we pass a NULL pointer */
+            MT_UKFPredict(m_vpUKF[i],
+                          &fish_dynamics,
+                          &fish_measurement,
+                          NULL);
+
 		}
 
+
 	}
-*/
 
 	// below here will require rewriting 
 	return;
-
-    /* Grayscale Thresholding
-     *    - Takes as input the current frame, a threshold value, and
-     *        optionally a mask image.
-     *    - Has a background frame (gotten from initialization, but
-     *        can be reset at any time), usually obtained beforehand
-     *        by averaging a fixed number (say, 100) frames from the video
-     *        source.
-     *    - Calculates a difference frame D.  D is the current frame
-     *        minus the background frame with all negative entries set to
-     *        zero.  Therefore anything in the current frame that is
-     *        darker than the background frame (after both are converted
-     *        to grayscale) shows up in the difference frame.  If the
-     *        ROI / mask frame is present, difference frame is set to zero
-     *        wherever the mask frame is zero.
-     *    - Thresholds the difference frame to obtain the threshold
-     *        frame, T.  T is 255 wherever D > the threshold value.
-     *
-     * The operation returns an MT_SparseBinaryImage, which is
-     * basically a list of pixels that are nonzero.  We don't
-     * end up using the sparse image - instead we use the full
-     * threshold image, which is pointed to by m_pThreshFrame.
-     */       
-	//HSVSplit(frame);
-    /*MT_SparseBinaryImage b = m_pGSThresholder->threshToBinary(m_pVFrame,
-                                                              m_iBlobValThresh,
-                                                              ROI_frame,
-															  MT_THRESH_DARKER); */
-
-    /* make sure these pointers are updated */
-    //m_pGSFrame = m_pVFrame; //m_pGSThresholder->getGSFrame();
-    //m_pDiffFrame = m_pVFrame; //m_pGSThresholder->getDiffFrame();
-    //pThreshFrame = m_pGSThresholder->getThreshFrame();
-	//cvThreshold(m_pVFrame, m_pThreshFrame, m_iBlobValThresh, 255, CV_THRESH_BINARY_INV);
-	//if(ROI_frame)
-	//{
-	//	cvAnd(m_pThreshFrame, ROI_frame, m_pThreshFrame);
-	//}
-	//cvSmooth(m_pThreshFrame, m_pThreshFrame, CV_MEDIAN, 5);
-
-    /* Blobbing with George Young's Mixture-of-Gaussians blobber
-     *
-     * In a nutshell, this looks for a fixed number of ellipsoidal
-     * objects in the thresholded frame, then returns a bunch of
-     * objects containing information about what it found -
-     * positions, orientations, areas, etc. 
-     * 
-     */
-	/*m_pGYBlobber->m_iBlob_area_thresh_low = m_iBlobAreaThreshLow;
-	m_pGYBlobber->m_iBlob_area_thresh_high = m_iBlobAreaThreshHigh;
-	m_pGYBlobber->setSearchArea(m_SearchArea);
-    std::vector<GYBlob> blobs = m_pGYBlobber->findBlobs(m_pThreshFrame);
-	*/
-
-	std::vector<GYBlob> blobs;
-
-    /* Matching step.
-     *
-     * After the blobbing step, we have N position measurements that
-     * we need to match up with N previously estimated positions.
-     * I.e. We need to assign measurement[j] to object[i], but we
-     * don't know which j goes with which i.  This is the job of the
-     * matcher; we load it up with a matrix where the [j,i] position
-     * is the squared distance between measurement[j] and object[i].
-     * The matcher figures out the optimal assignment between j's and
-     * i's to minimize the total sum of squared distances.  It's
-     * called a Hungarian matcher because it uses something called the
-     * "Hungarian Algorithm" to solve the optimization problem.
-     *
-     * Note that the matrix need not hold squared distances.  It could
-     * hold anything representing the "cost" of matching
-     * measurement[j] with object[i].
-     * 
-     */
-    if(m_iFrameCounter > 1 && m_iNObj > 1)  /* if there's only one object, */
-    {                                       /* then this is unnecessary    */
-        double dx, dy;
-        for(int i = 0; i < m_iNObj; i++)
-        {
-            for(int j = 0; j < m_iNObj; j++)
-            {
-                dx = (m_vdBlobs_X[j] - blobs[i].m_dXCentre);
-                dy = (m_vdBlobs_Y[j] - blobs[i].m_dYCentre);
-                m_HungarianMatcher.setValue(j, i, dx*dx+dy*dy);
-            }
-        }
-        m_HungarianMatcher.doMatch(&m_viMatchAssignments);
-    }
-    else
-    {
-        /* on the first frame, there's no history to compare to, so
-           we'll just keep the order given by the blobber, i.e. i = j. */
-        m_viMatchAssignments.resize(m_iNObj);
-        for(int i = 0; i < m_iNObj; i++)
-        {
-            m_viMatchAssignments[i] = i;
-        }
-    }
 
     /* Tracking / UKF / State Estimation
      *

@@ -17,7 +17,7 @@
  * The k subscript is for time - e.g. x_k = x(kT) where T is the
  * sampling time
  */
-static void fish_dynamics(const CvMat* x_k,
+void fish_dynamics(const CvMat* x_k,
                           const CvMat* u_k,
                           const CvMat* v_k,
                           CvMat* x_kplus1)
@@ -60,7 +60,7 @@ static void fish_dynamics(const CvMat* x_k,
  *
  * In this case, z is a vector with (x,y) position and heading and
  * noise is additive. */
-static void fish_measurement(const CvMat* x_k,
+void fish_measurement(const CvMat* x_k,
                              const CvMat* n_k,
                              CvMat* z_k)
 {
@@ -87,7 +87,7 @@ static void fish_measurement(const CvMat* x_k,
  *      b) if the estimate is also NaN, x, y, and heading are set to
  *          0, speed is set to 0.1 
  */
-static void constrain_state(CvMat* x_k,
+void constrain_state(CvMat* x_k,
                             CvMat* X_p,
                             double xmax,
 							double ymax)
@@ -217,13 +217,19 @@ bool CvMatIsOk(const CvMat* M, double max_val)
 
 CvRect searchRectAtPointWithSize(double x_center, double y_center, double size)
 {
-	return cvRect(x_center-0.5*size, y_center-0.5*size, size, size);
+	return cvRect((int)(x_center-0.5*size), (int)(y_center-0.5*size), (int) size, (int)size);
 }
 
 bool cvRectsIntersect(const CvRect& a, const CvRect& b)
 {
 	return a.x < (b.x+b.width) && (a.x+a.width) > b.x &&
 		a.y < (b.y+b.height) && (a.y+a.height) > b.y;
+}
+
+bool pointInCvRect(double px, double py, const CvRect& r)
+{
+	return (px >= r.x) && (px <= (r.x+r.width)) 
+		&& (py >= r.y) && (py <= (r.y+r.height));
 }
 
 CvRect unionOfCvRects(const CvRect& a, const CvRect&b)

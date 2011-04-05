@@ -104,8 +104,15 @@ private:
     std::vector<double> m_vdTracked_X;
     std::vector<double> m_vdTracked_Y;
 	std::vector<double> m_vdTracked_Z;
+	std::vector<double> m_vdaTracked_XC[4];
+	std::vector<double> m_vdaTracked_YC[4];
     std::vector<double> m_vdTracked_Heading;
     std::vector<double> m_vdTracked_Speed;
+
+	std::vector<std::vector<double> > m_vvdMeas_X;
+	std::vector<std::vector<double> > m_vvdMeas_Y;
+	std::vector<std::vector<double> > m_vvdMeas_Z;
+	std::vector<std::vector<double> > m_vvdMeas_Hdg;
 
 	std::vector<t_p_history> m_vdHistories_X;
     std::vector<t_p_history> m_vdHistories_Y;
