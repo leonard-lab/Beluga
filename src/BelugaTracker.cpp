@@ -26,6 +26,9 @@ const unsigned int N_hist = 5;
 
 const double DEFAULT_GATE_DIST2 = 100.0*100.0;
 
+//#define VFLIP m_iFrameHeight -
+#define VFLIP
+
 /**********************************************************************
  * Tracker Class
  *********************************************************************/
@@ -218,6 +221,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     m_vdTracked_Z.resize(m_iNObj);
 	m_vvdMeas_X.resize(m_iNObj);
 	m_vvdMeas_Y.resize(m_iNObj);
+	m_vviMeas_A.resize(m_iNObj);
 	m_vviMeas_Cam.resize(m_iNObj);
 	m_vvdMeas_Hdg.resize(m_iNObj);
 	for(int i = 0; i < 4; i++)
@@ -229,6 +233,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	{
 		m_vvdMeas_X[i].resize(0);
 		m_vvdMeas_Y[i].resize(0);
+		m_vviMeas_A[i].resize(0);
 		m_vviMeas_Cam[i].resize(0);
 		m_vvdMeas_Hdg[i].resize(0);
 	}
@@ -237,13 +242,15 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
     m_vdHistories_X.resize(m_iNObj);
     m_vdHistories_Y.resize(m_iNObj);
+	m_vbLastMeasValid.resize(m_iNObj);
     /* there is an X and Y history for each object.  They need to be
        initially zero in length so that we can fill them up with real
        data as it becomes available. */
     for(int i = 0; i < m_iNObj; i++)
     {
         m_vdHistories_X[i].resize(0);
-        m_vdHistories_Y[i].resize(0);        
+        m_vdHistories_Y[i].resize(0); 
+		m_vbLastMeasValid[i] = false;
     }
 
 
@@ -667,21 +674,22 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         cvSetReal2D(m_pQ, 3, 3, m_dSigmaHeading*m_dSigmaHeading);
         cvSetReal2D(m_pQ, 4, 4, m_dSigmaSpeed*m_dSigmaSpeed);        
 
-		printf("a.1\n");
-		/* makes sure we only have to copy the numbers once - it will
-		 * automatically get copied again later if necessary */
-		adjustRMatrixAndZForMeasurementSize(&m_pR, &m_pz, 1);
-		for(int i = 0; i < m_iNObj; i++)
-		{
-			m_vpUKF[i]->m = m_pR->rows;
-		}
-		printf("a.2\n");
         /* these are the diagonal entries of the "R matrix, also
            assumed to be uncorrellated. */
         cvSetReal2D(m_pR, 0, 0, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
         cvSetReal2D(m_pR, 1, 1, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
         cvSetReal2D(m_pR, 3, 3, m_dSigmaHeadingMeas*m_dSigmaHeadingMeas);
         cvSetReal2D(m_pR, 2, 2, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
+
+		printf("a.1\n");
+		/* makes sure we only have to copy the numbers once - it will
+		 * automatically get copied again later if necessary */
+		adjustRMatrixAndZForMeasurementSize(m_pR, m_pz, 1);
+		for(int i = 0; i < m_iNObj; i++)
+		{
+			m_vpUKF[i]->m = m_pR->rows;
+		}
+		printf("a.2\n");
 
 		m_dPrevSigmaPosition = m_dSigmaPosition;
 		m_dPrevSigmaHeading = m_dSigmaHeading;
@@ -730,7 +738,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		{
 			search_indexes_this_rect[0] = j;
 
-			if(m_vdHistories_X[j].size() == 0)
+			if(!m_vbLastMeasValid[j] || m_vdHistories_X[j].size() == 0)
 			{
 				m_SearchIndexes[i].push_back(search_indexes_this_rect);
 				m_SearchArea[i].push_back(cvRect(0, 0, m_iFrameWidth, m_iFrameHeight));
@@ -744,6 +752,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			double v = 0;
  
 			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
+			//v = m_iFrameHeight - v;
+			printf("%f, %f, %f -> %f, %f\n", x, y, z, u, v);
 
 			m_vdaTracked_XC[i][j] = u;
 			m_vdaTracked_YC[i][j] = v;
@@ -789,6 +799,10 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			m_iBlobAreaThreshLow,
 			NO_MAX,
 			m_iBlobAreaThreshHigh);
+		for(unsigned int j = 0; j < m_vBlobs[i].size(); j++)
+		{
+			m_vBlobs[i][j].COMy = m_iFrameHeight - m_vBlobs[i][j].COMy;
+		}
 
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
 	}
@@ -799,6 +813,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 	{
 		m_vvdMeas_X[i].resize(0);
 		m_vvdMeas_Y[i].resize(0);
+		m_vviMeas_A[i].resize(0);
 		m_vviMeas_Cam[i].resize(0);
 		m_vvdMeas_Hdg[i].resize(0);
 	}
@@ -831,7 +846,10 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 					d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
 						+ (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
 					printf("d2 = %f\n", d2);
-					if(((d2 < DEFAULT_GATE_DIST2) || (m_vdHistories_X[n].size() == 0)) && d2 < d2min)
+					if((!m_vbLastMeasValid[n] || 
+						(d2 < DEFAULT_GATE_DIST2) || 
+						(m_vdHistories_X[n].size() == 0)) 
+						&& d2 < d2min)
 					{
 						mmin = m;
 						d2min = d2;
@@ -843,7 +861,9 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 					m_vvdMeas_X[n].push_back(blobs_this_rect[mmin].COMx);
 					m_vvdMeas_Y[n].push_back(blobs_this_rect[mmin].COMy);
 					m_vvdMeas_Hdg[n].push_back(blobs_this_rect[mmin].orientation);
+					m_vviMeas_A[n].push_back(blobs_this_rect[mmin].area);
 					m_vviMeas_Cam[n].push_back(i);
+					printf("n = %d, i = %d\n", n, i);
 				}
 
 			}
@@ -860,13 +880,17 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		printf("Got %d Meas's for Object %d: ", m_vvdMeas_X[i].size(), i);
 		for(unsigned int j = 0; j < m_vvdMeas_X[i].size(); j++)
 		{
-			printf("(%f, %f, %f) ", m_vvdMeas_X[i][j], m_vvdMeas_Y[i][j], m_vvdMeas_Hdg[i][j]);
+			printf("(%f, %f, %f in Q%d) ", m_vvdMeas_X[i][j], m_vvdMeas_Y[i][j], m_vvdMeas_Hdg[i][j], m_vviMeas_Cam[i][j]);
 		}
 		printf("\n");
 
 		printf("A\n");
-		adjustRMatrixAndZForMeasurementSize(&m_pR, &m_pz, nmeas);
-		m_vpUKF[i]->m = m_pR->rows;
+		if(nmeas)
+		{
+			adjustRMatrixAndZForMeasurementSize(m_pR, m_pz, nmeas);
+			MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
+			m_vpUKF[i]->m = m_pR->rows;
+		}
 
         bool valid_meas = m_iFrameCounter > 1 && nmeas > 0;
 
@@ -891,6 +915,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
 		printf("C\n");
 
+		m_vbLastMeasValid[i] = valid_meas;
+
         /* if we're going to accept this measurement */
         if(valid_meas)
         {
@@ -898,14 +924,16 @@ void BelugaTracker::doTracking(IplImage* frames[4])
                the beluga_dynamics and beluga_measurement functions defined
                above.  The final parameter would be for the control input
                vector, which we don't use here so we pass a NULL pointer */
+			printf("UKF Predict\n");
             MT_UKFPredict(m_vpUKF[i],
                           &beluga_dynamics,
                           &beluga_measurement,
                           NULL);
 
+			printf("Meas assign\n");
 			/* build the measurement vector */
 			double x, y, z, th;
-			double th_prev = cvGetReal2D(m_vpUKF[i]->x, 4, 0);
+			double th_prev = cvGetReal2D(m_vpUKF[i]->x, 3, 0);
 			unsigned int cam_no;
 			for(unsigned int j = 0; j < nmeas; j++)
 			{
@@ -918,22 +946,84 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 					m_vdHistories_Y[i],
 					N_hist,
 					th_prev);
+				printf("%f, %f -> %f\n", m_vvdMeas_Hdg[i][j], MT_RAD2DEG*th_prev, MT_RAD2DEG*th);
+				m_vvdMeas_Hdg[i][j] = MT_RAD2DEG*th;
 				cvSetReal2D(m_pz, j*3 + 0, 0, x);
-				cvSetReal2D(m_pz, j*3 + 0, 0, y);
-				cvSetReal2D(m_pz, j*3 + 0, 0, th);
+				cvSetReal2D(m_pz, j*3 + 1, 0, y);
+				cvSetReal2D(m_pz, j*3 + 2, 0, th);
 			}
 			cvSetReal2D(m_pz, m_pz->rows - 1, 0, m_dWaterDepth);
 
+			printf("UKF SetMeas\n");
+			printf("z = [");
+			for(unsigned int r = 0; r < m_pz->rows; r++)
+			{
+				printf("%f ", cvGetReal2D(m_pz, r, 0));
+			}
+			printf("]\n");
 			MT_UKFSetMeasurement(m_vpUKF[i], m_pz);
+			printf("UKF Correct\n");
 			MT_UKFCorrect(m_vpUKF[i]);
 
+			printf("x = [");
+			for(unsigned int r = 0; r < m_vpUKF[i]->x->rows; r++)
+			{
+				printf("%f ", cvGetReal2D(m_vpUKF[i]->x, r, 0));
+			}
+			printf("]\n");
+
+			printf("constrain\n");
 			constrain_state(m_vpUKF[i]->x, m_vpUKF[i]->x1, 10.0, m_dWaterDepth);
+			printf("x = [");
+			for(unsigned int r = 0; r < m_vpUKF[i]->x->rows; r++)
+			{
+				printf("%f ", cvGetReal2D(m_vpUKF[i]->x, r, 0));
+			}
+			printf("]\n");
 
 
 		}
 		else
 		{
-
+			// on the first frame, take the average of the measurements
+			if(m_iFrameCounter == 1)
+			{
+				if(nmeas > 0)
+				{
+					double xavg = 0;
+					double yavg = 0;
+					double qx = 0;
+					double qy = 0;
+					double x, y, z;
+					unsigned int cam_no;
+					for(unsigned int j = 0; j < nmeas; j++)
+					{
+						cam_no = m_vviMeas_Cam[i][j];
+						m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[i][j],
+							m_vvdMeas_Y[i][j],
+							0, &x, &y, &z, false);
+						xavg += x;
+						yavg += y;
+						qx += cos(MT_DEG2RAD*m_vvdMeas_Hdg[i][j]);
+						qy += sin(MT_DEG2RAD*m_vvdMeas_Hdg[i][j]);
+					}
+					xavg /= (double) nmeas;
+					yavg /= (double) nmeas;
+					double th = atan2(qy, qx);
+					printf("Should be initializing %d at %f %f %f %f 0\n", i, xavg, yavg, m_dWaterDepth, th);
+					cvSetReal2D(m_vpUKF[i]->x, 0, 0, xavg);
+					cvSetReal2D(m_vpUKF[i]->x, 1, 0, yavg);
+					cvSetReal2D(m_vpUKF[i]->x, 2, 0, m_dWaterDepth);
+					cvSetReal2D(m_vpUKF[i]->x, 3, 0, th);
+					cvSetReal2D(m_vpUKF[i]->x, 4, 0, 0);
+					m_vbLastMeasValid[i] = true;
+				}
+			}
+			else
+			{
+				// use the prediction
+				cvCopy(m_vpUKF[i]->x1, m_vpUKF[i]->x);
+			}
 		}
 
 		rollHistories(&m_vdHistories_X[i], 
@@ -942,245 +1032,18 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			cvGetReal2D(m_vpUKF[i]->x, 1, 0),
 			N_hist);
 
-	}
-
-	// below here will require rewriting 
-	return;
-
-    /* Tracking / UKF / State Estimation
-     *
-     * Now that we've got the mapping of which measurement goes with
-     * which object, we need to feed the measurements into the UKF in
-     * order to obtain a state estimate.
-     *
-     * This is a loop over each object we're tracking. 
-     */
-    unsigned int j;
-	MT_BoundingBox object_limits;
-    for(int i = 0; i< m_iNObj; i++)
-    {
-        /* The index of the optimal measurement as determined by the
-           matching algorithm. */
-        j = m_viMatchAssignments[i];
-
-        /* Copy the raw blob data to the output vectors -
-         *   It wasn't strictly necessary to use the matching for
-         *   this, but it keeps the trajectories aligned when we look
-         *   at the raw data. */
-//        m_vdBlobs_X[i] = blobs[j].m_dXCentre;
-//        m_vdBlobs_Y[i] = blobs[j].m_dYCentre;
-//        m_vdBlobs_Area[i] = blobs[j].m_dArea;
-//        m_vdBlobs_Orientation[i] = blobs[j].m_dOrientation;
-//        m_vdBlobs_MajorAxis[i] = blobs[j].m_dMajorAxis;
-//        m_vdBlobs_MinorAxis[i] = blobs[j].m_dMinorAxis;
-//        m_vdBlobs_Speed[i] = 0;  /* not getting speed from the blobs */
-
-        /* update the position histories - see definition of
-           rollHistories */
-        rollHistories(&m_vdHistories_X[i],
-                      &m_vdHistories_Y[i],
-                      m_vdBlobs_X[i],
-                      m_vdBlobs_Y[i],
-                      N_hist);
-
-        /* we could throw out a measurement and use the blob
-           state as an estimate for various reasons.  On the first
-           frame we want to set the initial state, so we flag the
-           measurement as invalid */
-        bool valid_meas = m_iFrameCounter > 1;
-
-        /* if any state is NaN, reset the UKF
-         * This shouldn't happen anymore, but it's a decent safety
-         * check.  It could probably be omitted if we want to
-         * optimize for speed... */
-        if(m_iFrameCounter > 1 &&
-           (!CvMatIsOk(m_vpUKF[i]->x) ||
-            !CvMatIsOk(m_vpUKF[i]->P)))
-        {
-            MT_UKFFree(&(m_vpUKF[i]));
-            m_vpUKF[i] = MT_UKFInit(5, 4, 0.1);
-            MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
-            valid_meas = false;
-        }
-
-        /* if we're going to accept this measurement */
-        if(valid_meas)
-        {
-            /* UKF prediction step, note we use function pointers to
-               the beluga_dynamics and beluga_measurement functions defined
-               above.  The final parameter would be for the control input
-               vector, which we don't use here so we pass a NULL pointer */
-            MT_UKFPredict(m_vpUKF[i],
-                          &beluga_dynamics,
-                          &beluga_measurement,
-                          NULL);
-
-            /* Angle Madness
-             *
-             * Getting the orientation angle is one of the trickiest
-             * parts of tracking.  There's a couple reasons for this.
-             *
-             * 1. Measurements of orientation are
-             *        highly prone to pointing in the opposite
-             *        direction (confusing the head for the tail).
-             *
-             * 2. Orientation measurements will be fixed in a range of
-             *        [-\pi, \pi] or [0, 2\pi], etc, which creates
-             *        discontinuities in the measurement.  That is,
-             *        suppose your object is moving to the left in the
-             *        image plane, so its heading is hovering right
-             *        around \pi.  The measurement could go, in one
-             *        time step, from \pi - 0.001 to -\pi + 0.001.
-             *        This is a bad thing.
-             *
-             * Here's how we handle these problems.
-             *
-             * 1.   A) By default, we trust the orientation measurement.
-             *            It uses an algorithm that should be able to
-             *            distinguish the head from the tail.
-             *      B) We keep a history of past positions.  If the
-             *            object has moved far enough in the last few
-             *            time steps, we use the use the displacement
-             *            vector as a cue.  Otherwise we use the last
-             *            known orientation estimate as a cue.
-             *      C) The orientation measurement is compared to the
-             *            cue.  If the two are similar (see below),
-             *            the measurement is used as-is.  If they are
-             *            not similar, 180 degrees is subtracted from
-             *            the measurement.
-             *
-             * 2.  A) A shortest-arc difference between the
-             *            measurement and last known orientation is
-             *            calculated.
-             *     B) Due to the way we calculate
-             *            the orientation measurement, this difference
-             *            is most likely less than 90 degrees in
-             *            magnitude.
-             *     C) The actual measurement given
-             *            to the UKF is the current orientation
-             *            estimate plus the calculated difference.
-             * 
-             */
-            double th;
-            bool a = false;
-			double th_meas;
-            if(m_vdHistories_X[i].size() == N_hist)
-            {
-                double dx = m_vdHistories_X[i].at(N_hist-1) -
-                    m_vdHistories_X[i].at(0);
-                double dy = m_vdHistories_Y[i].at(N_hist-1) -
-                    m_vdHistories_Y[i].at(0);
-
-                double min_pix_move = 2.0;
-
-                /* if the object has moved far enough */
-                if(dx*dx + dy*dy > min_pix_move*min_pix_move)
-                {
-                    /* negative sign accounts for screen coordinates */
-                    th = atan2(-dy,dx);
-                    a = true;
-                }
-            }
-
-            /* if we don't have enough history or didn't move far
-               enough, use the previous orientation */
-            if(!a)
-            {
-                th = cvGetReal2D(m_vpUKF[i]->x, 3, 0);
-            }
-
-            /* this is how we determine if the two angles are "close"
-               - the magnitude of the order parameter, which is
-               equivalent to the length of the average phasor, i.e.
-               pth = 0.5*|e^{i*th} + e^{i*orientation measurement}|
-            */
-            double pth = fabs(
-                cos(0.5*(th - MT_DEG2RAD*m_vdBlobs_Orientation[i]))
-                );
-
-            /* sqrt(2)/2 is what we'd get if the angles differ by 90
-               degrees */
-            if(pth < 0.7)  /* a little less than sqrt(2)/2 */
-            {
-                /* looks like the orientation is opposite of what it
-                   should be, so subtract 180 degrees. */
-                th_meas = m_vdBlobs_Orientation[i] - 180.0;
-            }
-			else
-			{
-				th_meas = m_vdBlobs_Orientation[i];
-			}
-
-            /* taking asin(sin(angle)) ensures that |angle| < pi,
-             * i.e. we get the shortest-arc distance  */
-            double dth = asin(sin(MT_DEG2RAD*th_meas
-                                    - cvGetReal2D(m_vpUKF[i]->x, 3, 0)));
-
-            /* finally, set the measurement vector z */
-            cvSetReal2D(m_pz, 0, 0, m_vdBlobs_X[i]);
-            cvSetReal2D(m_pz, 1, 0, m_vdBlobs_Y[i]);
-            cvSetReal2D(m_pz, 2, 0, cvGetReal2D(m_vpUKF[i]->x, 3, 0) + dth);
-            MT_UKFSetMeasurement(m_vpUKF[i], m_pz);
-
-            /* then do the UKF correction step, which accounts for the
-               measurement */
-            MT_UKFCorrect(m_vpUKF[i]);
-
-            /* then constrain the state if necessary - see function
-             * definition above */
-            constrain_state(m_vpUKF[i]->x, m_vpUKF[i]->x1, 10.0, m_dWaterDepth);            
-
-        }
-        else  
-        {
-           /* measurement was not valid -> set the state.
-             this happens on the first time step as well; this is
-             where the initial conditions of the UKF are set. */
-            cvSetReal2D(m_px0, 0, 0, m_vdBlobs_X[i]);
-            cvSetReal2D(m_px0, 1, 0, m_vdBlobs_Y[i]);
-			/* 2 is z */
-            cvSetReal2D(m_px0, 3, 0, MT_DEG2RAD*m_vdBlobs_Orientation[i]);
-            cvSetReal2D(m_px0, 4, 0, 0.1);
-            MT_UKFSetState(m_vpUKF[i], m_px0);
-        }
-
-        /* grab the state estimate and store it in variables that will
+		/* grab the state estimate and store it in variables that will
            make it convenient to save it to a file. */
         CvMat* x = m_vpUKF[i]->x;
 
         m_vdTracked_X[i] = cvGetReal2D(x, 0, 0);
         m_vdTracked_Y[i] = cvGetReal2D(x, 1, 0);
-        m_vdTracked_Heading[i] = cvGetReal2D(x, 2, 0);
-        m_vdTracked_Speed[i] = cvGetReal2D(x, 3, 0);
+        m_vdTracked_Z[i] = cvGetReal2D(x, 2, 0);
+        m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
+        m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
 
-	    object_limits.ShowX(m_vdTracked_X[i]);
-		object_limits.ShowY(m_vdTracked_Y[i]);
 
-        /* If we wanted the predicted state, this would be how to get
-           it */
-        /* CvMat* xp = m_vpUKF[i]->x1; */
-    }
-
-	if(object_limits.xmin == object_limits.xmax == 0 ||
-		object_limits.ymin == object_limits.ymax == 0)
-	{
-		object_limits.ShowX(0);
-		object_limits.ShowY(0);
-		object_limits.ShowX(m_iFrameWidth);
-		object_limits.ShowY(m_iFrameHeight);
 	}
-
-	double cx = 0.5*(object_limits.xmin + object_limits.xmax);
-	double cy = 0.5*(object_limits.ymin + object_limits.ymax);
-	double w = object_limits.xmax - object_limits.xmin + m_iSearchAreaPadding;
-	double h = object_limits.ymax - object_limits.ymin + m_iSearchAreaPadding;
-/*	m_SearchArea[0] = cvRect(MT_CLAMP(cx - 0.5*w, 0, m_iFrameWidth),
-		                  MT_CLAMP(cy - 0.5*h, 0, m_iFrameHeight),
-						  MT_CLAMP(w, 0, m_iFrameWidth),
-						  MT_CLAMP(h, 0, m_iFrameHeight));*/
-
-    /* write data to file */
-    writeData();
 
 }
 
@@ -1246,14 +1109,14 @@ void BelugaTracker::doGLDrawing(int flags)
                bottom left but the image coordinates originating from
                the top left */
             blobcenter.setx(m_vBlobs[Q].at(i).COMx);
-            blobcenter.sety(m_iFrameHeight - m_vBlobs[Q].at(i).COMy);
+            blobcenter.sety(VFLIP m_vBlobs[Q].at(i).COMy);
             blobcenter.setz( 0 );
 
             /* draws an arrow using OpenGL */
             MT_DrawArrow(blobcenter,  // center of the base of the arrow
                          20.0,        // arrow length (pixels)
                          MT_DEG2RAD*m_vBlobs[Q].at(i).orientation, // arrow angle
-                         MT_Primaries[(i+1) % MT_NPrimaries], // color
+                         MT_White,//MT_Primaries[(i+1) % MT_NPrimaries], // color
                          1.0 // fixes the arrow width
                 );    
         }
@@ -1266,23 +1129,44 @@ void BelugaTracker::doGLDrawing(int flags)
         for (unsigned int i = 0; i < m_vdTracked_X.size(); i++)
         {
 
-            blobcenter.setx(m_vdTracked_X[i]);
-            blobcenter.sety(m_iFrameHeight - m_vdTracked_Y[i]);
+            blobcenter.setx(m_vdaTracked_XC[Q][i]);
+            blobcenter.sety(VFLIP m_vdaTracked_YC[Q][i]);
             blobcenter.setz( 0 );
 
             MT_DrawArrow(blobcenter,
                          25.0, 
                          m_vdTracked_Heading[i],
-                         MT_Primaries[(i+1) % MT_NPrimaries],
+                         MT_Red,//MT_Primaries[(i+1) % MT_NPrimaries],
                          1.0 
                 );    
         }
     }
 
+	for(int i = 0; i < m_iNObj; i++)
+	{
+		for(unsigned int j = 0; j < m_vvdMeas_X[i].size(); j++)
+		{
+			if(m_vviMeas_Cam[i][j] == Q)
+			{
+				blobcenter.setx(m_vvdMeas_X[i][j]);
+				blobcenter.sety(VFLIP m_vvdMeas_Y[i][j]);
+				blobcenter.setz(0);
+
+				MT_DrawArrow(blobcenter,
+					10.0,
+					MT_DEG2RAD*m_vvdMeas_Hdg[i][j],
+					MT_Green,//MT_Primaries[(i+1) % MT_NPrimaries],
+					0.8f);
+			}
+		}
+	}
+
 	for(unsigned int i = 0; i < m_SearchArea[Q].size(); i++)
 	{
-		MT_DrawRectangle(m_SearchArea[Q][i].x, 
-			m_iFrameHeight - m_SearchArea[Q][i].y - m_SearchArea[Q][i].height,
+		MT_DrawRectangle(m_SearchArea[Q][i].x,
+     		// if VFLIP is m_iFrameHeight -, then VFLIP m_iFrameHeight = 0
+			VFLIP m_iFrameHeight ? m_SearchArea[Q][i].y : 
+			   VFLIP m_SearchArea[Q][i].y - m_SearchArea[Q][i].height,
 			m_SearchArea[Q][i].width, 
 			m_SearchArea[Q][i].height);
 	}

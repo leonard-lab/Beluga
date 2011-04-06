@@ -3,7 +3,7 @@ clear all;  close all;
 
 % if this is 1, the user supplies the file via the GUI, otherwise a value
 % is set manually in the code.  should be 1 except for debugging.
-ASK_FOR_FILE = 0;
+ASK_FOR_FILE = 1;
 
 if ASK_FOR_FILE,
     image_file = uigetfile(...
@@ -164,7 +164,7 @@ if ~SKIP_UI,
         % waits for the user to draw a rectangle on the image
         imshow(I)
         title(s)
-        msgbox(s, 'CreateMode', 'modal');
+        %msgbox(s, 'CreateMode', 'modal');
         waitforbuttonpress
         waitforbuttonpress
         init_pt = get(gcf, 'CurrentPoint');

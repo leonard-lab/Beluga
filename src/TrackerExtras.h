@@ -7,7 +7,7 @@
 #include "MT/MT_Core/support/UKF.h"
 
 //void adjustUKFMeasurementSize(MT_UKF_struct* pUKF, unsigned int nmeas);
-void adjustRMatrixAndZForMeasurementSize(CvMat** R, CvMat** z, unsigned int nmeas);
+void adjustRMatrixAndZForMeasurementSize(CvMat*& R, CvMat*& z, unsigned int nmeas);
 
 void rollHistories(std::vector<double>* X,
                    std::vector<double>* Y,

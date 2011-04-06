@@ -236,7 +236,7 @@ class BelugaServer < GServer
    end
 end
 
-server = BelugaServer.new(1234, '192.168.1.2')
+server = BelugaServer.new(1234, 'pod.princeton.edu')
 
 server.audit = true
 server.start

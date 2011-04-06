@@ -103,8 +103,9 @@ for cx = 1 : CC.NumObjects,
     end
 end
 
-[~, basename, ~] = fileparts(image_file);
+[basepath, basename, ~] = fileparts(image_file);
 save(sprintf('TankMask-%s.mat', basename), 'TankMask');
 
 % show the masked tank
 imshow(immultiply(V, TankMask))
+imwrite(TankMask, fullfile(basepath, [basename 'Mask.bmp']))

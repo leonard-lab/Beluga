@@ -127,7 +127,7 @@ void constrain_state(CvMat* x_k,
 		y = 0.95*tank_radius*sin(phi);
 	}
 
-    z = MT_CLAMP(y, 0, water_depth);
+    z = MT_CLAMP(z, 0, water_depth);
     spd = MT_CLAMP(spd, 0, 100);
 
     /* MT_isnan(x) returns true if x is NaN */

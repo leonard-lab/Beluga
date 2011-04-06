@@ -12,10 +12,15 @@
 	pUKF->z = cvCreateMat(pUKF->m, 1, CV_64FC1);
 }*/
 
-void adjustRMatrixAndZForMeasurementSize(CvMat** R, CvMat** z, unsigned int nmeas)
+void adjustRMatrixAndZForMeasurementSize(CvMat*& R, CvMat*& z, unsigned int nmeas)
 {
-	unsigned int nrows_prev = (*R)->rows;
-	unsigned int nrows_z_prev = (*z)->rows;
+	if(nmeas == 0)
+	{
+		return;
+	}
+
+	unsigned int nrows_prev = (R)->rows;
+	unsigned int nrows_z_prev = (z)->rows;
 	if(nrows_prev < 4)
 	{
 		fprintf(stderr, "adjustRMatrixForMeasurementSize Error:  Existing R is too small.\n");
@@ -31,29 +36,29 @@ void adjustRMatrixAndZForMeasurementSize(CvMat** R, CvMat** z, unsigned int nmea
 	}
 
 	printf("adjR a  %d %d\n", nrows_prev, nrows_now);
-	double sx = cvGetReal2D(*R, 0, 0);
-	double sy = cvGetReal2D(*R, 1, 1);
-	double sth = cvGetReal2D(*R, 2, 2);
-	double sz = cvGetReal2D(*R, nrows_prev-1, nrows_prev-1);
+	double sx = cvGetReal2D(R, 0, 0);
+	double sy = cvGetReal2D(R, 1, 1);
+	double sth = cvGetReal2D(R, 2, 2);
+	double sz = cvGetReal2D(R, nrows_prev-1, nrows_prev-1);
 
 	printf("adjR b\n");
-	cvReleaseMat(R);
-	cvReleaseMat(z);
+	cvReleaseMat(&R);
+	cvReleaseMat(&z);
 	printf("adjR c\n");
-	*R = cvCreateMat(nrows_now, nrows_now, CV_64FC1);
-	*z = cvCreateMat(nrows_now, 1, CV_64FC1);
+	R = cvCreateMat(nrows_now, nrows_now, CV_64FC1);
+	z = cvCreateMat(nrows_now, 1, CV_64FC1);
 	printf("adjR d\n");
-	cvZero(*R);
-	cvZero(*z);
+	cvZero(R);
+	cvZero(z);
 	printf("adjR e\n");
 	for(unsigned int i = 0; i < nmeas; i++)
 	{
-		cvSetReal2D(*R, i*3 + 0, i*3 + 0, sx);
-		cvSetReal2D(*R, i*3 + 1, i*3 + 1, sy);
-		cvSetReal2D(*R, i*3 + 0, i*3 + 0, sth);
+		cvSetReal2D(R, i*3 + 0, i*3 + 0, sx);
+		cvSetReal2D(R, i*3 + 1, i*3 + 1, sy);
+		cvSetReal2D(R, i*3 + 2, i*3 + 2, sth);
 	}
 	printf("adjR f\n");
-	cvSetReal2D(*R, nrows_now-1, nrows_now-1, sz);
+	cvSetReal2D(R, nrows_now-1, nrows_now-1, sz);
 }
 
 /* helper function.  Basic FIFO buffer with N_hist entries
@@ -144,6 +149,7 @@ double rectifyAngleMeasurement(double meas,
             double th;
             bool a = false;
 			double th_meas;
+			double meas_in = meas;
             if(hist_X.size() == N_hist)
             {
                 double dx = hist_X.at(N_hist-1) -
@@ -151,13 +157,13 @@ double rectifyAngleMeasurement(double meas,
                 double dy = hist_Y.at(N_hist-1) -
                     hist_Y.at(0);
 
-                double min_move = 0.1;
+                double min_move = 0.07;
 
                 /* if the object has moved far enough */
                 if(dx*dx + dy*dy > min_move*min_move)
                 {
                     /* negative sign accounts for screen coordinates */
-                    th = atan2(-dy,dx);
+                    th = atan2(dy,dx);
                     a = true;
                 }
             }
@@ -193,8 +199,9 @@ double rectifyAngleMeasurement(double meas,
 
             /* taking asin(sin(angle)) ensures that |angle| < pi,
              * i.e. we get the shortest-arc distance  */
-            double dth = asin(sin(MT_DEG2RAD*th_meas - meas));
+            double dth = asin(sin(MT_DEG2RAD*th_meas - angle_prev));
 
+			printf("Rectify:  %f %f (%f) -> %f %f %f\n", meas_in, MT_RAD2DEG*angle_prev, MT_RAD2DEG*th, meas, MT_RAD2DEG*th, MT_RAD2DEG*dth);
 			return angle_prev + dth;
 }
 

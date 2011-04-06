@@ -14,7 +14,7 @@ void beluga_measurement(const CvMat* x_k,
 
 void constrain_state(CvMat* x_k,
                             CvMat* X_p,
-                            double xmax,
-							double ymax);
+							double tank_radius,
+							double water_depth);
 
 #endif // BELUGADYNAMICS_H
