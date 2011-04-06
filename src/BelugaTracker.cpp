@@ -766,7 +766,40 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			}
 		}
 
+		printf("============= IN %d ============\n", i);
+/*		printf("%d search areas\n", m_SearchArea[i].size());
+		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
+		{
+			printf("[%d, %d, %d, %d] including indeces ", 
+				m_SearchArea[i][j].x,
+				m_SearchArea[i][j].y,
+				m_SearchArea[i][j].width,
+				m_SearchArea[i][j].height);
+			for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
+			{
+				printf("%d ", m_SearchIndexes[i][j][k]);
+			}
+			printf("\n");
+		}*/
+
 	    combineSearchAreas(&m_SearchArea[i], &m_SearchIndexes[i]);
+
+		printf("============= OUT %d ============\n", i);
+/*		printf("%d search areas\n", m_SearchArea[i].size());
+		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
+		{
+			printf("[%d, %d, %d, %d] including indeces ", 
+				m_SearchArea[i][j].x,
+				m_SearchArea[i][j].y,
+				m_SearchArea[i][j].width,
+				m_SearchArea[i][j].height);
+			for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
+			{
+				printf("%d ", m_SearchIndexes[i][j][k]);
+			}
+			printf("\n");
+		}*/
+
 	}
 
 	printf("d\n");
@@ -832,40 +865,83 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 				}
 			}
 
-			for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
+			if(blobs_this_rect.size() == 0)
+			{
+				continue;
+			}
+
+			MT_HungarianMatcher matcher;
+			bool do_match = false;
+			if(blobs_this_rect.size() >= m_SearchIndexes[i][j].size())
+			{
+				do_match = true;
+				matcher.doInit(m_SearchIndexes[i][j].size(), blobs_this_rect.size());
+			}
+
+			//for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
+			for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
 			{
 				double d2;
 				double d2min = 1e10;
-				int mmin = -1;
+				int kmin = -1;
 				/* i'th camera, j'th rectangle, k'th index */
-				unsigned int n = m_SearchIndexes[i][j][k];
-				double xk = m_vdaTracked_XC[i][n];
-				double yk = m_vdaTracked_YC[i][n];
-				for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
+				//for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
+				for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
 				{
+					unsigned int n = m_SearchIndexes[i][j][k];
+					double xk = m_vdaTracked_XC[i][n];
+					double yk = m_vdaTracked_YC[i][n];
+
 					d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
 						+ (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
 					printf("d2 = %f\n", d2);
+
+					if(do_match)
+					{
+						matcher.setValue(k, m, d2);
+					}
+
 					if((!m_vbLastMeasValid[n] || 
 						(d2 < DEFAULT_GATE_DIST2) || 
 						(m_vdHistories_X[n].size() == 0)) 
 						&& d2 < d2min)
 					{
-						mmin = m;
+						kmin = k;
 						d2min = d2;
 					}
 				}
 
-				if(mmin >= 0)
+				unsigned int n = m_SearchIndexes[i][j][kmin];
+				if(kmin >= 0 && !do_match  && m_vvdMeas_X[n].size() == 0)
 				{
-					m_vvdMeas_X[n].push_back(blobs_this_rect[mmin].COMx);
-					m_vvdMeas_Y[n].push_back(blobs_this_rect[mmin].COMy);
-					m_vvdMeas_Hdg[n].push_back(blobs_this_rect[mmin].orientation);
-					m_vviMeas_A[n].push_back(blobs_this_rect[mmin].area);
+					m_vvdMeas_X[n].push_back(blobs_this_rect[m].COMx);
+					m_vvdMeas_Y[n].push_back(blobs_this_rect[m].COMy);
+					m_vvdMeas_Hdg[n].push_back(blobs_this_rect[m].orientation);
+					m_vviMeas_A[n].push_back(blobs_this_rect[m].area);
 					m_vviMeas_Cam[n].push_back(i);
-					printf("n = %d, i = %d\n", n, i);
+					printf("n = %d, i = %d\n", n, i); 
 				}
 
+			}
+
+			if(do_match)
+			{
+			std::vector<int> matches;
+			matches.resize(m_SearchIndexes[i][j].size());
+			matcher.doMatch(&matches);
+
+			printf("Hungarian matches:  ");
+			for(unsigned int k = 0; k < matches.size(); k++)
+			{
+				printf("%d -> %d ", k, matches[k]);
+				unsigned int n = m_SearchIndexes[i][j][k];
+				m_vvdMeas_X[n].push_back(blobs_this_rect[matches[k]].COMx);
+				m_vvdMeas_Y[n].push_back(blobs_this_rect[matches[k]].COMy);
+				m_vvdMeas_Hdg[n].push_back(blobs_this_rect[matches[k]].orientation);
+				m_vviMeas_A[n].push_back(blobs_this_rect[matches[k]].area);
+				m_vviMeas_Cam[n].push_back(i);
+			}
+			printf("\n");
 			}
 
 		}

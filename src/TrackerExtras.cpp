@@ -261,6 +261,25 @@ std::vector<unsigned int> unionOfIndexSets(const std::vector<unsigned int>& a,
 	return result;
 }
 
+void dumpSearchAreas(const std::vector<CvRect>& searchAreas,
+					 const std::vector<std::vector<unsigned int> >& searchIndexes)
+{
+	printf("%d search areas\n", searchAreas.size());
+		for(unsigned int j = 0; j < searchAreas.size(); j++)
+		{
+			printf("[%d, %d, %d, %d] including indeces ", 
+				searchAreas[j].x,
+				searchAreas[j].y,
+				searchAreas[j].width,
+				searchAreas[j].height);
+			for(unsigned int k = 0; k < searchIndexes[j].size(); k++)
+			{
+				printf("%d ", searchIndexes[j][k]);
+			}
+			printf("\n");
+		}
+}
+
 void combineSearchAreas(std::vector<CvRect>* searchAreas, 
 						std::vector<std::vector<unsigned int> >* searchIndexes)
 {
@@ -272,12 +291,16 @@ void combineSearchAreas(std::vector<CvRect>* searchAreas,
 	std::vector<CvRect> inAreas = *searchAreas;
 	std::vector<std::vector<unsigned int> > inIndexes = *searchIndexes;
 
+	dumpSearchAreas(inAreas, inIndexes);
+
 	std::vector<CvRect> outAreas;
 	std::vector<std::vector<unsigned int> > outIndexes;
 	int num_joined = 0;
 
+	int c = 0;
 	do
 	{
+		printf("count %d\n", c++);
 		outAreas.resize(0);
 		outIndexes.resize(0);
 		num_joined = 0;
@@ -288,21 +311,30 @@ void combineSearchAreas(std::vector<CvRect>* searchAreas,
 			{
 				if(cvRectsIntersect(inAreas[i], inAreas[j]))
 				{
+					printf("%d %d intersect\n", i, j);
 					num_joined++;
 					outAreas.push_back(unionOfCvRects(inAreas[i], inAreas[j]));
 					outIndexes.push_back(unionOfIndexSets(inIndexes[i], inIndexes[j]));
+					printf("out size %d\n", outAreas.size());
 				}
 				else
 				{
+					printf("%d %d don't intersect\n", i, j);
 					outAreas.push_back(inAreas[i]);
 					outIndexes.push_back(inIndexes[i]);
+					outAreas.push_back(inAreas[j]);
+					outIndexes.push_back(inIndexes[j]);
 				}
 			}
 		}
 
+		printf("out size 2 %d\n", outAreas.size());
+
 		inAreas = outAreas;
 		inIndexes = outIndexes;
-	} while(num_joined > 0);
+	} while(num_joined > 0 && inAreas.size() > 1);
+
+	dumpSearchAreas(inAreas, inIndexes);
 
 	*searchAreas = inAreas;
 	*searchIndexes = inIndexes;
