@@ -25,6 +25,7 @@ enum
 {
 	BELUGA_STATE_X = 0,
 	BELUGA_STATE_Y,
+	BELUGA_STATE_Z,
 	BELUGA_STATE_HEADING,
 	BELUGA_STATE_SPEED,
 	BELUGA_STATE_ORIENTATION,
@@ -54,6 +55,7 @@ public:
 
     const char* getInfo() const;
 
+	void SendCommand(double fwd_speed, double up_spd, double turn);
     void SendCommand(const char* command);
 
 	void Update(std::vector<double> state);
@@ -70,6 +72,8 @@ public:
 
     unsigned char IsConnected() const;
 
+	double getDepth();
+
 protected:
     MT_ComIO m_COMPort;
     std::string m_sPort;
@@ -79,12 +83,11 @@ protected:
     
     void doCommonInit();
 
-    void SendVerticalSpeed(double speed);
-    void SendSpeed(double speed);
-    void SendTurn(double turn);
-
 private:
     mutable bool m_bIsConnected;
+
+	unsigned char m_ucDepthByte[2];
+	double m_dDepth;
 
     double m_dMaxSpeed;
     double m_dMaxVertSpeed;

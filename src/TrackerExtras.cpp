@@ -35,29 +35,29 @@ void adjustRMatrixAndZForMeasurementSize(CvMat*& R, CvMat*& z, unsigned int nmea
 		return;
 	}
 
-	printf("adjR a  %d %d\n", nrows_prev, nrows_now);
+//	printf("adjR a  %d %d\n", nrows_prev, nrows_now);
 	double sx = cvGetReal2D(R, 0, 0);
 	double sy = cvGetReal2D(R, 1, 1);
 	double sth = cvGetReal2D(R, 2, 2);
 	double sz = cvGetReal2D(R, nrows_prev-1, nrows_prev-1);
 
-	printf("adjR b\n");
+//	printf("adjR b\n");
 	cvReleaseMat(&R);
 	cvReleaseMat(&z);
-	printf("adjR c\n");
+//	printf("adjR c\n");
 	R = cvCreateMat(nrows_now, nrows_now, CV_64FC1);
 	z = cvCreateMat(nrows_now, 1, CV_64FC1);
-	printf("adjR d\n");
+//	printf("adjR d\n");
 	cvZero(R);
 	cvZero(z);
-	printf("adjR e\n");
+//	printf("adjR e\n");
 	for(unsigned int i = 0; i < nmeas; i++)
 	{
 		cvSetReal2D(R, i*3 + 0, i*3 + 0, sx);
 		cvSetReal2D(R, i*3 + 1, i*3 + 1, sy);
 		cvSetReal2D(R, i*3 + 2, i*3 + 2, sth);
 	}
-	printf("adjR f\n");
+//	printf("adjR f\n");
 	cvSetReal2D(R, nrows_now-1, nrows_now-1, sz);
 }
 
@@ -201,7 +201,7 @@ double rectifyAngleMeasurement(double meas,
              * i.e. we get the shortest-arc distance  */
             double dth = asin(sin(MT_DEG2RAD*th_meas - angle_prev));
 
-			printf("Rectify:  %f %f (%f) -> %f %f %f\n", meas_in, MT_RAD2DEG*angle_prev, MT_RAD2DEG*th, meas, MT_RAD2DEG*th, MT_RAD2DEG*dth);
+//			printf("Rectify:  %f %f (%f) -> %f %f %f\n", meas_in, MT_RAD2DEG*angle_prev, MT_RAD2DEG*th, meas, MT_RAD2DEG*th, MT_RAD2DEG*dth);
 			return angle_prev + dth;
 }
 
@@ -276,7 +276,7 @@ void dumpSearchAreas(const std::vector<CvRect>& searchAreas,
 			{
 				printf("%d ", searchIndexes[j][k]);
 			}
-			printf("\n");
+			printf("\n"); 
 		}
 }
 
@@ -291,7 +291,7 @@ void combineSearchAreas(std::vector<CvRect>* searchAreas,
 	std::vector<CvRect> inAreas = *searchAreas;
 	std::vector<std::vector<unsigned int> > inIndexes = *searchIndexes;
 
-	dumpSearchAreas(inAreas, inIndexes);
+//	dumpSearchAreas(inAreas, inIndexes);
 
 	std::vector<CvRect> outAreas;
 	std::vector<std::vector<unsigned int> > outIndexes;
@@ -300,7 +300,7 @@ void combineSearchAreas(std::vector<CvRect>* searchAreas,
 	int c = 0;
 	do
 	{
-		printf("count %d\n", c++);
+//		printf("count %d\n", c++);
 		outAreas.resize(0);
 		outIndexes.resize(0);
 		num_joined = 0;
@@ -311,15 +311,15 @@ void combineSearchAreas(std::vector<CvRect>* searchAreas,
 			{
 				if(cvRectsIntersect(inAreas[i], inAreas[j]))
 				{
-					printf("%d %d intersect\n", i, j);
+//					printf("%d %d intersect\n", i, j);
 					num_joined++;
 					outAreas.push_back(unionOfCvRects(inAreas[i], inAreas[j]));
 					outIndexes.push_back(unionOfIndexSets(inIndexes[i], inIndexes[j]));
-					printf("out size %d\n", outAreas.size());
+//					printf("out size %d\n", outAreas.size());
 				}
 				else
 				{
-					printf("%d %d don't intersect\n", i, j);
+//					printf("%d %d don't intersect\n", i, j);
 					outAreas.push_back(inAreas[i]);
 					outIndexes.push_back(inIndexes[i]);
 					outAreas.push_back(inAreas[j]);
@@ -328,13 +328,13 @@ void combineSearchAreas(std::vector<CvRect>* searchAreas,
 			}
 		}
 
-		printf("out size 2 %d\n", outAreas.size());
+//		printf("out size 2 %d\n", outAreas.size());
 
 		inAreas = outAreas;
 		inIndexes = outIndexes;
 	} while(num_joined > 0 && inAreas.size() > 1);
 
-	dumpSearchAreas(inAreas, inIndexes);
+//	dumpSearchAreas(inAreas, inIndexes);
 
 	*searchAreas = inAreas;
 	*searchIndexes = inIndexes;

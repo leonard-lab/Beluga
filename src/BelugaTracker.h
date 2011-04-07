@@ -31,6 +31,7 @@ private:
 	IplImage* m_pMasks[4];
 
 	IplImage* m_pTempFrame1;
+	IplImage* m_pTempFrame2;
 
 	CvMat* m_pCameraMatrices[4];
 	CvMat* m_pDistortionCoeffs[4];
@@ -52,7 +53,10 @@ private:
 	unsigned int m_iBlobAreaThreshHigh;
 
 	unsigned int m_iVThresh;
-	unsigned int m_iHThresh;
+	unsigned int m_iHThresh_Low;
+	unsigned int m_iHThresh_High;
+	unsigned int m_iSThresh_Low;
+	unsigned int m_iSThresh_High;
     
 	YABlobber m_YABlobber;
 	std::vector<YABlob> m_vBlobs[4];
@@ -166,6 +170,15 @@ public:
 	std::vector<double> getBelugaState(unsigned int i);
 	double getBelugaX(unsigned int i){if(i >= m_vdTracked_X.size()){return 0;} else {return m_vdTracked_X[i];}};
 	double getBelugaY(unsigned int i){if(i >= m_vdTracked_Y.size()){return 0;} else {return m_iFrameHeight - m_vdTracked_Y[i];}};
+
+	void getWorldXYZFromImageXYAndDepthInCamera(double* x,
+		double* y,
+		double* z,
+		double u,
+		double v,
+		double d,
+		bool undistort,
+		unsigned int camera);
 
 };
 

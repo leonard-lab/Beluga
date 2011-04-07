@@ -14,6 +14,8 @@ const std::string RobotNames[] = {"Beluga 1",
 
 const int NO_ROBOT = -1;
 
+const unsigned int FRAME_PERIOD_MSEC = 200;
+
 enum
 {
     ID_MENU_POP_ROBOT = MT_RFB_ID_HIGHEST + 10,
@@ -31,7 +33,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                const wxSize& size,     
                                long style)
   : MT_RobotFrameBase(parent, id, title, pos, size, style),
-    m_iNToTrack(2),
+    m_iNToTrack(1),
 	m_dGotoDist(50.0),
 	m_dGotoMaxSpeed(15.0),
 	m_dGotoTurningGain(25.0),
@@ -39,8 +41,11 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_iGrabbedTrackedObj(NO_ROBOT),
     m_pServer(NULL),
 	m_bGotoActive(false),
-	m_dGotoX(0),
-	m_dGotoY(0),
+	m_iGotoCam(0),
+	m_dGotoXC(0),
+	m_dGotoYC(0),
+	m_dGotoXW(0),
+	m_dGotoYW(0),
 	m_bCamerasReady(false)
 {
 	for(unsigned int i = 0; i < 4; i++)
@@ -140,7 +145,7 @@ void BelugaTrackerFrame::initUserData()
                             &m_sQuad4MaskPath);
                             
     
-    setTimer(67);
+    setTimer(FRAME_PERIOD_MSEC);
 }
 
 void BelugaTrackerFrame::writeUserXML()
@@ -186,6 +191,10 @@ MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* na
 {
     Beluga* thebot = new Beluga(config, name);
     ReadDataGroupFromXML(m_XMLSettingsFile, thebot->GetParameters());
+
+	// Fixing robot 0 as tracked object 0 for now
+	m_Robots.TrackingIndex[0] = 0;
+
     return thebot;
 }
 
@@ -216,6 +225,7 @@ void BelugaTrackerFrame::runTracker()
 	{
 		m_pBelugaTracker->doTracking(m_pCameraFrames);
 	}
+
 }
 
 void BelugaTrackerFrame::doUserControl()
@@ -247,13 +257,13 @@ void BelugaTrackerFrame::doUserControl()
 
 	if(m_Robots.IsPhysical(2))
 	{
-		m_dGotoX = m_Robots[2]->GetX();
-		m_dGotoY = m_Robots[2]->GetY();
+		m_dGotoXW = m_Robots[2]->GetX();
+		m_dGotoYW = m_Robots[2]->GetY();
 	}
 
-	double dx = m_Robots[0]->GetX() - m_dGotoX;
-	double dy = m_Robots[0]->GetY() - m_dGotoY;
-	double dth = atan2(dy, -dx) - MT_DEG2RAD*(m_Robots[0]->GetTheta());
+	double dx = m_dGotoXW - m_Robots[0]->GetX();
+	double dy = m_dGotoYW - m_Robots[0]->GetY();
+	double dth = (m_Robots[0]->GetTheta()) - atan2(dy, dx);
 	double d = sqrt(dx*dx + dy*dy);
 	double spd = 0;
 	double vert = 0;
@@ -274,11 +284,11 @@ void BelugaTrackerFrame::doUserControl()
 			spd = m_dGotoMaxSpeed*0.3333*(d/m_dGotoDist);
 		}
 
-		turn = m_dGotoTurningGain*sin(dth);
+		turn = -m_dGotoTurningGain*sin(dth);
 	}
 
 	printf("dx = %f, dy = %f, dth = %f (%f - %f) spd = %f, turn = %f\n",
-		dx, dy, MT_RAD2DEG*dth, MT_RAD2DEG*atan2(dy, -dx), m_Robots[0]->GetTheta(), spd, turn);
+		dx, dy, MT_RAD2DEG*dth, MT_RAD2DEG*atan2(dy, dx), MT_RAD2DEG*m_Robots[0]->GetTheta(), spd, turn);
 
 	u[BELUGA_CONTROL_FWD_SPEED] = -spd;
 	u[BELUGA_CONTROL_VERT_SPEED] = vert;
@@ -334,7 +344,8 @@ void BelugaTrackerFrame::initTracker()
     /* note - do NOT call MT_TrackerBase::initTracker, which is
      * a placeholder function that sets m_pTracker to NULL! */
 
-	setTimer(67);
+	setTimer(FRAME_PERIOD_MSEC);
+
 }
 
 void BelugaTrackerFrame::updateRobotStatesFromTracker()
@@ -352,6 +363,25 @@ void BelugaTrackerFrame::updateRobotStatesFromTracker()
     }
 }
 
+bool BelugaTrackerFrame::doSlaveKeyboardCallback(wxKeyEvent& event, int slave_index)
+{
+	bool result = MT_DO_BASE_KEY;
+
+	char k = event.GetKeyCode();
+
+	switch(k)
+	{
+	case 'g':
+		m_bControlActive = !m_bControlActive;
+		break;
+	case 'q':
+		doQuit();
+		break;
+	}
+
+	return result;
+}
+
 bool BelugaTrackerFrame::doKeyboardCallback(wxKeyEvent& event)
 {
 	bool result = MT_DO_BASE_KEY;
@@ -367,6 +397,37 @@ bool BelugaTrackerFrame::doKeyboardCallback(wxKeyEvent& event)
 
 	bool tresult = MT_RobotFrameBase::doKeyboardCallback(event);
 	return result && tresult;
+}
+
+bool BelugaTrackerFrame::doSlaveMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y, int slave_index)
+{
+	bool result = MT_DO_BASE_MOUSE;
+
+		if(event.LeftUp())
+		{
+			if(m_bControlActive)
+			{
+				m_bGotoActive = true;
+				m_iGotoCam = slave_index;
+				m_dGotoXC = viewport_x;
+				m_dGotoYC = getYMax() - viewport_y;
+				if(m_pBelugaTracker)
+				{
+					double z = 0;
+					m_pBelugaTracker->getWorldXYZFromImageXYAndDepthInCamera(
+						&m_dGotoXW,
+						&m_dGotoYW,
+						&z,
+						m_dGotoXC,
+						m_dGotoYC,
+						0,
+						false,
+						slave_index);
+				}
+			}
+		}
+
+	return result;
 }
 
 bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y)
@@ -429,8 +490,22 @@ bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x,
 			if(m_bControlActive)
 			{
 				m_bGotoActive = true;
-				m_dGotoX = viewport_x;
-				m_dGotoY = getYMax() - viewport_y;
+				m_iGotoCam = 0;
+				m_dGotoXC = viewport_x;
+				m_dGotoYC = getYMax() - viewport_y;
+				if(m_pBelugaTracker)
+				{
+					double z = 0;
+					m_pBelugaTracker->getWorldXYZFromImageXYAndDepthInCamera(
+						&m_dGotoXW,
+						&m_dGotoYW,
+						&z,
+						m_dGotoXC,
+						m_dGotoYC,
+						0,
+						false,
+						0);
+				}
 			}
 		}
 	}
@@ -460,11 +535,20 @@ void BelugaTrackerFrame::doUserGLDrawing()
 {
 	MT_RobotFrameBase::doUserGLDrawing();
 
-	if(m_bGotoActive)
+	if(m_bGotoActive && m_iGotoCam == 0)
 	{
-		MT_DrawCircle(m_dGotoX, getYMax() - m_dGotoY, MT_Green, m_dGotoDist);
+		MT_DrawCircle(m_dGotoXC, getYMax() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
 	}
 }
+
+void BelugaTrackerFrame::doSlaveGLDrawing(int slave_index)
+{
+	if(m_bGotoActive && m_iGotoCam == slave_index)
+	{
+		MT_DrawCircle(m_dGotoXC, getYMax() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
+	}
+}
+
 
 void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 {
@@ -537,6 +621,7 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 		m_pSlaves[i]->setCurrentFrame(m_pCameraFrames[i]);
 		m_pSlaves[i]->setImage(m_pCameraFrames[i]);
         m_pSlaves[i]->setIndex(i);
+		m_pSlaves[i]->setMTParent(this);
 
         /* don't want the user to be able to close these */
 		frame->EnableCloseButton(false);
