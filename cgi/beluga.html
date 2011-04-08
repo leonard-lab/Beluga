@@ -62,7 +62,10 @@ function getXMLHttp()
 
 function moveDot(dot_name, x, y)
 {
-    var cPos = getPos(document.getElementById("canvasDiv"));
+    x = 300.0*(x*0.328); // .328 = 1/(10' -> meters)
+    y = 300.0*(y*0.328);
+
+    var cPos = getPos(document.getElementById("tankImage"));
     x = (x + cPos.left - dotHalfWidth);
     y = (y + cPos.top - dotHalfHeight);
 
@@ -158,7 +161,7 @@ Welcome to Beluga Pod.
 
 <br/>
 
-<img src="media/TankMed.png" width=600px>
+<img id="tankImage" src="media/TankMed.png" width=600px>
 
 
 </body> </html>
