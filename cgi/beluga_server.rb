@@ -13,12 +13,13 @@ Server_Cmds = [
 
 Cmd_Position = {:name =>"position", :setArgs =>3}
 Cmd_Cmd = {:name => "command", :setArgs =>3}
+Cmd_Verbose = {:name => "verbose", :setArgs => 1}
 
 Server_Cmds_GetIndexed = [Cmd_Position, Cmd_Cmd]
 Server_Cmds_SetIndexed = [Cmd_Position, Cmd_Cmd]
 
-Server_Cmds_Get = []
-Server_Cmds_Set = []
+Server_Cmds_Get = [Cmd_Verbose]
+Server_Cmds_Set = [Cmd_Verbose]
 
 class Robot
 
@@ -52,6 +53,8 @@ class BelugaServer < GServer
     @@robots << Robot.new(3);
     @@index_max = 3;
 
+    @@verbose = false
+
     @@client_id = 0
     @@chat = []
     
@@ -81,6 +84,20 @@ class BelugaServer < GServer
     @@robots[i].position_y = args[1].to_f
     @@robots[i].position_z = args[2].to_f
     getPosition(i)
+  end
+
+  def getVerbose(args, cmd_def)
+    @@verbose ? "on" : "off"
+  end
+
+  def setVerbose(args, cmd_def)
+    if args[2] == "on"
+      @@verbose = true
+    end
+    if args[2] == "off"
+      @@verbose = false
+    end
+    getVerbose(args, cmd_def)
   end
 
   def respondToIndexedOp(words, op, resp_def)
@@ -200,7 +217,7 @@ class BelugaServer < GServer
       begin
         line = io.readline.strip
 
-        puts "GOT:  |" + line + "|\n"
+        puts "GOT:  |" + line + "|\n" unless !@@verbose
 
         if line == Server_ClientQuit
           io.puts "Goodbye"
