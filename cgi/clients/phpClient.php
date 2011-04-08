@@ -16,9 +16,9 @@ class belugaClient
 
     function __destruct()
     {
-        if($connected)
+        if($this->connected)
         {
-            fclose($socket);
+            fclose($this->socket);
         }
     }
 
