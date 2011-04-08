@@ -87,7 +87,7 @@ function doUpdate()
 
     var coords = req.responseText.split(" ");
 
-    moveDot("dot1", parseFloat(coords[0]), parseFloat(coords[1]));
+    moveDot("dot1", parseFloat(coords[1]), parseFloat(coords[2]));
 
     if(go)
     {
@@ -155,6 +155,10 @@ Welcome to Beluga Pod.
 
 <br/>
 <div id="d1"></div>
+
+<br/>
+
+<img src="media/TankMed.png" width=600px>
 
 
 </body> </html>

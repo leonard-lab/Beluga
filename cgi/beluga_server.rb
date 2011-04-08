@@ -200,6 +200,8 @@ class BelugaServer < GServer
       begin
         line = io.readline.strip
 
+        puts "GOT:  |" + line + "|\n"
+
         if line == Server_ClientQuit
           io.puts "Goodbye"
           break
@@ -236,7 +238,7 @@ class BelugaServer < GServer
    end
 end
 
-server = BelugaServer.new(1234, 'pod.princeton.edu')
+server = BelugaServer.new(1234, '127.0.0.1')
 
 server.audit = true
 server.start
