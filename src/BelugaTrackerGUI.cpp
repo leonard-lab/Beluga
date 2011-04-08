@@ -223,7 +223,9 @@ void BelugaTrackerFrame::runTracker()
 {
 	if(m_pCameraFrames[0])
 	{
+		printf("Tracking start\n");
 		m_pBelugaTracker->doTracking(m_pCameraFrames);
+		printf("Tracking done\n");
 	}
 
 }
@@ -261,6 +263,8 @@ void BelugaTrackerFrame::doUserControl()
 		m_dGotoYW = m_Robots[2]->GetY();
 	}
 
+	printf("Control start\n");
+
 	double dx = m_dGotoXW - m_Robots[0]->GetX();
 	double dy = m_dGotoYW - m_Robots[0]->GetY();
 	double dth = (m_Robots[0]->GetTheta()) - atan2(dy, dx);
@@ -287,8 +291,8 @@ void BelugaTrackerFrame::doUserControl()
 		turn = -m_dGotoTurningGain*sin(dth);
 	}
 
-	printf("dx = %f, dy = %f, dth = %f (%f - %f) spd = %f, turn = %f\n",
-		dx, dy, MT_RAD2DEG*dth, MT_RAD2DEG*atan2(dy, dx), MT_RAD2DEG*m_Robots[0]->GetTheta(), spd, turn);
+/*	printf("dx = %f, dy = %f, dth = %f (%f - %f) spd = %f, turn = %f\n",
+		dx, dy, MT_RAD2DEG*dth, MT_RAD2DEG*atan2(dy, dx), MT_RAD2DEG*m_Robots[0]->GetTheta(), spd, turn);*/
 
 	u[BELUGA_CONTROL_FWD_SPEED] = -spd;
 	u[BELUGA_CONTROL_VERT_SPEED] = vert;
@@ -296,6 +300,8 @@ void BelugaTrackerFrame::doUserControl()
 
 	m_Robots[0]->SetControl(u);
 	m_Robots[0]->Control();
+
+	printf("Control done\n");
 
 }
 
@@ -410,7 +416,7 @@ bool BelugaTrackerFrame::doSlaveMouseCallback(wxMouseEvent& event, double viewpo
 				m_bGotoActive = true;
 				m_iGotoCam = slave_index;
 				m_dGotoXC = viewport_x;
-				m_dGotoYC = getYMax() - viewport_y;
+				m_dGotoYC = viewport_y;
 				if(m_pBelugaTracker)
 				{
 					double z = 0;
@@ -492,7 +498,7 @@ bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x,
 				m_bGotoActive = true;
 				m_iGotoCam = 0;
 				m_dGotoXC = viewport_x;
-				m_dGotoYC = getYMax() - viewport_y;
+				m_dGotoYC = viewport_y;
 				if(m_pBelugaTracker)
 				{
 					double z = 0;
@@ -537,7 +543,7 @@ void BelugaTrackerFrame::doUserGLDrawing()
 
 	if(m_bGotoActive && m_iGotoCam == 0)
 	{
-		MT_DrawCircle(m_dGotoXC, getYMax() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
+		MT_DrawCircle(m_dGotoXC, m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
 	}
 }
 
@@ -545,7 +551,7 @@ void BelugaTrackerFrame::doSlaveGLDrawing(int slave_index)
 {
 	if(m_bGotoActive && m_iGotoCam == slave_index)
 	{
-		MT_DrawCircle(m_dGotoXC, getYMax() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
+		MT_DrawCircle(m_dGotoXC, m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
 	}
 }
 
