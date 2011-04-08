@@ -39,15 +39,7 @@ Beluga::~Beluga()
 
 void Beluga::SafeStop()
 {
-	if(IsConnected())
-	{
-		double t0 = MT_getTimeSec();
-		SendSpeed(0);
-		while(MT_getTimeSec() - t0 < 0.1){};
-		SendVerticalSpeed(0);
-		while(MT_getTimeSec() - t0 < 0.2){};
-		SendTurn(0);
-	}
+	SendCommand(0, 0, 0);
 }
 
 void Beluga::doCommonInit()
@@ -153,72 +145,6 @@ std::vector<double> Beluga::GetControl()
 	return m_vdControls;
 }
 
-void Beluga::SendVerticalSpeed(double speed)
-{
-    /* The speed command starts with a % and is followed by 3 digits
-       and terminated by an exclamation point */
-    char cmd[] = "%123!";
-    unsigned int spd_cmd;
-    char d = 0;
-
-    /* the first digit is 1 if speed is negative */
-    if(speed < 0)
-    {
-        d = 1;
-    }
-
-    /* make sure the speed is within an exceptable range */
-    spd_cmd = MT_CLAMP(fabs(speed), 0, BELUGA_MAX_VERT_SPEED);
-    /* makes sure the first digit is 1 if the speed was negative */
-    spd_cmd += 100*d;
-
-    /* %% printf's a single %, %03d printfs a zero-padded 3-digit
-       integer */
-    sprintf(cmd, "%%%03d!", spd_cmd);
-    SendCommand(cmd);
-    
-}
-
-/* function to send a signed double number as the speed.  see
- * SendVerticalSpeed */
-void Beluga::SendSpeed(double speed)
-{
-    char cmd[] = "$123!";
-    unsigned int spd_cmd;
-    char d = 0;
-
-    if(speed < 0)
-    {
-        d = 1;
-    }
-    
-    spd_cmd = MT_CLAMP(fabs(speed), 0, BELUGA_MAX_SPEED);
-    spd_cmd += 100*d;
-    
-    sprintf(cmd, "$%03d!", spd_cmd);
-    SendCommand(cmd);
-    
-}
-
-/* function to send a signed double number as a turning servo command */
-void Beluga::SendTurn(double turn)
-{
-    char cmd[] = "#123!";
-    unsigned int servo_cmd;
-
-    /* assuming that halfway between the minimum and maximum servo
-       positions is the neutral (straight forward) position */
-    double half_speed = 0.5*((double) (BELUGA_SERVO_MIN + BELUGA_SERVO_MAX));
-
-    servo_cmd = MT_CLAMP(half_speed + turn,
-                         BELUGA_SERVO_MIN,
-                         BELUGA_SERVO_MAX);
-    
-    sprintf(cmd, "#%03d!", servo_cmd);
-    SendCommand(cmd);
-    
-}
-
 /* function to send a command to a Beluga via the COM port.  Makes
  * sure that the final two bytes of the command are an exclamation
  * mark '!' followed by a line feed (10).  Assumes that the line feed
@@ -241,12 +167,23 @@ void Beluga::SendCommand(const char* command)
 	//printf("Sending %s\n", cmd);
     
     m_COMPort.SendCommand(cmd);
+
+	int r;
+	r = m_COMPort.ReadData(m_ucDepthByte, 2);
+
+	//printf("Got %d %d %d\n", r, m_ucDepthByte[0], m_ucDepthByte[1]);
+}
+
+double Beluga::getDepth()
+{
+	/* this is wrong, but it will show us the bytes */
+	return 100*m_ucDepthByte[0] + m_ucDepthByte[1];
 }
 
 /* function to check if the COM port is connected */
 unsigned char Beluga::IsConnected() const
 {
-    m_bIsConnected = m_COMPort.IsConnected();
+    m_bIsConnected = (bool) m_COMPort.IsConnected();
     return m_bIsConnected;
 }
 
@@ -268,8 +205,6 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
     double vert = 0;
     double turn = 0;
 
-    static unsigned int which_cmd = 0;
-
     double x = -js_axes[0];
     double y = -js_axes[1];
     double w = js_axes[2];
@@ -290,43 +225,53 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 		vert = -m_dVertSpeed;
 	}
 #endif
+	SendCommand(speed, vert, turn);
+}
 
-    switch(which_cmd)
+void Beluga::SendCommand(double fwd_speed, double up_speed, double turn)
+{
+	unsigned int servo_cmd;
+    /* assuming that halfway between the minimum and maximum servo
+       positions is the neutral (straight forward) position */
+    double half_speed = 0.5*((double) (BELUGA_SERVO_MIN + BELUGA_SERVO_MAX));
+
+    servo_cmd = MT_CLAMP(half_speed + turn,
+                         BELUGA_SERVO_MIN,
+                         BELUGA_SERVO_MAX);
+
+	unsigned int vert_spd_cmd;
+    char vert_d = 0;
+
+    if(up_speed < 0)
     {
-    case 0:
-        SendSpeed(speed);
-        break;
-    case 1:
-        SendVerticalSpeed(vert);
-        break;
-    case 2:
-        SendTurn(turn);
-        break;
+        vert_d = 1;
     }
-    if(++which_cmd == 3)
+    
+    vert_spd_cmd = MT_CLAMP(fabs(up_speed), 0, BELUGA_MAX_VERT_SPEED);
+    vert_spd_cmd += 100*vert_d;
+
+    unsigned int spd_cmd;
+    char d = 0;
+
+    /* the first digit is 1 if speed is negative */
+    if(fwd_speed < 0)
     {
-        which_cmd = 0;
+        d = 1;
     }
+
+    spd_cmd = MT_CLAMP(fabs(fwd_speed), 0, BELUGA_MAX_SPEED);
+    /* makes sure the first digit is 1 if the speed was negative */
+    spd_cmd += 100*d;
+
+	char cmd[] = "$123!456!789!";
+	sprintf(cmd, "$%03d!%03d!%03d!", vert_spd_cmd, spd_cmd, servo_cmd);
+	SendCommand(cmd);
+
 }
 
 void Beluga::Control()
 {
-	static unsigned int which_cmd = 0;
-
-	switch(which_cmd)
-	{
-	case 0:
-		SendSpeed(m_vdControls[BELUGA_CONTROL_FWD_SPEED]);
-		break;
-	case 1:
-		SendVerticalSpeed(m_vdControls[BELUGA_CONTROL_VERT_SPEED]);
-		break;
-	case 2:
-		SendTurn(m_vdControls[BELUGA_CONTROL_STEERING]);
-		break;
-	}
-	if(++which_cmd == 3)
-	{
-		which_cmd = 0;
-	}
+	SendCommand(m_vdControls[BELUGA_CONTROL_FWD_SPEED],
+		m_vdControls[BELUGA_CONTROL_VERT_SPEED],
+		m_vdControls[BELUGA_CONTROL_STEERING]);
 }

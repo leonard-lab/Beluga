@@ -14,7 +14,10 @@ const double DEFAULT_MAX_BLOB_AREA = 1000;
 const unsigned int DEFAULT_SEARCH_AREA_PADDING = 100;
 
 const unsigned int DEFAULT_V_THRESH = 40;
-const unsigned int DEFAULT_H_THRESH = 130;
+const unsigned int DEFAULT_H_THRESH_HIGH = 130;
+const unsigned int DEFAULT_H_THRESH_LOW = 10;
+const unsigned int DEFAULT_S_THRESH_LOW = 0;
+const unsigned int DEFAULT_S_THRESH_HIGH = 255;
 
 const double DEFAULT_WATER_DEPTH = 2.286;
 
@@ -43,7 +46,10 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
 	  m_iBlobAreaThreshLow(DEFAULT_MIN_BLOB_AREA),
 	  m_iBlobAreaThreshHigh(DEFAULT_MAX_BLOB_AREA),
 	  m_iVThresh(DEFAULT_V_THRESH),
-	  m_iHThresh(DEFAULT_H_THRESH),
+	  m_iHThresh_Low(DEFAULT_H_THRESH_LOW),
+	  m_iHThresh_High(DEFAULT_H_THRESH_HIGH),
+	  m_iSThresh_Low(DEFAULT_S_THRESH_LOW),
+	  m_iSThresh_High(DEFAULT_S_THRESH_HIGH),
 	  m_iSearchAreaPadding(DEFAULT_SEARCH_AREA_PADDING),
       m_iStartFrame(-1),
       m_iStopFrame(-1),
@@ -112,6 +118,7 @@ BelugaTracker::~BelugaTracker()
 			cvReleaseImage(&m_pThreshFrames[i]);
 		}
 		cvReleaseImage(&m_pTempFrame1);
+    	cvReleaseImage(&m_pTempFrame2);
 	}
 
 	if(m_pMasks[0])
@@ -183,6 +190,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_pMasks[i] = NULL;
 
 		m_pTempFrame1 = NULL;
+		m_pTempFrame2 = NULL;
 
 		m_pCameraMatrices[i] = NULL;
 		m_pDistortionCoeffs[i] = NULL;
@@ -294,7 +302,10 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     /* first group is for blob tracking parameters */
     MT_DataGroup* dg_blob = new MT_DataGroup("Blob Tracking Parameters");
 	dg_blob->AddUInt("HSV V Threshold", &m_iVThresh, MT_DATA_READWRITE, 0, 255);
-	dg_blob->AddUInt("HSV H Threshold", &m_iHThresh, MT_DATA_READWRITE, 0, 255);
+	dg_blob->AddUInt("HSV H Threshold Low", &m_iHThresh_Low, MT_DATA_READWRITE, 0, 255);
+	dg_blob->AddUInt("HSV H Threshold High", &m_iHThresh_High, MT_DATA_READWRITE, 0, 255);
+	dg_blob->AddUInt("HSV S Threshold Low", &m_iSThresh_Low, MT_DATA_READWRITE, 0, 255);
+	dg_blob->AddUInt("HSV S Threshold High", &m_iSThresh_High, MT_DATA_READWRITE, 0, 255);
     dg_blob->AddDouble("Water Depth", &m_dWaterDepth, MT_DATA_READWRITE, 0);
     dg_blob->AddUInt("Difference Threshold", /* parameter name */
                      &m_iBlobValThresh,      /* pointer to variable */
@@ -408,6 +419,7 @@ void BelugaTracker::createFrames()
 			cvReleaseImage(&m_pThreshFrames[i]);
 		}
 		cvReleaseImage(&m_pTempFrame1);
+		cvReleaseImage(&m_pTempFrame2);
 	}
 
 	if(m_pUndistortMapX)
@@ -433,6 +445,7 @@ void BelugaTracker::createFrames()
                                       IPL_DEPTH_8U, 1);
 	}
 	m_pTempFrame1 = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
+	m_pTempFrame2 = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 
 	m_pUndistortMapX = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
 	m_pUndistortMapY = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
@@ -650,7 +663,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
     /* keeping track of the frame number, if necessary */
     m_iFrameCounter++;
 
-	printf("a\n");
+//	printf("a\n");
     /* This checks every time step to see if the UKF parameters have
        changed and modifies the UKF structures accordingly.  This will
        also get called the first time through b/c the "Prev" values get
@@ -681,7 +694,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         cvSetReal2D(m_pR, 3, 3, m_dSigmaHeadingMeas*m_dSigmaHeadingMeas);
         cvSetReal2D(m_pR, 2, 2, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
 
-		printf("a.1\n");
+//		printf("a.1\n");
 		/* makes sure we only have to copy the numbers once - it will
 		 * automatically get copied again later if necessary */
 		adjustRMatrixAndZForMeasurementSize(m_pR, m_pz, 1);
@@ -689,7 +702,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		{
 			m_vpUKF[i]->m = m_pR->rows;
 		}
-		printf("a.2\n");
+//		printf("a.2\n");
 
 		m_dPrevSigmaPosition = m_dSigmaPosition;
 		m_dPrevSigmaHeading = m_dSigmaHeading;
@@ -701,14 +714,14 @@ void BelugaTracker::doTracking(IplImage* frames[4])
            and makes sure that it's internals are properly initialized -
            it's set up to handle the fact that the sizes of these
            matrices could have changed. */
-		printf("a.3\n");
+//		printf("a.3\n");
         for(int i = 0; i < m_iNObj; i++)
         {
             MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
         }
     }
 
-	printf("b\n");
+//	printf("b\n");
 	std::vector<std::vector<double> > measX;
 	std::vector<std::vector<double> > measY;
 	std::vector<std::vector<double> > measZ;
@@ -723,7 +736,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		measZ[i].resize(0);
 	}
 
-	printf("c\n");
+//	printf("c\n");
 	/* determine search rectangles */
 	for(int i = 0; i < 4; i++)
 	{
@@ -753,7 +766,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
  
 			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
 			//v = m_iFrameHeight - v;
-			printf("%f, %f, %f -> %f, %f\n", x, y, z, u, v);
+//			printf("%f, %f, %f -> %f, %f\n", x, y, z, u, v);
 
 			m_vdaTracked_XC[i][j] = u;
 			m_vdaTracked_YC[i][j] = v;
@@ -766,7 +779,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			}
 		}
 
-		printf("============= IN %d ============\n", i);
+//		printf("============= IN %d ============\n", i);
 /*		printf("%d search areas\n", m_SearchArea[i].size());
 		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
 		{
@@ -784,7 +797,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
 	    combineSearchAreas(&m_SearchArea[i], &m_SearchIndexes[i]);
 
-		printf("============= OUT %d ============\n", i);
+//		printf("============= OUT %d ============\n", i);
 /*		printf("%d search areas\n", m_SearchArea[i].size());
 		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
 		{
@@ -802,7 +815,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
 	}
 
-	printf("d\n");
+//	printf("d\n");
 	/* image processing and blob finding */
 	for(int i = 0; i < 4; i++)
 	{
@@ -814,12 +827,14 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		/* just for display */
 		m_pGSFrames[i] = m_pVFrames[i];
 
-		cvThreshold(m_pVFrames[i],
-                    m_pThreshFrames[i],
-                    m_iVThresh,
-                    255,
-                    CV_THRESH_BINARY_INV);
-		cvThreshold(m_pHFrames[i], m_pTempFrame1, m_iHThresh, 255, CV_THRESH_BINARY);
+		cvThreshold(m_pVFrames[i], m_pThreshFrames[i], m_iVThresh, 255, CV_THRESH_BINARY_INV);
+		cvThreshold(m_pHFrames[i], m_pTempFrame1, m_iHThresh_High, 255, CV_THRESH_BINARY);
+		cvThreshold(m_pHFrames[i], m_pTempFrame2, m_iHThresh_Low, 255, CV_THRESH_BINARY_INV);
+		cvOr(m_pTempFrame1, m_pTempFrame2, m_pTempFrame1);
+		cvAnd(m_pTempFrame1, m_pThreshFrames[i], m_pThreshFrames[i]);
+		cvThreshold(m_pSFrames[i], m_pTempFrame1, m_iSThresh_Low, 255, CV_THRESH_BINARY);
+		cvThreshold(m_pSFrames[i], m_pTempFrame2, m_iSThresh_High, 255, CV_THRESH_BINARY_INV);
+		cvAnd(m_pTempFrame1, m_pTempFrame2, m_pTempFrame1);
 		cvAnd(m_pTempFrame1, m_pThreshFrames[i], m_pThreshFrames[i]);
 		cvSmooth(m_pThreshFrames[i], m_pThreshFrames[i], CV_MEDIAN, 3);
 		if(m_pMasks[i])
@@ -840,7 +855,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
 	}
 
-	printf("e\n");
+//	printf("e\n");
 	/* measurement association */
 	for(int i = 0; i < m_iNObj; i++)
 	{
@@ -894,7 +909,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
 					d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
 						+ (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
-					printf("d2 = %f\n", d2);
+//					printf("d2 = %f\n", d2);
 
 					if(do_match)
 					{
@@ -919,7 +934,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 					m_vvdMeas_Hdg[n].push_back(blobs_this_rect[m].orientation);
 					m_vviMeas_A[n].push_back(blobs_this_rect[m].area);
 					m_vviMeas_Cam[n].push_back(i);
-					printf("n = %d, i = %d\n", n, i); 
+//					printf("n = %d, i = %d\n", n, i); 
 				}
 
 			}
@@ -930,10 +945,10 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			matches.resize(m_SearchIndexes[i][j].size());
 			matcher.doMatch(&matches);
 
-			printf("Hungarian matches:  ");
+//			printf("Hungarian matches:  ");
 			for(unsigned int k = 0; k < matches.size(); k++)
 			{
-				printf("%d -> %d ", k, matches[k]);
+//				printf("%d -> %d ", k, matches[k]);
 				unsigned int n = m_SearchIndexes[i][j][k];
 				m_vvdMeas_X[n].push_back(blobs_this_rect[matches[k]].COMx);
 				m_vvdMeas_Y[n].push_back(blobs_this_rect[matches[k]].COMy);
@@ -941,26 +956,27 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 				m_vviMeas_A[n].push_back(blobs_this_rect[matches[k]].area);
 				m_vviMeas_Cam[n].push_back(i);
 			}
-			printf("\n");
+//			printf("\n");
 			}
 
 		}
 	}
 
-	printf("f\n");
+//	printf("f\n");
 	/* filtering */
 	for(int i =0; i < m_iNObj; i++)
 	{
 		unsigned int nmeas = m_vvdMeas_X[i].size();
 
-		printf("Got %d Meas's for Object %d: ", m_vvdMeas_X[i].size(), i);
-		for(unsigned int j = 0; j < m_vvdMeas_X[i].size(); j++)
+//		printf("Got %d Meas's for Object %d: ", m_vvdMeas_X[i].size(), i);
+/*		for(unsigned int j = 0; j < m_vvdMeas_X[i].size(); j++)
 		{
 			printf("(%f, %f, %f in Q%d) ", m_vvdMeas_X[i][j], m_vvdMeas_Y[i][j], m_vvdMeas_Hdg[i][j], m_vviMeas_Cam[i][j]);
 		}
 		printf("\n");
+*/
 
-		printf("A\n");
+//		printf("A\n");
 		if(nmeas)
 		{
 			adjustRMatrixAndZForMeasurementSize(m_pR, m_pz, nmeas);
@@ -970,7 +986,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
         bool valid_meas = m_iFrameCounter > 1 && nmeas > 0;
 
-		printf("B\n");
+//		printf("B\n");
         /* if any state is NaN, reset the UKF
          * This shouldn't happen anymore, but it's a decent safety
          * check.  It could probably be omitted if we want to
@@ -979,17 +995,17 @@ void BelugaTracker::doTracking(IplImage* frames[4])
            (!CvMatIsOk(m_vpUKF[i]->x) ||
             !CvMatIsOk(m_vpUKF[i]->P)))
         {
-			printf("B.1\n");
+//			printf("B.1\n");
             MT_UKFFree(&(m_vpUKF[i]));
-			printf("B.2 %d\n", m_pR->rows);
+//			printf("B.2 %d\n", m_pR->rows);
             m_vpUKF[i] = MT_UKFInit(5, m_pR->rows, 0.1);
-			printf("B.3\n");
+//			printf("B.3\n");
             MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
-			printf("B.4\n");
+//			printf("B.4\n");
             valid_meas = false;
         }
 
-		printf("C\n");
+//		printf("C\n");
 
 		m_vbLastMeasValid[i] = valid_meas;
 
@@ -1000,13 +1016,13 @@ void BelugaTracker::doTracking(IplImage* frames[4])
                the beluga_dynamics and beluga_measurement functions defined
                above.  The final parameter would be for the control input
                vector, which we don't use here so we pass a NULL pointer */
-			printf("UKF Predict\n");
+//			printf("UKF Predict\n");
             MT_UKFPredict(m_vpUKF[i],
                           &beluga_dynamics,
                           &beluga_measurement,
                           NULL);
 
-			printf("Meas assign\n");
+//			printf("Meas assign\n");
 			/* build the measurement vector */
 			double x, y, z, th;
 			double th_prev = cvGetReal2D(m_vpUKF[i]->x, 3, 0);
@@ -1022,7 +1038,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 					m_vdHistories_Y[i],
 					N_hist,
 					th_prev);
-				printf("%f, %f -> %f\n", m_vvdMeas_Hdg[i][j], MT_RAD2DEG*th_prev, MT_RAD2DEG*th);
+//				printf("%f, %f -> %f\n", m_vvdMeas_Hdg[i][j], MT_RAD2DEG*th_prev, MT_RAD2DEG*th);
 				m_vvdMeas_Hdg[i][j] = MT_RAD2DEG*th;
 				cvSetReal2D(m_pz, j*3 + 0, 0, x);
 				cvSetReal2D(m_pz, j*3 + 1, 0, y);
@@ -1030,33 +1046,34 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			}
 			cvSetReal2D(m_pz, m_pz->rows - 1, 0, m_dWaterDepth);
 
-			printf("UKF SetMeas\n");
-			printf("z = [");
-			for(unsigned int r = 0; r < m_pz->rows; r++)
+//			printf("UKF SetMeas\n");
+//			printf("z = [");
+/*			for(unsigned int r = 0; r < m_pz->rows; r++)
 			{
 				printf("%f ", cvGetReal2D(m_pz, r, 0));
 			}
 			printf("]\n");
+*/
 			MT_UKFSetMeasurement(m_vpUKF[i], m_pz);
-			printf("UKF Correct\n");
+//			printf("UKF Correct\n");
 			MT_UKFCorrect(m_vpUKF[i]);
 
-			printf("x = [");
+/*			printf("x = [");
 			for(unsigned int r = 0; r < m_vpUKF[i]->x->rows; r++)
 			{
 				printf("%f ", cvGetReal2D(m_vpUKF[i]->x, r, 0));
 			}
 			printf("]\n");
-
-			printf("constrain\n");
+*/
+//			printf("constrain\n");
 			constrain_state(m_vpUKF[i]->x, m_vpUKF[i]->x1, 10.0, m_dWaterDepth);
-			printf("x = [");
+/*			printf("x = [");
 			for(unsigned int r = 0; r < m_vpUKF[i]->x->rows; r++)
 			{
 				printf("%f ", cvGetReal2D(m_vpUKF[i]->x, r, 0));
 			}
 			printf("]\n");
-
+*/
 
 		}
 		else
@@ -1086,7 +1103,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 					xavg /= (double) nmeas;
 					yavg /= (double) nmeas;
 					double th = atan2(qy, qx);
-					printf("Should be initializing %d at %f %f %f %f 0\n", i, xavg, yavg, m_dWaterDepth, th);
+//					printf("Should be initializing %d at %f %f %f %f 0\n", i, xavg, yavg, m_dWaterDepth, th);
 					cvSetReal2D(m_vpUKF[i]->x, 0, 0, xavg);
 					cvSetReal2D(m_vpUKF[i]->x, 1, 0, yavg);
 					cvSetReal2D(m_vpUKF[i]->x, 2, 0, m_dWaterDepth);
@@ -1137,11 +1154,30 @@ std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
 	r.resize(BELUGA_STATE_SIZE);
 	r[BELUGA_STATE_X] = m_vdTracked_X[i];
 	r[BELUGA_STATE_Y] = m_vdTracked_Y[i];
+	r[BELUGA_STATE_Z] = m_vdTracked_Z[i];
 	r[BELUGA_STATE_HEADING] = m_vdTracked_Heading[i];
 	r[BELUGA_STATE_SPEED] = m_vdTracked_Speed[i];
-	r[BELUGA_STATE_ORIENTATION] = m_vdBlobs_Orientation[i];
+	r[BELUGA_STATE_ORIENTATION] = m_vdTracked_Heading[i];
 
 	return r;
+}
+
+void BelugaTracker::getWorldXYZFromImageXYAndDepthInCamera(double* x,
+		double* y,
+		double* z,
+		double u,
+		double v,
+		double d,
+		bool undistort,
+		unsigned int camera)
+{
+	if(camera >= 4 || !x || !y || !z)
+	{
+		return;
+	}
+
+	m_CoordinateTransforms[camera].imageAndDepthToWorld(u, v, d, x, y, z, undistort);
+
 }
 
 /* Drawing function - gets called by the GUI

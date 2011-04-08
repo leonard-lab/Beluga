@@ -34,8 +34,11 @@ protected:
 
     bool m_bControlActive;
 	bool m_bGotoActive;
-	double m_dGotoX;
-	double m_dGotoY;
+	int m_iGotoCam;
+	double m_dGotoXC;
+	double m_dGotoYC;
+	double m_dGotoXW;
+	double m_dGotoYW;
 
 	bool m_bCamerasReady;
     unsigned int m_uiaIndexMap[4];
@@ -81,6 +84,7 @@ public:
 	void doUserStep();
 	void doUserControl();
 	void doUserGLDrawing();
+	void doSlaveGLDrawing(int slave_index);
 
     void readUserXML();
     void writeUserXML();
@@ -92,6 +96,9 @@ public:
 
 	bool doKeyboardCallback(wxKeyEvent &event);
 	bool doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y);
+
+	bool doSlaveKeyboardCallback(wxKeyEvent &event, int slave_index);
+	bool doSlaveMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y, int slave_index);
     
    /* menu callbacks */
 	void onMenuAssign(wxCommandEvent& event);
