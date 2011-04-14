@@ -1,5 +1,19 @@
 <?php
 
+function connectError($errno, $errstr)
+{
+    if($errno == 2)
+    {
+        // do nothing, this just means the IPC server is down
+        return true;
+    }
+    else
+    {
+        // let the system handle this error
+        return false;
+    }
+}
+
 class belugaClient
 {
     private $host;
@@ -28,6 +42,7 @@ class belugaClient
         $this->host = $to_host;
         $this->port = $on_port;
 
+        set_error_handler("connectError");
         $this->socket = fsockopen($this->host,
                                    $this->port,
                                    $errnum,
@@ -35,7 +50,7 @@ class belugaClient
                                    $this->timeout);
         if(!is_resource($this->socket))
         {
-            error_log($errstr, 3, $this->error_file);
+            error_log($errstr . "\n", 3, $this->error_file);
             $this->connected = false;
         }
         else
@@ -43,6 +58,7 @@ class belugaClient
             $this->last_response = trim(fgets($this->socket));
             $this->connected = true;
         }
+        restore_error_handler();
         return $this->connected;
     }
 
