@@ -2,11 +2,10 @@ if(exist('sock', 'var')),
     fclose(sock);
 end
 
-w = 400;
-h = 400;
+rmax = 3.2;
 x = 0;
 y = 0;
-v = 1;
+v = 0.05;
 th = 0;
 kth = -0.1;
 
@@ -14,7 +13,7 @@ go_x = 0;  go_y = 0;
 
 try_timeout = 10;
 
-addpath('../clients')
+addpath('../matlab')
 
 sock = getBelugaIPCSocket('127.0.0.1', 1234);
 
@@ -32,27 +31,24 @@ while(1)
     x = x + v*cos(th);
     y = y + v*sin(th);
     
-    if(x >= w),
-        x = w - (x - w);
-        th = atan2(sin(th), -cos(th));
-    end
-    if(x <= 0),
-        x = -x;
-        th = atan2(sin(th), -cos(th));
-    end
-    if(y >= h),
-        y = y - (y - h);
-        th = atan2(-sin(th), cos(th));
-    end
-    if(y <= 0),
-        y = -y;
-        th = atan2(-sin(th), cos(th));
+    r = sqrt(x.^2 + y.^2);
+    if r > rmax,
+        % this is not an exact collision correction
+        phi = atan2(y,x);
+        rnew = rmax - (r - rmax);
+        x = rnew*cos(phi);
+        y = rnew*sin(phi);
+        v_vec = [v*cos(th); v*sin(th)];
+        v_radial = [cos(phi) sin(phi)]*v_vec;
+        v_perp = [-sin(phi) cos(phi)]*v_vec;
+        v_vec_new = -v_radial*[cos(phi); sin(phi)] + v_perp*[-sin(phi); cos(phi)];
+        th = atan2(v_vec_new(2), v_vec_new(1));
     end
     
     belugaSendPositionIPC(0, x, y, 0, sock);
     
     plot(x, y, 'kx', go_x, go_y, 'go')
-    axis([0 w 0 h])
+    axis(1.1*[-rmax rmax -rmax rmax])
     
     pause(0.1)
 end
