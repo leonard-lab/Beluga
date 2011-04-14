@@ -58,7 +58,8 @@ HS.RobotRad = RobotRad;
 guidata(gcf,HS);
 
 while double(get(HS.Fig,'currentcharacter')) ~= 27
-    uiwait(HS.Fig,.5);
+    %uiwait(HS.Fig,.5);
+    pause(0.5)
     HS = guidata(HS.Fig);
     for i = 1:1:NumRobots
         URLString = ['http://pod.princeton.edu/beluga/beluga.php?go_x=' num2str(HS.Targets(i,1)) '&go_y=' num2str(HS.Targets(i,2)) '&go_z=' num2str(HS.Targets(i,3))];
