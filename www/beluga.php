@@ -21,17 +21,35 @@ if(!$client->connect($server_address, $server_port))
 $robot = (isset($_GET["robot"]) ? $_GET["robot"] : "");
 $x = (isset($_GET["go_x"]) ? $_GET["go_x"] : "");
 $y = (isset($_GET["go_y"]) ? $_GET["go_y"] : "");
+$z = (isset($_GET["go_z"]) ? $_GET["go_z"] : "");
 
 $message = "";
 
 if(!(strlen($robot) && strlen($x) && strlen($y)))
 {
-    $message = "get position *";
+    $message = "";
+    if(isset($_GET["get_commands"]))
+    {
+        $message = "get command *";
+    }
+    else
+    {
+        $message = "get position *";
+    }
     echo $client->sendMessage($message);
 }
 else
 {
-    $message = "set command " . $robot . " " . $x . " " . $y . " " . " 0";
+    $message = "set command " . $robot . " " . $x . " " . $y . " ";
+    if(strlen($z))
+    {
+        $message = $message . $z;
+    }
+    else
+    {
+        $message = $message . "0";
+    }
+
     $resp1 = $client->sendMessage($message);
     echo $client->sendMessage("get position *");
 }
