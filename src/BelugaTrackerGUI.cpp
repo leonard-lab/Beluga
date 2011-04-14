@@ -22,6 +22,55 @@ enum
     ID_MENU_FILE_CAM_SETUP
 };
 
+void writeLineToSocket(const char* str, wxSocketBase* sock)
+{
+	char* c = (char *)calloc(strlen(str)+1, sizeof(char));
+	memcpy(c, str, strlen(str));
+	c[strlen(str)] = '\n';
+	sock->Write(c, (strlen(str)+1)*sizeof(char));
+	free(c);
+}
+
+std::string readLineFromSocket(wxSocketBase* sock)
+{
+	sock->SetFlags(wxSOCKET_NOWAIT);
+	std::ostringstream ss;
+
+	char c;
+	unsigned int i = 0;
+	do
+	{
+		sock->Read(&c, 1);
+		if(c >= ' ' && '~')
+		{
+			ss << c;
+		}
+	}while(c != '\n' && i < 1024);
+
+	std::string s = ss.str();
+	return s;
+}
+
+void parseCommandFromSocket(std::string cmd, int* id, double* x, double* y, double* z)
+{
+	if(cmd.length() < 7)
+	{
+		return;
+	}
+	std::istringstream ss(cmd);
+
+	float tmp = 0;
+	ss >> tmp;
+	*id = tmp;
+	ss >> tmp;
+	*x = tmp;
+	ss >> tmp;
+	*y = tmp;
+	ss >> tmp;
+	*z = tmp;
+
+}
+
 /**********************************************************************
  * GUI Frame Class
  *********************************************************************/
@@ -46,7 +95,8 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_dGotoYC(0),
 	m_dGotoXW(0),
 	m_dGotoYW(0),
-	m_bCamerasReady(false)
+	m_bCamerasReady(false),
+	m_bConnectSocket(false)
 {
 	for(unsigned int i = 0; i < 4; i++)
 	{
@@ -97,6 +147,8 @@ void BelugaTrackerFrame::initUserData()
                               wxT("num_to_track"),
                               wxT("Number of objects to track. Default is 3."),
                               wxCMD_LINE_VAL_NUMBER);
+
+	m_pPreferences->AddBool("Connect IPC Server", &m_bConnectSocket);
 
 	m_pPreferences->AddDouble("Goto Cutoff Distance",
                               &m_dGotoDist,
@@ -226,6 +278,31 @@ void BelugaTrackerFrame::runTracker()
 		printf("Tracking start\n");
 		m_pBelugaTracker->doTracking(m_pCameraFrames);
 		printf("Tracking done\n");
+
+		if(m_bConnectSocket && !m_Socket.IsConnected())
+		{
+			wxIPV4address addr;
+			addr.Hostname(wxT("127.0.0.1"));
+			addr.Service(1234);
+
+			m_Socket.Connect(addr, false);
+			m_Socket.WaitOnConnect(2);
+			if(!m_Socket.IsConnected())
+			{
+				MT_ShowErrorDialog(this, wxT("Could not connect to IPC server."));
+				m_bConnectSocket = false;
+			}
+			else
+			{
+				std::string serverMessage = readLineFromSocket(&m_Socket);
+				printf("Success connecting to IPC server, server says:\n%s\n", serverMessage.c_str());
+			}
+		}
+		if(!m_bConnectSocket && m_Socket.IsConnected())
+		{
+			m_Socket.Close();
+		}
+
 	}
 
 }
@@ -263,8 +340,6 @@ void BelugaTrackerFrame::doUserControl()
 		m_dGotoYW = m_Robots[2]->GetY();
 	}
 
-	printf("Control start\n");
-
 	double dx = m_dGotoXW - m_Robots[0]->GetX();
 	double dy = m_dGotoYW - m_Robots[0]->GetY();
 	double dth = (m_Robots[0]->GetTheta()) - atan2(dy, dx);
@@ -300,8 +375,6 @@ void BelugaTrackerFrame::doUserControl()
 
 	m_Robots[0]->SetControl(u);
 	m_Robots[0]->Control();
-
-	printf("Control done\n");
 
 }
 
@@ -367,6 +440,38 @@ void BelugaTrackerFrame::updateRobotStatesFromTracker()
             m_Robots[i]->Update(curr_state);
         }
     }
+
+	if(m_Socket.IsConnected())
+	{
+		std::ostringstream ss;
+		ss << "set position";
+		for(int i = 0; i < m_iNToTrack; i++)
+		{
+			ss << " " << i;
+			ss << " " << m_pBelugaTracker->getBelugaX(i);
+			ss << " " << m_pBelugaTracker->getBelugaY(i);
+			ss << " " << m_pBelugaTracker->getBelugaZ(i);
+		}
+		writeLineToSocket(ss.str().c_str(), &m_Socket);
+		std::string response = readLineFromSocket(&m_Socket);
+		writeLineToSocket("get command 0", &m_Socket);
+		response = readLineFromSocket(&m_Socket);
+		int id = -1;
+		double x = -100;
+		double y = -100;
+		double z = -100;
+		parseCommandFromSocket(response, &id, &x, &y, &z);
+
+		if(id == 0)
+		{
+			if(x != m_dGotoXW || y!= m_dGotoYW)
+			{
+				m_dGotoXW = x;
+				m_dGotoYW = y;
+				m_pBelugaTracker->getCameraXYFromWorldXYandDepth(&m_iGotoCam, &m_dGotoXC, &m_dGotoYC, m_dGotoXW, m_dGotoYW, 0, false);
+			}
+		}
+	}
 }
 
 bool BelugaTrackerFrame::doSlaveKeyboardCallback(wxKeyEvent& event, int slave_index)
@@ -398,6 +503,7 @@ bool BelugaTrackerFrame::doKeyboardCallback(wxKeyEvent& event)
 	{
 	case 'g':
 		m_bControlActive = !m_bControlActive;
+		m_bGotoActive = m_bControlActive;
 		break;
 	}
 

@@ -16,7 +16,7 @@ dead2 = 0.05;   % set the size of the deadzone for the joystick (left/right)
 
 forward = 1;
 
-while 1
+while 5
      [axes, buttons, povs] = read(joy);
      
      % throttle max horizontal velocity with dial

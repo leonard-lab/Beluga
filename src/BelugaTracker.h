@@ -169,7 +169,8 @@ public:
 
 	std::vector<double> getBelugaState(unsigned int i);
 	double getBelugaX(unsigned int i){if(i >= m_vdTracked_X.size()){return 0;} else {return m_vdTracked_X[i];}};
-	double getBelugaY(unsigned int i){if(i >= m_vdTracked_Y.size()){return 0;} else {return m_iFrameHeight - m_vdTracked_Y[i];}};
+	double getBelugaY(unsigned int i){if(i >= m_vdTracked_Y.size()){return 0;} else {return m_vdTracked_Y[i];}};
+	double getBelugaZ(unsigned int i){if(i >= m_vdTracked_Z.size()){return 0;} else {return m_vdTracked_Z[i];}};
 
 	void getWorldXYZFromImageXYAndDepthInCamera(double* x,
 		double* y,
@@ -179,6 +180,7 @@ public:
 		double d,
 		bool undistort,
 		unsigned int camera);
+	void getCameraXYFromWorldXYandDepth(int* camera, double* u, double* v, double x, double y, double depth, bool distort);
 
 };
 

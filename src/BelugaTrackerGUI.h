@@ -61,6 +61,9 @@ protected:
     std::string m_sQuad3MaskPath;
     std::string m_sQuad4MaskPath;  
 
+	bool m_bConnectSocket;
+	wxSocketClient m_Socket;
+
 	void acquireFrames();
 	void runTracker();
 
