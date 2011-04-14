@@ -97,7 +97,32 @@ varargout{1} = handles.output;
 
 function [x,y,z,success] = getPositions()
 
-BELUGA_PHP = 'http://localhost/~dan/beluga/beluga.php';
+%BELUGA_PHP = 'http://localhost/~dan/beluga/beluga.php';
+BELUGA_PHP = 'http://pod.princeton.edu/beluga/beluga.php';
+
+[s, success] = urlread(BELUGA_PHP);
+if success,
+    d = sscanf(s, '%f ');
+    if(numel(d) == 0 || mod(numel(d), 4) ~= 0),
+        success = 0;
+        x = 0;
+        y = 0;
+        z = 0;
+    else
+        x = d([2 : 4 : end]);
+        y = d([3 : 4 : end]);
+        z = d([4 : 4 : end]);
+    end
+else
+    x = 0;
+    y = 0;
+    z = 0;
+end
+
+function [x,y,z,success] = getCommands()
+
+%BELUGA_PHP = 'http://localhost/~dan/beluga/beluga.php';
+BELUGA_PHP = 'http://pod.princeton.edu/beluga/beluga.php?get_commands';
 
 [s, success] = urlread(BELUGA_PHP);
 if success,
@@ -122,6 +147,7 @@ function timerFcn(src,event,handles)
 handles = guidata(handles);
 
 [x, y, z, success] = getPositions();
+[xc, yc, zc, successc] = getCommands();
 
 if(~success),
     return;
@@ -133,7 +159,8 @@ drawWireFrame(handles.axesMain);
 
 hold(handles.axesMain, 'on');
 h = plot3(handles.axesMain, x, y, z, 'go');
-set(h, 'LineWidth', 2, 'MarkerSize', 10);
+hc = plot3(handles.axesMain, xc, yc, zc, 'rs');
+set([h hc], 'LineWidth', 2, 'MarkerSize', 10);
 view(handles.axesMain, [az, el]);
 
 hold(handles.axesMain, 'off');
