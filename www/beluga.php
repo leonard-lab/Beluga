@@ -22,12 +22,19 @@ $robot = (isset($_GET["robot"]) ? $_GET["robot"] : "");
 $x = (isset($_GET["go_x"]) ? $_GET["go_x"] : "");
 $y = (isset($_GET["go_y"]) ? $_GET["go_y"] : "");
 
+$message = "";
+
 if(!(strlen($robot) && strlen($x) && strlen($y)))
 {
-    trigger_error('Must specify robot, go_x, and go_y', E_USER_ERROR);
+    $message = "get position *";
+    echo $client->sendMessage($message);
+}
+else
+{
+    $message = "set command " . $robot . " " . $x . " " . $y . " " . " 0";
+    $resp1 = $client->sendMessage($message);
+    echo $client->sendMessage("get position *");
 }
 
-$resp1 = $client->sendMessage("set command " . $robot . " " . $x . " " . $y . " 0");
-echo $client->sendMessage("get position 0");
 
 ?>
