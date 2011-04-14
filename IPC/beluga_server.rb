@@ -1,4 +1,4 @@
-require 'rhubarb/rhubarb.rb'
+require File.dirname(__FILE__) + "/rhubarb/rhubarb.rb"
 
 class Robot
 
