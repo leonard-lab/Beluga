@@ -58,17 +58,16 @@ HS.RobotRad = RobotRad;
 guidata(gcf,HS);
 
 while double(get(HS.Fig,'currentcharacter')) ~= 27
-    %uiwait(HS.Fig,.5);
-    pause(0.5)
+    pause(.2);
     HS = guidata(HS.Fig);
     for i = 1:1:NumRobots
-        URLString = ['http://pod.princeton.edu/beluga/beluga.php?go_x=' num2str(HS.Targets(i,1)) '&go_y=' num2str(HS.Targets(i,2)) '&go_z=' num2str(HS.Targets(i,3))];
-        % out = urlread(URLString);
-        %    out = urlread('http://pod.princeton.edu/beluga/beluga.php?go_x=1.2&go_y=-2.1&go_z=0');
-        out = .8*HS.RobLocs(i,:) + .2*HS.Targets(i,:);
-        set(HS.RobXY(i),'XData',RobotRad*cos(thetas)+out(1),'YData',RobotRad*sin(thetas)+out(2));
-        set(HS.RobZ(i),'YData',RobotRad*sin(thetas)+out(3));
-        HS.RobLocs(i,:) = out;
+        URLString = ['http://pod.princeton.edu/beluga/beluga.php?robot=' sprintf('%i',i-1) '&go_x=' sprintf('%1.2f',HS.Targets(i,1)) '&go_y=' sprintf('%1.2f',HS.Targets(i,2)) '&go_z=' sprintf('%1.2f',HS.Targets(i,3))];
+        out = str2num(urlread(URLString));
+        %    out = urlread('http://pod.princeton.edu/beluga/beluga.php?robot=0&go_x=1.2&go_y=-2.1&go_z=0');
+%         out = .8*HS.RobLocs(i,:) + .2*HS.Targets(i,:);
+        HS.RobLocs(i,:) = out(4*(i-1)+2:4*(i-1)+4);
+        set(HS.RobXY(i),'XData',RobotRad*cos(thetas)+HS.RobLocs(i,1),'YData',RobotRad*sin(thetas)+HS.RobLocs(i,2));
+        set(HS.RobZ(i),'YData',RobotRad*sin(thetas)+HS.RobLocs(i,3));
     end
     guidata(HS.Fig,HS);
 end
@@ -81,16 +80,15 @@ CP = CP(1,1:2);
 HS.Targets(1,1:2) = CP;
 set(HS.AimPtsXY(1),'XData',HS.RobotRad*[1 1 .2 .2 -.2 -.2 -1 -1 -.2 -.2 .2 .2]+HS.Targets(1,1),'YData',HS.RobotRad*[-.2 .2 .2 1 1 .2 .2 -.2 -.2 -1 -1 -.2]+HS.Targets(1,2));
 guidata(gcf,HS);
-uiresume;
 
 function AdjustZ(src,event)
 HS = guidata(gcf);
 CP = get(HS.Z,'CurrentPoint');
 CP = CP(1,2);
 HS.Targets(1,3) = CP;
+HS.Targets(1,3) = max([min([HS.Targets(1,3) HS.TankDepth-HS.RobotRad]) HS.RobotRad]);
 set(HS.AimPtsZ(1),'XData',HS.RobotRad*[1 1 .2 .2 -.2 -.2 -1 -1 -.2 -.2 .2 .2],'YData',HS.RobotRad*[-.2 .2 .2 1 1 .2 .2 -.2 -.2 -1 -1 -.2]+HS.Targets(1,3));
 guidata(gcf,HS);
-uiresume;
 
 function ScrollZ(src,event)
 HS = guidata(gcf);
@@ -98,7 +96,6 @@ HS.Targets(1,3) = HS.Targets(1,3)+event.VerticalScrollCount*event.VerticalScroll
 HS.Targets(1,3) = max([min([HS.Targets(1,3) HS.TankDepth-HS.RobotRad]) HS.RobotRad]);
 set(HS.AimPtsZ(1),'XData',HS.RobotRad*[1 1 .2 .2 -.2 -.2 -1 -1 -.2 -.2 .2 .2],'YData',HS.RobotRad*[-.2 .2 .2 1 1 .2 .2 -.2 -.2 -1 -1 -.2]+HS.Targets(1,3));
 guidata(gcf,HS);
-% uiresume;
 
 
 
