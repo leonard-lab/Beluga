@@ -663,7 +663,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
     /* keeping track of the frame number, if necessary */
     m_iFrameCounter++;
 
-//	printf("a\n");
+//	printf("Tracking: Update parameters\n");
     /* This checks every time step to see if the UKF parameters have
        changed and modifies the UKF structures accordingly.  This will
        also get called the first time through b/c the "Prev" values get
@@ -736,7 +736,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		measZ[i].resize(0);
 	}
 
-//	printf("c\n");
+//	printf("Tracking:  Update search rectangles\n");
+
 	/* determine search rectangles */
 	for(int i = 0; i < 4; i++)
 	{
@@ -815,7 +816,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
 	}
 
-//	printf("d\n");
+//	printf("Tracking:  Image processing\n");
+
 	/* image processing and blob finding */
 	for(int i = 0; i < 4; i++)
 	{
@@ -855,7 +857,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
 	}
 
-//	printf("e\n");
+//	printf("Tracking:  Assign Measurements\n");
 	/* measurement association */
 	for(int i = 0; i < m_iNObj; i++)
 	{
@@ -869,6 +871,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 	{
 		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
 		{
+//			printf("Tracking:   Collect Blobs\n");
 			/* blobs in search area */
 			std::vector<YABlob> blobs_this_rect;
 			blobs_this_rect.resize(0);
@@ -885,17 +888,20 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 				continue;
 			}
 
+//			printf("Tracking:   Setup matcher\n");
 			MT_HungarianMatcher matcher;
 			bool do_match = false;
-			if(blobs_this_rect.size() >= m_SearchIndexes[i][j].size())
+			if(blobs_this_rect.size() >= m_SearchIndexes[i][j].size() && blobs_this_rect.size() > 1)
 			{
 				do_match = true;
 				matcher.doInit(m_SearchIndexes[i][j].size(), blobs_this_rect.size());
 			}
 
+//			printf("Tracking:   Distance Loop (doMatch?  %s)\n", do_match ? "yes" : "no");
 			//for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
 			for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
 			{
+//				printf("\t\t\tm = %d\n", m);
 				double d2;
 				double d2min = 1e10;
 				int kmin = -1;
@@ -903,10 +909,12 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 				//for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
 				for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
 				{
+//					printf("\t\t\tk = %d\n", k);
 					unsigned int n = m_SearchIndexes[i][j][k];
 					double xk = m_vdaTracked_XC[i][n];
 					double yk = m_vdaTracked_YC[i][n];
 
+//					printf("\t\t\t   1\n");
 					d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
 						+ (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
 //					printf("d2 = %f\n", d2);
@@ -915,7 +923,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 					{
 						matcher.setValue(k, m, d2);
 					}
-
+//					printf("\t\t\t   2\n");
 					if((!m_vbLastMeasValid[n] || 
 						(d2 < DEFAULT_GATE_DIST2) || 
 						(m_vdHistories_X[n].size() == 0)) 
@@ -924,11 +932,22 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 						kmin = k;
 						d2min = d2;
 					}
+//					printf("\t\t\t   3\n");
+				}
+
+//				printf("\t\t\t    A\n");
+
+				if(kmin < 0)
+				{
+					kmin = 0;
 				}
 
 				unsigned int n = m_SearchIndexes[i][j][kmin];
+
+//				printf("\t\t\t    B\n");
 				if(kmin >= 0 && !do_match  && m_vvdMeas_X[n].size() == 0)
 				{
+//					printf("\t\t\tForce assign\n");
 					m_vvdMeas_X[n].push_back(blobs_this_rect[m].COMx);
 					m_vvdMeas_Y[n].push_back(blobs_this_rect[m].COMy);
 					m_vvdMeas_Hdg[n].push_back(blobs_this_rect[m].orientation);
@@ -937,8 +956,10 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 //					printf("n = %d, i = %d\n", n, i); 
 				}
 
+//				printf("loop out\n");
 			}
 
+//			printf("Tracking:   Do match\n");
 			if(do_match)
 			{
 			std::vector<int> matches;
@@ -962,7 +983,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		}
 	}
 
-//	printf("f\n");
+//	printf("Tracking:  UKF Update\n");
+
 	/* filtering */
 	for(int i =0; i < m_iNObj; i++)
 	{
@@ -1119,6 +1141,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 			}
 		}
 
+//		printf("Tracking: State update\n");
+
 		rollHistories(&m_vdHistories_X[i], 
 			&m_vdHistories_Y[i], 
 			cvGetReal2D(m_vpUKF[i]->x, 0, 0),
@@ -1178,6 +1202,33 @@ void BelugaTracker::getWorldXYZFromImageXYAndDepthInCamera(double* x,
 
 	m_CoordinateTransforms[camera].imageAndDepthToWorld(u, v, d, x, y, z, undistort);
 
+}
+
+void BelugaTracker::getCameraXYFromWorldXYandDepth(int* camera, double* u, double* v, double x, double y, double depth, bool distort)
+{
+	if(!u || !v)
+	{
+		return;
+	}
+
+	if(x >= 0 && y >= 0)
+	{
+		*camera = 0;
+	}
+	if(x < 0 && y >= 0)
+	{
+		*camera = 1;
+	}
+	if(x <0 && y < 0)
+	{
+		*camera = 2;
+	}
+	if(x >= 0 && y < 0)
+	{
+		*camera = 3;
+	}
+
+	m_CoordinateTransforms[*camera].worldToImage(x, y, m_dWaterDepth-depth, u, v, distort);
 }
 
 /* Drawing function - gets called by the GUI
