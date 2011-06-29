@@ -429,6 +429,12 @@ void BelugaTrackerFrame::initTracker()
 
 void BelugaTrackerFrame::updateRobotStatesFromTracker()
 {
+
+    if(!m_pTracker)
+	{
+		return;
+	}
+
     int ti;
 	std::vector<double> curr_state;
     for(unsigned int i = 0; i < MT_MAX_NROBOTS; i++)

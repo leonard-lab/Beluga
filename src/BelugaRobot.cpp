@@ -207,8 +207,8 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 
     double x = -js_axes[0];
     double y = -js_axes[1];
-    double w = js_axes[2];
-    double z = -js_axes[3];
+    double w = 0;//js_axes[2];
+    double z = 0;//-js_axes[3];
 
     speed = MT_DeadBandAndScale(y, m_dSpeedDeadBand, m_dMaxSpeed);
     turn = MT_DeadBandAndScale(x, m_dTurnDeadBand, m_dMaxTurn);
