@@ -171,6 +171,26 @@ void Beluga::SendCommand(const char* command)
         sprintf(cmd, "%s!%c", command, BELUGA_LINEFEED);
     }
 
+	int f, v, t;
+	f = 0; v = 0; t = 0;
+	sscanf(command, "$%03d!%03d!%03d!", &v, &f, &t);
+
+	if(v > 100)
+	{
+		v = 100 - v;
+	}
+	if(f > 100)
+	{
+		f = 100 - f;
+	}
+	f = -f;
+	double half_speed = 0.5*((double) (BELUGA_SERVO_MIN + BELUGA_SERVO_MAX));
+	t = t - half_speed;
+
+	m_vdControls[BELUGA_CONTROL_FWD_SPEED] = f;
+	m_vdControls[BELUGA_CONTROL_STEERING] = t;
+	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = v;
+
     /* uncomment to see output in console */
 	//printf("Sending %s\n", cmd);
     
@@ -253,6 +273,10 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 
 void Beluga::SendCommand(double fwd_speed, double up_speed, double turn)
 {
+	m_vdControls[BELUGA_CONTROL_FWD_SPEED] = fwd_speed;
+	m_vdControls[BELUGA_CONTROL_STEERING] = turn;
+	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = up_speed;
+
 	unsigned int servo_cmd;
     /* assuming that halfway between the minimum and maximum servo
        positions is the neutral (straight forward) position */
