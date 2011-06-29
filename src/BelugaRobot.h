@@ -42,6 +42,13 @@ enum
 	BELUGA_CONTROL_SIZE /* must always be the last one */
 };
 
+enum
+{
+	BELUGA_MEASUREMENT_DEPTH = 0,
+
+	BELUGA_MEASUREMENT_SIZE /* must always be the last one */
+};
+
 class Beluga : public MT_RobotBase
 {
 public:
@@ -66,6 +73,7 @@ public:
 	void SetControl(std::vector<double> u);
 	std::vector<double> GetState();
 	std::vector<double> GetControl();
+	std::vector<double> GetMeasurements();
 
 	void Control();
 	void SafeStop();
@@ -86,7 +94,7 @@ protected:
 private:
     mutable bool m_bIsConnected;
 
-	unsigned char m_ucDepthByte[2];
+	unsigned char m_ucDepthByte[6];
 	double m_dDepth;
 
     double m_dMaxSpeed;

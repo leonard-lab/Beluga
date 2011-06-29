@@ -115,6 +115,14 @@ std::vector<double> Beluga::GetState()
 	return m_vdState;
 }
 
+std::vector<double> Beluga::GetMeasurements()
+{
+	std::vector<double> r;
+	r.resize(1);
+	r[0] = m_dDepth;
+	return r;
+}
+
 double Beluga::GetX() const
 {
 	return m_vdState[BELUGA_STATE_X];
@@ -169,9 +177,21 @@ void Beluga::SendCommand(const char* command)
     m_COMPort.SendCommand(cmd);
 
 	int r;
-	r = m_COMPort.ReadData(m_ucDepthByte, 2);
+	r = m_COMPort.ReadData(m_ucDepthByte, 6);
 
-	//printf("Got %d %d %d\n", r, m_ucDepthByte[0], m_ucDepthByte[1]);
+/*	printf("Got %d %d %d %d %d %d %d\n", 
+		r,
+		m_ucDepthByte[0], 
+		m_ucDepthByte[1], 
+		m_ucDepthByte[2], 
+		m_ucDepthByte[3],
+        m_ucDepthByte[4],
+		m_ucDepthByte[5]); */
+	m_ucDepthByte[4] = 0;
+	int d;
+	sscanf((const char*) m_ucDepthByte, "%d", &d);
+	m_dDepth = d;
+	printf("\t -> %f\n", m_dDepth);
 }
 
 double Beluga::getDepth()
@@ -226,6 +246,9 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 	}
 #endif
 	SendCommand(speed, vert, turn);
+	m_vdControls[BELUGA_CONTROL_FWD_SPEED] = speed;
+	m_vdControls[BELUGA_CONTROL_STEERING] = turn;
+	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = vert;
 }
 
 void Beluga::SendCommand(double fwd_speed, double up_speed, double turn)
