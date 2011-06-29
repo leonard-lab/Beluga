@@ -222,6 +222,11 @@ void BelugaTrackerFrame::makeFileMenu(wxMenu* file_menu)
                      wxEVT_COMMAND_MENU_SELECTED,
                      wxCommandEventHandler(BelugaTrackerFrame::onMenuFileCamSetup));
 
+    file_menu->Append(MT_TFB_ID_MENU_FILE_SELECT_DATAFILE, wxT("Select Data Output &File..."));
+    wxFrame::Connect(MT_TFB_ID_MENU_FILE_SELECT_DATAFILE,
+                     wxEVT_COMMAND_MENU_SELECTED,
+                     wxCommandEventHandler(MT_TrackerFrameBase::onMenuFileSelectDataFile));
+
     file_menu->AppendSeparator();
 
     MT_FrameBase::makeFileMenu(file_menu);
@@ -275,6 +280,29 @@ void BelugaTrackerFrame::runTracker()
 {
 	if(m_pCameraFrames[0])
 	{
+		std::vector<double> depth, speed, vert, turn, u, z;
+		depth.resize(0);
+		speed.resize(0);
+		vert.resize(0);
+		turn.resize(0);
+
+		int ti;
+		for(unsigned int i = 0; i < MT_MAX_NROBOTS; i++)
+		{
+			ti = m_Robots.TrackingIndex[i];
+			if(ti != MT_NOT_TRACKED)
+			{
+				z = m_Robots[i]->GetMeasurements();
+				depth.push_back(z[BELUGA_MEASUREMENT_DEPTH]);
+
+				u = m_Robots[i]->GetControl();
+				speed.push_back(u[BELUGA_CONTROL_FWD_SPEED]);
+				vert.push_back(u[BELUGA_CONTROL_VERT_SPEED]);
+				turn.push_back(u[BELUGA_CONTROL_STEERING]);
+			}
+		}
+		m_pBelugaTracker->setRobotData(depth, speed, vert, turn);
+
 		printf("Tracking start\n");
 		m_pBelugaTracker->doTracking(m_pCameraFrames);
 		printf("Tracking done\n");
