@@ -115,6 +115,14 @@ std::vector<double> Beluga::GetState()
 	return m_vdState;
 }
 
+std::vector<double> Beluga::GetMeasurements()
+{
+	std::vector<double> r;
+	r.resize(1);
+	r[0] = m_dDepth;
+	return r;
+}
+
 double Beluga::GetX() const
 {
 	return m_vdState[BELUGA_STATE_X];
@@ -163,15 +171,47 @@ void Beluga::SendCommand(const char* command)
         sprintf(cmd, "%s!%c", command, BELUGA_LINEFEED);
     }
 
+	int f, v, t;
+	f = 0; v = 0; t = 0;
+	sscanf(command, "$%03d!%03d!%03d!", &v, &f, &t);
+
+	if(v > 100)
+	{
+		v = 100 - v;
+	}
+	if(f > 100)
+	{
+		f = 100 - f;
+	}
+	f = -f;
+	double half_speed = 0.5*((double) (BELUGA_SERVO_MIN + BELUGA_SERVO_MAX));
+	t = t - half_speed;
+
+	m_vdControls[BELUGA_CONTROL_FWD_SPEED] = f;
+	m_vdControls[BELUGA_CONTROL_STEERING] = t;
+	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = v;
+
     /* uncomment to see output in console */
 	//printf("Sending %s\n", cmd);
     
     m_COMPort.SendCommand(cmd);
 
 	int r;
-	r = m_COMPort.ReadData(m_ucDepthByte, 2);
+	r = m_COMPort.ReadData(m_ucDepthByte, 6);
 
-	//printf("Got %d %d %d\n", r, m_ucDepthByte[0], m_ucDepthByte[1]);
+/*	printf("Got %d %d %d %d %d %d %d\n", 
+		r,
+		m_ucDepthByte[0], 
+		m_ucDepthByte[1], 
+		m_ucDepthByte[2], 
+		m_ucDepthByte[3],
+        m_ucDepthByte[4],
+		m_ucDepthByte[5]); */
+	m_ucDepthByte[4] = 0;
+	int d;
+	sscanf((const char*) m_ucDepthByte, "%d", &d);
+	m_dDepth = d;
+	printf("\t -> %f\n", m_dDepth);
 }
 
 double Beluga::getDepth()
@@ -207,8 +247,8 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 
     double x = -js_axes[0];
     double y = -js_axes[1];
-    double w = js_axes[2];
-    double z = -js_axes[3];
+    double w = 0;//js_axes[2];
+    double z = 0;//-js_axes[3];
 
     speed = MT_DeadBandAndScale(y, m_dSpeedDeadBand, m_dMaxSpeed);
     turn = MT_DeadBandAndScale(x, m_dTurnDeadBand, m_dMaxTurn);
@@ -226,10 +266,17 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
 	}
 #endif
 	SendCommand(speed, vert, turn);
+	m_vdControls[BELUGA_CONTROL_FWD_SPEED] = speed;
+	m_vdControls[BELUGA_CONTROL_STEERING] = turn;
+	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = vert;
 }
 
 void Beluga::SendCommand(double fwd_speed, double up_speed, double turn)
 {
+	m_vdControls[BELUGA_CONTROL_FWD_SPEED] = fwd_speed;
+	m_vdControls[BELUGA_CONTROL_STEERING] = turn;
+	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = up_speed;
+
 	unsigned int servo_cmd;
     /* assuming that halfway between the minimum and maximum servo
        positions is the neutral (straight forward) position */

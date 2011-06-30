@@ -71,6 +71,7 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_dDt(0),
       m_iFrameCounter(0),
       m_iNObj(n_obj),
+	  m_dCurrentTime(0),
       m_iFrameHeight(0),
 	  m_iFrameWidth(0)
 {
@@ -247,6 +248,11 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	}
     m_vdTracked_Heading.resize(m_iNObj);
     m_vdTracked_Speed.resize(m_iNObj);
+
+	m_vdDepthMeasurement.resize(0);
+	m_vdSpeedCommand.resize(0);
+	m_vdVerticalCommand.resize(0);
+	m_vdTurnCommand.resize(0);
 
     m_vdHistories_X.resize(m_iNObj);
     m_vdHistories_Y.resize(m_iNObj);
@@ -505,10 +511,21 @@ void BelugaTracker::initDataFile()
     m_XDF.addDataStream("Blob Major Axis", "blob_major.dat");
     m_XDF.addDataStream("Blob Minor Axis", "blob_minor.dat");
 
+    m_XDF.addDataStream("Time", "time_stamp.dat");
+
     m_XDF.addDataStream("Tracked X", "tracked_x.dat");
-    m_XDF.addDataStream("Tracked Y", "tracked_y.dat");    
+    m_XDF.addDataStream("Tracked Y", "tracked_y.dat");  
+    m_XDF.addDataStream("Tracked Z", "tracked_z.dat");  
     m_XDF.addDataStream("Tracked Heading", "tracked_heading.dat");    
     m_XDF.addDataStream("Tracked Speed", "tracked_speed.dat");
+
+	m_XDF.addDataStream("Tracked Camera X", "tracked_camera_x.dat");
+	m_XDF.addDataStream("Tracked Camera Y", "tracked_camera_y.dat");
+
+	m_XDF.addDataStream("Depth Measurement", "depth_meas.dat");
+	m_XDF.addDataStream("Speed Command", "cmd_speed.dat");
+    m_XDF.addDataStream("Vertical Command", "cmd_vert.dat");
+    m_XDF.addDataStream("Turn Command", "cmd_turn.dat");
     
     MT_TrackerBase::initDataFile();
 }
@@ -518,6 +535,11 @@ void BelugaTracker::writeData()
 {
     /* the XDF object handles writing data to the right files - all we
        have to do is pass the data as vectors */
+	std::vector<double> tmp;
+	tmp.resize(0);
+	tmp.push_back(m_dCurrentTime);
+    m_XDF.writeData("Time"             , tmp);
+
     m_XDF.writeData("Blob X"           , m_vdBlobs_X); 
     m_XDF.writeData("Blob Y"           , m_vdBlobs_Y); 
     m_XDF.writeData("Blob Area"        , m_vdBlobs_Area); 
@@ -527,8 +549,33 @@ void BelugaTracker::writeData()
 
     m_XDF.writeData("Tracked X"        , m_vdTracked_X); 
     m_XDF.writeData("Tracked Y"        , m_vdTracked_Y); 
+    m_XDF.writeData("Tracked Z"        , m_vdTracked_Z); 
     m_XDF.writeData("Tracked Heading"  , m_vdTracked_Heading); 
     m_XDF.writeData("Tracked Speed"    , m_vdTracked_Speed); 
+
+	std::vector<double> tmp2;
+	tmp.resize(0);
+	tmp2.resize(0);
+	for(unsigned int i = 0; i < m_vdaTracked_XC[0].size(); i++)
+	{
+		tmp.push_back(m_vdaTracked_XC[0][i]);
+		tmp.push_back(m_vdaTracked_XC[1][i]);
+		tmp.push_back(m_vdaTracked_XC[2][i]);
+		tmp.push_back(m_vdaTracked_XC[3][i]);
+
+		tmp2.push_back(m_vdaTracked_YC[0][i]);
+		tmp2.push_back(m_vdaTracked_YC[1][i]);
+		tmp2.push_back(m_vdaTracked_YC[2][i]);
+		tmp2.push_back(m_vdaTracked_YC[3][i]);
+	}
+	m_XDF.writeData("Tracked Camera X", tmp);
+	m_XDF.writeData("Tracked Camera Y", tmp2);
+    
+	m_XDF.writeData("Depth Measurement", m_vdDepthMeasurement);
+	m_XDF.writeData("Speed Command", m_vdSpeedCommand);
+	m_XDF.writeData("Vertical Command", m_vdVerticalCommand);
+	m_XDF.writeData("Turn Command", m_vdTurnCommand);
+
 }
 
 void BelugaTracker::setMasks(const char* maskfile1,
@@ -659,6 +706,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
     double t_now = MT_getTimeSec();
     m_dDt = t_now - t_prev;
     t_prev = t_now;
+	m_dCurrentTime = t_now;
 
     /* keeping track of the frame number, if necessary */
     m_iFrameCounter++;
@@ -1162,6 +1210,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
 	}
 
+	writeData();
+
 }
 
 std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
@@ -1184,6 +1234,17 @@ std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
 	r[BELUGA_STATE_ORIENTATION] = m_vdTracked_Heading[i];
 
 	return r;
+}
+
+void BelugaTracker::setRobotData(const std::vector<double>& depth_meas,
+		const std::vector<double>& speed,
+		const std::vector<double>& vert,
+		const std::vector<double>& turn)
+{
+	m_vdDepthMeasurement = depth_meas;
+	m_vdSpeedCommand = speed;
+	m_vdVerticalCommand = vert;
+	m_vdTurnCommand = turn;
 }
 
 void BelugaTracker::getWorldXYZFromImageXYAndDepthInCamera(double* x,

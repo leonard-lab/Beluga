@@ -119,6 +119,12 @@ private:
 	std::vector<std::vector<unsigned int> > m_vviMeas_A;
 	std::vector<std::vector<unsigned int> > m_vviMeas_Cam;
 
+    double m_dCurrentTime;
+	std::vector<double> m_vdDepthMeasurement;
+	std::vector<double> m_vdSpeedCommand;
+	std::vector<double> m_vdVerticalCommand;
+	std::vector<double> m_vdTurnCommand;
+
 	std::vector<bool> m_vbLastMeasValid;
 	std::vector<t_p_history> m_vdHistories_X;
     std::vector<t_p_history> m_vdHistories_Y;
@@ -182,6 +188,10 @@ public:
 		unsigned int camera);
 	void getCameraXYFromWorldXYandDepth(int* camera, double* u, double* v, double x, double y, double depth, bool distort);
 
+	void setRobotData(const std::vector<double>& depth_meas,
+		const std::vector<double>& speed,
+		const std::vector<double>& vert,
+		const std::vector<double>& turn);
 };
 
 #endif /* BELUGATRACKER_H */
