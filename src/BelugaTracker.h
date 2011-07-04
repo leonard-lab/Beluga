@@ -26,12 +26,14 @@ private:
 	IplImage* m_pHFrames[4];
 	IplImage* m_pSFrames[4];
 	IplImage* m_pVFrames[4];
+	IplImage* m_pHThreshFrames[4];
+	IplImage* m_pSThreshFrames[4];
+	IplImage* m_pVThreshFrames[4];
 	IplImage* m_pThreshFrames[4];
 
 	IplImage* m_pMasks[4];
 
 	IplImage* m_pTempFrame1;
-	IplImage* m_pTempFrame2;
 
 	CvMat* m_pCameraMatrices[4];
 	CvMat* m_pDistortionCoeffs[4];
