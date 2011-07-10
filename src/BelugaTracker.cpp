@@ -116,10 +116,12 @@ BelugaTracker::~BelugaTracker()
 			cvReleaseImage(&m_pHFrames[i]);
 			cvReleaseImage(&m_pSFrames[i]);
 			cvReleaseImage(&m_pVFrames[i]);
+			cvReleaseImage(&m_pHThreshFrames[i]);
+			cvReleaseImage(&m_pSThreshFrames[i]);
+			cvReleaseImage(&m_pVThreshFrames[i]);
 			cvReleaseImage(&m_pThreshFrames[i]);
 		}
 		cvReleaseImage(&m_pTempFrame1);
-    	cvReleaseImage(&m_pTempFrame2);
 	}
 
 	if(m_pMasks[0])
@@ -187,11 +189,13 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_pHFrames[i] = NULL;
 		m_pSFrames[i] = NULL;
 		m_pVFrames[i] = NULL;
+		m_pHThreshFrames[i] = NULL;
+		m_pSThreshFrames[i] = NULL;
+		m_pVThreshFrames[i] = NULL;
 
 		m_pMasks[i] = NULL;
 
 		m_pTempFrame1 = NULL;
-		m_pTempFrame2 = NULL;
 
 		m_pCameraMatrices[i] = NULL;
 		m_pDistortionCoeffs[i] = NULL;
@@ -277,6 +281,9 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	m_pTrackerFrameGroup->pushFrame(&m_pHFrames[0], "H");
 	m_pTrackerFrameGroup->pushFrame(&m_pSFrames[0], "S");
 	m_pTrackerFrameGroup->pushFrame(&m_pVFrames[0], "V");
+	m_pTrackerFrameGroup->pushFrame(&m_pHThreshFrames[0], "H Thresh");
+	m_pTrackerFrameGroup->pushFrame(&m_pSThreshFrames[0], "S Thresh");
+	m_pTrackerFrameGroup->pushFrame(&m_pVThreshFrames[0], "V Thresh");
 	m_pTrackerFrameGroup->pushFrame(&m_pGSFrames[0], "GS");
 
     for(unsigned int i = 0; i < 3; i++)
@@ -288,6 +295,9 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
         m_pAuxFrameGroups[i]->pushFrame(&m_pHFrames[i+1], "H");
         m_pAuxFrameGroups[i]->pushFrame(&m_pSFrames[i+1], "S");
         m_pAuxFrameGroups[i]->pushFrame(&m_pVFrames[i+1], "V");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pHThreshFrames[i+1], "H Thresh");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pSThreshFrames[i+1], "S Thresh");
+        m_pAuxFrameGroups[i]->pushFrame(&m_pVThreshFrames[i+1], "V Thresh");
         m_pAuxFrameGroups[i]->pushFrame(&m_pGSFrames[i+1], "GS");        
     }
 
@@ -422,10 +432,12 @@ void BelugaTracker::createFrames()
 			cvReleaseImage(&m_pHFrames[i]);
 			cvReleaseImage(&m_pSFrames[i]);
 			cvReleaseImage(&m_pVFrames[i]);
+			cvReleaseImage(&m_pHThreshFrames[i]);
+			cvReleaseImage(&m_pSThreshFrames[i]);
+			cvReleaseImage(&m_pVThreshFrames[i]);
 			cvReleaseImage(&m_pThreshFrames[i]);
 		}
 		cvReleaseImage(&m_pTempFrame1);
-		cvReleaseImage(&m_pTempFrame2);
 	}
 
 	if(m_pUndistortMapX)
@@ -449,9 +461,14 @@ void BelugaTracker::createFrames()
                                       IPL_DEPTH_8U, 1);
 		m_pVFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
                                       IPL_DEPTH_8U, 1);
+		m_pHThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
+                                      IPL_DEPTH_8U, 1);
+		m_pSThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
+                                      IPL_DEPTH_8U, 1);
+		m_pVThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
+                                      IPL_DEPTH_8U, 1);
 	}
 	m_pTempFrame1 = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
-	m_pTempFrame2 = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 
 	m_pUndistortMapX = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
 	m_pUndistortMapY = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
@@ -877,7 +894,20 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		/* just for display */
 		m_pGSFrames[i] = m_pVFrames[i];
 
-		cvThreshold(m_pVFrames[i], m_pThreshFrames[i], m_iVThresh, 255, CV_THRESH_BINARY_INV);
+		cvThreshold(m_pVFrames[i], m_pVThreshFrames[i], m_iVThresh, 255, CV_THRESH_BINARY_INV);
+
+		cvThreshold(m_pHFrames[i], m_pHThreshFrames[i], m_iHThresh_High, 255, CV_THRESH_BINARY);
+		cvThreshold(m_pHFrames[i], m_pTempFrame1, m_iHThresh_Low, 255, CV_THRESH_BINARY_INV);
+		cvOr(m_pHThreshFrames[i], m_pTempFrame1, m_pHThreshFrames[i]);
+
+		cvThreshold(m_pSFrames[i], m_pSThreshFrames[i], m_iSThresh_Low, 255, CV_THRESH_BINARY);
+		cvThreshold(m_pSFrames[i], m_pTempFrame1, m_iSThresh_High, 255, CV_THRESH_BINARY_INV);
+		cvAnd(m_pSThreshFrames[i], m_pTempFrame1, m_pSThreshFrames[i]);
+
+		cvAnd(m_pVThreshFrames[i], m_pHThreshFrames[i], m_pTempFrame1);
+		cvAnd(m_pTempFrame1, m_pSThreshFrames[i], m_pThreshFrames[i]);
+
+/*		cvThreshold(m_pVFrames[i], m_pThreshFrames[i], m_iVThresh, 255, CV_THRESH_BINARY_INV);
 		cvThreshold(m_pHFrames[i], m_pTempFrame1, m_iHThresh_High, 255, CV_THRESH_BINARY);
 		cvThreshold(m_pHFrames[i], m_pTempFrame2, m_iHThresh_Low, 255, CV_THRESH_BINARY_INV);
 		cvOr(m_pTempFrame1, m_pTempFrame2, m_pTempFrame1);
@@ -886,6 +916,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		cvThreshold(m_pSFrames[i], m_pTempFrame2, m_iSThresh_High, 255, CV_THRESH_BINARY_INV);
 		cvAnd(m_pTempFrame1, m_pTempFrame2, m_pTempFrame1);
 		cvAnd(m_pTempFrame1, m_pThreshFrames[i], m_pThreshFrames[i]);
+*/
+
 		cvSmooth(m_pThreshFrames[i], m_pThreshFrames[i], CV_MEDIAN, 3);
 		if(m_pMasks[i])
 		{
