@@ -76,7 +76,7 @@ function moveDot(dot_name, x, y)
     x = 300.0*(x*0.328) + 300.0; // .328 = 1/(10' -> meters)
     y = 300.0*(y*0.328) + 300.0;
 
- //   document.getElementById("d1").innerHTML += x + ", " + y;
+//    document.getElementById("d1").innerHTML += x + ", " + y;
     var cPos = getPos(document.getElementById("tankImage"));
     x = (x + cPos.left - dotHalfWidth);
     y = ((600 - y) + cPos.top - dotHalfHeight);
@@ -101,11 +101,12 @@ function doUpdate()
 
     var resp = req.responseText;
 
- //   document.getElementById("d1").innerHTML = resp + " "
+//    document.getElementById("d1").innerHTML = resp + " "
 
     var coords = resp.split(" ");
 
     moveDot("dot1", parseFloat(coords[1]), parseFloat(coords[2]));
+    moveDot("dot2", goX, goY);
 
     if(go)
     {
