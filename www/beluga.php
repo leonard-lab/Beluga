@@ -14,7 +14,8 @@ $client = new belugaClient();
 
 if(!$client->connect($server_address, $server_port))
 {
-    trigger_error('Could not connect to IPC server.', E_USER_ERROR);
+    echo "<span>The IPC server is down.</span>";
+    die();
 }
 
 /* grab input variables */

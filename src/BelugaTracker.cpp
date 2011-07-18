@@ -32,6 +32,19 @@ const double DEFAULT_GATE_DIST2 = 100.0*100.0;
 //#define VFLIP m_iFrameHeight -
 #define VFLIP
 
+template <class T>
+int indexInVector(const std::vector<T>& v, const T& value)
+{
+    for(unsigned int i = 0; i < v.size(); i++)
+    {
+        if(v[i] == value)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
 /**********************************************************************
  * Tracker Class
  *********************************************************************/
@@ -516,17 +529,14 @@ void BelugaTracker::initDataFile()
 
        These can then be read by e.g. MATLAB */
     char v[10];
-    sprintf(v, "%d", m_iStartFrame);
-    m_XDF.writeParameterToXML("Starting Frame", v);
-    sprintf(v, "%d", m_iStopFrame);
-    m_XDF.writeParameterToXML("Stopping Frame", v);
+    
+    sprintf(v, "%d", m_iNObj);
+    m_XDF.writeParameterToXML("Number of Objects Tracked", v);    
 
     m_XDF.addDataStream("Blob X", "blob_x.dat");
     m_XDF.addDataStream("Blob Y", "blob_y.dat");
     m_XDF.addDataStream("Blob Area", "blob_area.dat");
     m_XDF.addDataStream("Blob Orientation", "blob_orientation.dat");
-    m_XDF.addDataStream("Blob Major Axis", "blob_major.dat");
-    m_XDF.addDataStream("Blob Minor Axis", "blob_minor.dat");
 
     m_XDF.addDataStream("Time", "time_stamp.dat");
 
@@ -552,17 +562,42 @@ void BelugaTracker::writeData()
 {
     /* the XDF object handles writing data to the right files - all we
        have to do is pass the data as vectors */
-	std::vector<double> tmp;
-	tmp.resize(0);
-	tmp.push_back(m_dCurrentTime);
-    m_XDF.writeData("Time"             , tmp);
+	std::vector<double> tmp1, tmp2, tmp3, tmp4;
+	tmp1.resize(0);
+	tmp1.push_back(m_dCurrentTime);
+    m_XDF.writeData("Time"             , tmp1);
 
-    m_XDF.writeData("Blob X"           , m_vdBlobs_X); 
-    m_XDF.writeData("Blob Y"           , m_vdBlobs_Y); 
-    m_XDF.writeData("Blob Area"        , m_vdBlobs_Area); 
-    m_XDF.writeData("Blob Orientation" , m_vdBlobs_Orientation); 
-    m_XDF.writeData("Blob Major Axis"  , m_vdBlobs_MajorAxis); 
-    m_XDF.writeData("Blob Minor Axis"  , m_vdBlobs_MinorAxis); 
+    tmp1.resize(4*m_iNObj);
+	tmp2.resize(4*m_iNObj);
+	tmp3.resize(4*m_iNObj);
+	tmp4.resize(4*m_iNObj);
+
+    for(unsigned int i = 0; i < m_iNObj; i++)
+    {
+        for(unsigned int c = 0; c < 4; c++)
+        {
+            int k = indexInVector(m_vviMeas_Cam[i], c);
+            if(k < 0)
+            {
+                tmp1[4*i + c] = -1;
+                tmp2[4*i + c] = -1;
+                tmp3[4*i + c] = -1;
+                tmp4[4*i + c] = -1;                
+            }
+            else
+            {
+                tmp1[4*i + c] = m_vvdMeas_X[i][k];
+                tmp2[4*i + c] = m_vvdMeas_Y[i][k];
+                tmp3[4*i + c] = m_vvdMeas_Hdg[i][k];
+                tmp4[4*i + c] = m_vviMeas_A[i][k];                
+            }
+        }
+    }
+    
+	m_XDF.writeData("Blob X"		   , tmp1);
+	m_XDF.writeData("Blob Y"		   , tmp2);
+	m_XDF.writeData("Blob Orientation" , tmp3);     
+	m_XDF.writeData("Blob Area"		   , tmp4); 
 
     m_XDF.writeData("Tracked X"        , m_vdTracked_X); 
     m_XDF.writeData("Tracked Y"        , m_vdTracked_Y); 
@@ -570,22 +605,21 @@ void BelugaTracker::writeData()
     m_XDF.writeData("Tracked Heading"  , m_vdTracked_Heading); 
     m_XDF.writeData("Tracked Speed"    , m_vdTracked_Speed); 
 
-	std::vector<double> tmp2;
-	tmp.resize(0);
+	tmp1.resize(0);
 	tmp2.resize(0);
 	for(unsigned int i = 0; i < m_vdaTracked_XC[0].size(); i++)
 	{
-		tmp.push_back(m_vdaTracked_XC[0][i]);
-		tmp.push_back(m_vdaTracked_XC[1][i]);
-		tmp.push_back(m_vdaTracked_XC[2][i]);
-		tmp.push_back(m_vdaTracked_XC[3][i]);
+		tmp1.push_back(m_vdaTracked_XC[0][i]);
+		tmp1.push_back(m_vdaTracked_XC[1][i]);
+		tmp1.push_back(m_vdaTracked_XC[2][i]);
+		tmp1.push_back(m_vdaTracked_XC[3][i]);
 
 		tmp2.push_back(m_vdaTracked_YC[0][i]);
 		tmp2.push_back(m_vdaTracked_YC[1][i]);
 		tmp2.push_back(m_vdaTracked_YC[2][i]);
 		tmp2.push_back(m_vdaTracked_YC[3][i]);
 	}
-	m_XDF.writeData("Tracked Camera X", tmp);
+	m_XDF.writeData("Tracked Camera X", tmp1);
 	m_XDF.writeData("Tracked Camera Y", tmp2);
     
 	m_XDF.writeData("Depth Measurement", m_vdDepthMeasurement);
