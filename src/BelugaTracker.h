@@ -135,6 +135,40 @@ private:
     unsigned int m_iFrameHeight;
 
     MT_TrackerFrameGroup* m_pAuxFrameGroups[3];
+
+    ////////////////////////////////////////////////////////////
+    /* functions that get called during each tracking step */
+    
+    /* calculates a time stamp */
+    void doTimeKeeping();
+
+    /* updates UKF parameters/matrices if they have changed */
+    void updateUKFParameters();
+
+    /* image processing step */
+    void doImageProcessingInCamera(unsigned int cam_number);
+
+    /* first finding step - i.e., find image connected components */
+    void doBlobFindingInCamera(unsigned int cam_number);
+
+    /* resolves blob identities in each camera in order to
+     * generate measurements for the UKF */
+    void findMeasurementsInCamera(unsigned int cam_number);
+
+    /* update the state for each object
+     *   usually using the UKF but handling special cases */
+    void updateObjectState(unsigned int obj_number);
+    
+    /* apply UKF to an object */
+    void applyUKFToObject(unsigned int obj_number);
+
+    /* handles the first frame */
+    void useAverageMeasurementForObject(unsigned int obj_number);
+
+    /* handles when no measurement is available */
+    void usePredictedStateForObject(unsigned int obj_number);
+
+    ////////////////////////////////////////////////////////////    
     
 public:
     /* constructor */

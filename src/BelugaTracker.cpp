@@ -749,20 +749,17 @@ void BelugaTracker::doTracking(IplImage* frame)
 	std::cerr << "ERROR:  This function should never get called!  BelugaTracker::doTracking(IplImage* frame)\n";
 }
 
-void BelugaTracker::doTracking(IplImage* frames[4])
+void BelugaTracker::doTimeKeeping()
 {
-    /* time-keeping, if necessary
-     * NOTE this is not necessary for keeping track of frame rate */
     static double t_prev = MT_getTimeSec();
     double t_now = MT_getTimeSec();
     m_dDt = t_now - t_prev;
     t_prev = t_now;
 	m_dCurrentTime = t_now;
+}
 
-    /* keeping track of the frame number, if necessary */
-    m_iFrameCounter++;
-
-//	printf("Tracking: Update parameters\n");
+void BelugaTracker::updateUKFParameters()
+{
     /* This checks every time step to see if the UKF parameters have
        changed and modifies the UKF structures accordingly.  This will
        also get called the first time through b/c the "Prev" values get
@@ -793,7 +790,6 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         cvSetReal2D(m_pR, 3, 3, m_dSigmaHeadingMeas*m_dSigmaHeadingMeas);
         cvSetReal2D(m_pR, 2, 2, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
 
-//		printf("a.1\n");
 		/* makes sure we only have to copy the numbers once - it will
 		 * automatically get copied again later if necessary */
 		adjustRMatrixAndZForMeasurementSize(m_pR, m_pz, 1);
@@ -801,7 +797,6 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		{
 			m_vpUKF[i]->m = m_pR->rows;
 		}
-//		printf("a.2\n");
 
 		m_dPrevSigmaPosition = m_dSigmaPosition;
 		m_dPrevSigmaHeading = m_dSigmaHeading;
@@ -813,166 +808,330 @@ void BelugaTracker::doTracking(IplImage* frames[4])
            and makes sure that it's internals are properly initialized -
            it's set up to handle the fact that the sizes of these
            matrices could have changed. */
-//		printf("a.3\n");
         for(int i = 0; i < m_iNObj; i++)
         {
             MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
         }
     }
+    
+}
 
-//	printf("b\n");
-	std::vector<std::vector<double> > measX;
-	std::vector<std::vector<double> > measY;
-	std::vector<std::vector<double> > measZ;
+void BelugaTracker::doImageProcessingInCamera(unsigned int cam_number)
+{
+    /* correct for barrel distortion */
+    cvRemap(frames[cam_number],
+            m_pUndistortedFrames[cam_number],
+            m_pUndistortMapX,
+            m_pUndistortMapY);
 
-	measX.resize(m_iNObj);
-	measY.resize(m_iNObj);
-	measZ.resize(m_iNObj);
-	for(int i = 0; i < m_iNObj; i++)
-	{
-		measX[i].resize(0);
-		measY[i].resize(0);
-		measZ[i].resize(0);
-	}
+    /* split into HSV frames */
+    HSVSplit(m_pUndistortedFrames[cam_number], cam_number);
 
-//	printf("Tracking:  Update search rectangles\n");
+    /* just for display - the "grayscale" image is the V channel */
+    m_pGSFrames[cam_number] = m_pVFrames[cam_number];
 
-	/* determine search rectangles */
+    /* Tv = V < Vthresh */
+    cvThreshold(m_pVFrames[cam_number],
+                m_pVThreshFrames[cam_number],
+                m_iVThresh, 255, CV_THRESH_BINARY_INV);
+
+    /* Th = (H > H_hi) OR (H < H_lo)
+     *          i.e., reject between H_lo and H_hi */
+    cvThreshold(m_pHFrames[cam_number],
+                m_pHThreshFrames[cam_number],
+                m_iHThresh_High, 255, CV_THRESH_BINARY);
+    cvThreshold(m_pHFrames[cam_number],
+                m_pTempFrame1,
+                m_iHThresh_Low, 255, CV_THRESH_BINARY_INV);
+    cvOr(m_pHThreshFrames[cam_number], m_pTempFrame1, m_pHThreshFrames[cam_number]);
+
+    /* Ts = (S > S_lo) AND (S < S_hi)
+     *         i.e., S_lo < S < S_hi */
+    cvThreshold(m_pSFrames[cam_number],
+                m_pSThreshFrames[cam_number],
+                m_iSThresh_Low, 255, CV_THRESH_BINARY);
+    cvThreshold(m_pSFrames[cam_number],
+                m_pTempFrame1,
+                m_iSThresh_High, 255, CV_THRESH_BINARY_INV);
+    cvAnd(m_pSThreshFrames[cam_number], m_pTempFrame1, m_pSThreshFrames[cam_number]);
+
+    /* T = Tv AND Th AND Tv */
+    cvAnd(m_pVThreshFrames[cam_number], m_pHThreshFrames[cam_number], m_pTempFrame1);
+    cvAnd(m_pTempFrame1, m_pSThreshFrames[cam_number], m_pThreshFrames[cam_number]);
+
+    /* apply a median filter to get rid of "salt and pepper" noise */
+    cvSmooth(m_pThreshFrames[cam_number], m_pThreshFrames[cam_number], CV_MEDIAN, 3);
+
+    /* apply the mask image */
+    if(m_pMasks[cam_number])
+    {
+        cvAnd(m_pThreshFrames[cam_number],
+              m_pMasks[cam_number],
+              m_pThreshFrames[cam_number]);
+    }
+}
+
+void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
+{
+    m_vBlobs[cam_number] = m_YABlobber.FindBlobs(m_pThreshFrames[cam_number],
+                                                 5, /* min perimeter */
+                                                 m_iBlobAreaThreshLow,
+                                                 NO_MAX,
+                                                 m_iBlobAreaThreshHigh);
+    /* have to adjust the y coordinate because the image coordinates
+       are flipped */
+    for(unsigned int j = 0; j < m_vBlobs[cam_number].size(); j++)
+    {
+        m_vBlobs[cam_number][j].COMy = m_iFrameHeight - m_vBlobs[cam_number][j].COMy;
+    }
+}
+
+void BelugaTracker::findMeasurementsInCamera(unsigned int cam_number)
+{
+    for(unsigned int j = 0; j < m_SearchArea[cam_number].size(); j++)
+    {
+        /* blobs in search area */
+        std::vector<YABlob> blobs_this_rect;
+        blobs_this_rect.resize(0);
+        for(unsigned int k = 0; k < m_vBlobs[cam_number].size(); k++)
+        {
+            if(pointInCvRect(m_vBlobs[cam_number][k].COMx, m_vBlobs[cam_number][k].COMy, m_SearchArea[cam_number][j]))
+            {
+                blobs_this_rect.push_back(m_vBlobs[cam_number][k]);
+            }
+        }
+
+        if(blobs_this_rect.size() == 0)
+        {
+            continue;
+        }
+
+        MT_HungarianMatcher matcher;
+        bool do_match = false;
+        if(blobs_this_rect.size() >= m_SearchIndexes[cam_number][j].size() && blobs_this_rect.size() > 1)
+        {
+            do_match = true;
+            matcher.doInit(m_SearchIndexes[cam_number][j].size(), blobs_this_rect.size());
+        }
+
+        for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
+        {
+            double d2;
+            double d2min = 1e10;
+            int kmin = -1;
+            /* i'th camera, j'th rectangle, k'th index */
+            //for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
+            for(unsigned int k = 0; k < m_SearchIndexes[cam_number][j].size(); k++)
+            {
+                unsigned int n = m_SearchIndexes[cam_number][j][k];
+                double xk = m_vdaTracked_XC[cam_number][n];
+                double yk = m_vdaTracked_YC[cam_number][n];
+
+                d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
+                    + (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
+
+                if(do_match)
+                {
+                    matcher.setValue(k, m, d2);
+                }
+                if((!m_vbLastMeasValid[n] || 
+                    (d2 < DEFAULT_GATE_DIST2) || 
+                    (m_vdHistories_X[n].size() == 0)) 
+                   && d2 < d2min)
+                {
+                    kmin = k;
+                    d2min = d2;
+                }
+            }
+
+            if(kmin < 0)
+            {
+                kmin = 0;
+            }
+
+            unsigned int n = m_SearchIndexes[cam_number][j][kmin];
+
+            if(kmin >= 0 && !do_match  && m_vvdMeas_X[n].size() == 0)
+            {
+                m_vvdMeas_X[n].push_back(blobs_this_rect[m].COMx);
+                m_vvdMeas_Y[n].push_back(blobs_this_rect[m].COMy);
+                m_vvdMeas_Hdg[n].push_back(blobs_this_rect[m].orientation);
+                m_vviMeas_A[n].push_back(blobs_this_rect[m].area);
+                m_vviMeas_Cam[n].push_back(i);
+            }
+
+        }
+
+        if(do_match)
+        {
+            std::vector<int> matches;
+            matches.resize(m_SearchIndexes[cam_number][j].size());
+            matcher.doMatch(&matches);
+
+            for(unsigned int k = 0; k < matches.size(); k++)
+            {
+                unsigned int n = m_SearchIndexes[cam_number][j][k];
+                m_vvdMeas_X[n].push_back(blobs_this_rect[matches[k]].COMx);
+                m_vvdMeas_Y[n].push_back(blobs_this_rect[matches[k]].COMy);
+                m_vvdMeas_Hdg[n].push_back(blobs_this_rect[matches[k]].orientation);
+                m_vviMeas_A[n].push_back(blobs_this_rect[matches[k]].area);
+                m_vviMeas_Cam[n].push_back(i);
+            }
+        }
+
+    }
+}
+
+void BelugaTracker::updateObjectState(unsigned int obj_number)
+{
+    unsigned int nmeas = m_vvdMeas_X[obj_number].size();
+
+    if(nmeas)
+    {
+        adjustRMatrixAndZForMeasurementSize(m_pR, m_pz, nmeas);
+        MT_UKFCopyQR(m_vpUKF[obj_number], m_pQ, m_pR);
+        m_vpUKF[obj_number]->m = m_pR->rows;
+    }
+
+    bool valid_meas = m_iFrameCounter > 1 && nmeas > 0;
+
+    /* if any state is NaN, reset the UKF
+     * This shouldn't happen anymore, but it's a decent safety
+     * check.  It could probably be omitted if we want to
+     * optimize for speed... */
+    if(m_iFrameCounter > 1 &&
+       (!CvMatIsOk(m_vpUKF[obj_number]->x) ||
+        !CvMatIsOk(m_vpUKF[obj_number]->P)))
+    {
+        MT_UKFFree(&(m_vpUKF[obj_number]));
+        m_vpUKF[obj_number] = MT_UKFInit(5, m_pR->rows, 0.1);
+        MT_UKFCopyQR(m_vpUKF[obj_number], m_pQ, m_pR);
+        valid_meas = false;
+    }
+
+    m_vbLastMeasValid[obj_number] = valid_meas;
+
+    /* if we're going to accept this measurement */
+    if(valid_meas)
+    {
+        applyUKFToObject(obj_number);
+    }
+    else
+    {
+       // on the first frame, take the average of the measurements
+        if(m_iFrameCounter == 1)
+        {
+            if(nmeas > 0)
+            {
+                useAverageMeasurementForObject(obj_number);
+            }
+        }
+        else
+        {
+            usePredictedStateForObject(obj_number);
+        }
+    }
+    
+}
+
+void BelugaTracker::applyUKFToObject(unsigned int obj_number)
+{
+    /* UKF prediction step, note we use function pointers to
+       the beluga_dynamics and beluga_measurement functions defined
+       above.  The final parameter would be for the control input
+       vector, which we don't use here so we pass a NULL pointer */
+    MT_UKFPredict(m_vpUKF[obj_number],
+                  &beluga_dynamics,
+                  &beluga_measurement,
+                  NULL);
+
+    /* build the measurement vector */
+    double x, y, z, th;
+    double th_prev = cvGetReal2D(m_vpUKF[obj_number]->x, 3, 0);
+    unsigned int cam_no;
+    for(unsigned int j = 0; j < nmeas; j++)
+    {
+        cam_no = m_vviMeas_Cam[obj_number][j];
+        m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
+                                                            m_vvdMeas_Y[obj_number][j],
+                                                            0, &x, &y, &z, false);
+        th = rectifyAngleMeasurement(m_vvdMeas_Hdg[obj_number][j],
+                                     m_vdHistories_X[obj_number],
+                                     m_vdHistories_Y[obj_number],
+                                     N_hist,
+                                     th_prev);
+        m_vvdMeas_Hdg[obj_number][j] = MT_RAD2DEG*th;
+        cvSetReal2D(m_pz, j*3 + 0, 0, x);
+        cvSetReal2D(m_pz, j*3 + 1, 0, y);
+        cvSetReal2D(m_pz, j*3 + 2, 0, th);
+    }
+    cvSetReal2D(m_pz, m_pz->rows - 1, 0, m_dWaterDepth);
+
+    MT_UKFSetMeasurement(m_vpUKF[obj_number], m_pz);
+    MT_UKFCorrect(m_vpUKF[obj_number]);
+
+    constrain_state(m_vpUKF[obj_number]->x, m_vpUKF[obj_number]->x1, 10.0, m_dWaterDepth);
+}
+
+void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
+{
+    double xavg = 0;
+    double yavg = 0;
+    double qx = 0;
+    double qy = 0;
+    double x, y, z;
+    unsigned int cam_no;
+    for(unsigned int j = 0; j < nmeas; j++)
+    {
+        cam_no = m_vviMeas_Cam[obj_number][j];
+        m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
+                                                            m_vvdMeas_Y[obj_number][j],
+                                                            0, &x, &y, &z, false);
+        xavg += x;
+        yavg += y;
+        qx += cos(MT_DEG2RAD*m_vvdMeas_Hdg[obj_number][j]);
+        qy += sin(MT_DEG2RAD*m_vvdMeas_Hdg[obj_number][j]);
+    }
+    xavg /= (double) nmeas;
+    yavg /= (double) nmeas;
+    double th = atan2(qy, qx);
+
+    cvSetReal2D(m_vpUKF[obj_number]->x, 0, 0, xavg);
+    cvSetReal2D(m_vpUKF[obj_number]->x, 1, 0, yavg);
+    cvSetReal2D(m_vpUKF[obj_number]->x, 2, 0, m_dWaterDepth);
+    cvSetReal2D(m_vpUKF[obj_number]->x, 3, 0, th);
+    cvSetReal2D(m_vpUKF[obj_number]->x, 4, 0, 0);
+    m_vbLastMeasValid[obj_number] = true;
+}
+
+void BelugaTracker::usePredictedStateForObject(unsigned int obj_number)
+{
+    // use the prediction
+    cvCopy(m_vpUKF[obj_number]->x1, m_vpUKF[obj_number]->x);
+}
+
+void BelugaTracker::doTracking(IplImage* frames[4])
+{
+    /* calculate time stamp */
+    doTimeKeeping();
+
+    /* update the frame counter */
+    m_iFrameCounter++;
+
+    /* update UKF parameters if they have changed */
+    updateUKFParameters();
+
+	/* preprocessing steps for each camera */
 	for(int i = 0; i < 4; i++)
 	{
-        m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
+        doImageProcessingInCamera(i);
+        doBlobFindingInCamera(i);
 
-		m_SearchIndexes[i].resize(0);
-		m_SearchArea[i].resize(0);
-		std::vector<unsigned int> search_indexes_this_rect;
-		search_indexes_this_rect.resize(1);
-
-		for(int j = 0; j < m_iNObj; j++)
-		{
-			search_indexes_this_rect[0] = j;
-
-			if(!m_vbLastMeasValid[j] || m_vdHistories_X[j].size() == 0)
-			{
-				m_SearchIndexes[i].push_back(search_indexes_this_rect);
-				m_SearchArea[i].push_back(cvRect(0, 0, m_iFrameWidth, m_iFrameHeight));
-				continue;
-			}
-
-			double x = m_vdTracked_X[j];
-			double y = m_vdTracked_Y[j];
-			double z = m_vdTracked_Z[j];
-			double u = 0;
-			double v = 0;
- 
-			m_CoordinateTransforms[i].worldToImage(x, y, z, &u, &v, false);
-			//v = m_iFrameHeight - v;
-//			printf("%f, %f, %f -> %f, %f\n", x, y, z, u, v);
-
-			m_vdaTracked_XC[i][j] = u;
-			m_vdaTracked_YC[i][j] = v;
-
-			if(u > -(double)m_iSearchAreaPadding && u < (double)(m_iFrameWidth+m_iSearchAreaPadding)
-				&& v > -(double)m_iSearchAreaPadding && v < (double)(m_iFrameHeight+m_iSearchAreaPadding))
-			{
-				m_SearchIndexes[i].push_back(search_indexes_this_rect);
-				m_SearchArea[i].push_back(searchRectAtPointWithSize(u,v,m_iSearchAreaPadding));
-			}
-		}
-
-//		printf("============= IN %d ============\n", i);
-/*		printf("%d search areas\n", m_SearchArea[i].size());
-		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
-		{
-			printf("[%d, %d, %d, %d] including indeces ", 
-				m_SearchArea[i][j].x,
-				m_SearchArea[i][j].y,
-				m_SearchArea[i][j].width,
-				m_SearchArea[i][j].height);
-			for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
-			{
-				printf("%d ", m_SearchIndexes[i][j][k]);
-			}
-			printf("\n");
-		}*/
-
-	    combineSearchAreas(&m_SearchArea[i], &m_SearchIndexes[i]);
-
-//		printf("============= OUT %d ============\n", i);
-/*		printf("%d search areas\n", m_SearchArea[i].size());
-		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
-		{
-			printf("[%d, %d, %d, %d] including indeces ", 
-				m_SearchArea[i][j].x,
-				m_SearchArea[i][j].y,
-				m_SearchArea[i][j].width,
-				m_SearchArea[i][j].height);
-			for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
-			{
-				printf("%d ", m_SearchIndexes[i][j][k]);
-			}
-			printf("\n");
-		}*/
-
-	}
-
-//	printf("Tracking:  Image processing\n");
-
-	/* image processing and blob finding */
-	for(int i = 0; i < 4; i++)
-	{
-		cvRemap(frames[i], m_pUndistortedFrames[i], m_pUndistortMapX, m_pUndistortMapY);
-		HSVSplit(m_pUndistortedFrames[i], i);
-
-		//HSVSplit(frames[i], i);
-
-		/* just for display */
-		m_pGSFrames[i] = m_pVFrames[i];
-
-		cvThreshold(m_pVFrames[i], m_pVThreshFrames[i], m_iVThresh, 255, CV_THRESH_BINARY_INV);
-
-		cvThreshold(m_pHFrames[i], m_pHThreshFrames[i], m_iHThresh_High, 255, CV_THRESH_BINARY);
-		cvThreshold(m_pHFrames[i], m_pTempFrame1, m_iHThresh_Low, 255, CV_THRESH_BINARY_INV);
-		cvOr(m_pHThreshFrames[i], m_pTempFrame1, m_pHThreshFrames[i]);
-
-		cvThreshold(m_pSFrames[i], m_pSThreshFrames[i], m_iSThresh_Low, 255, CV_THRESH_BINARY);
-		cvThreshold(m_pSFrames[i], m_pTempFrame1, m_iSThresh_High, 255, CV_THRESH_BINARY_INV);
-		cvAnd(m_pSThreshFrames[i], m_pTempFrame1, m_pSThreshFrames[i]);
-
-		cvAnd(m_pVThreshFrames[i], m_pHThreshFrames[i], m_pTempFrame1);
-		cvAnd(m_pTempFrame1, m_pSThreshFrames[i], m_pThreshFrames[i]);
-
-/*		cvThreshold(m_pVFrames[i], m_pThreshFrames[i], m_iVThresh, 255, CV_THRESH_BINARY_INV);
-		cvThreshold(m_pHFrames[i], m_pTempFrame1, m_iHThresh_High, 255, CV_THRESH_BINARY);
-		cvThreshold(m_pHFrames[i], m_pTempFrame2, m_iHThresh_Low, 255, CV_THRESH_BINARY_INV);
-		cvOr(m_pTempFrame1, m_pTempFrame2, m_pTempFrame1);
-		cvAnd(m_pTempFrame1, m_pThreshFrames[i], m_pThreshFrames[i]);
-		cvThreshold(m_pSFrames[i], m_pTempFrame1, m_iSThresh_Low, 255, CV_THRESH_BINARY);
-		cvThreshold(m_pSFrames[i], m_pTempFrame2, m_iSThresh_High, 255, CV_THRESH_BINARY_INV);
-		cvAnd(m_pTempFrame1, m_pTempFrame2, m_pTempFrame1);
-		cvAnd(m_pTempFrame1, m_pThreshFrames[i], m_pThreshFrames[i]);
-*/
-
-		cvSmooth(m_pThreshFrames[i], m_pThreshFrames[i], CV_MEDIAN, 3);
-		if(m_pMasks[i])
-		{
-			cvAnd(m_pThreshFrames[i], m_pMasks[i], m_pThreshFrames[i]);
-		}
-
-		m_vBlobs[i] = m_YABlobber.FindBlobs(m_pThreshFrames[i],
-			5, /* min perimeter */
-			m_iBlobAreaThreshLow,
-			NO_MAX,
-			m_iBlobAreaThreshHigh);
-		for(unsigned int j = 0; j < m_vBlobs[i].size(); j++)
-		{
-			m_vBlobs[i][j].COMy = m_iFrameHeight - m_vBlobs[i][j].COMy;
-		}
-
+        /* update the water depth from the GUI */
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
 	}
 
-//	printf("Tracking:  Assign Measurements\n");
-	/* measurement association */
+	/* reset measurement vectors to zero */
 	for(int i = 0; i < m_iNObj; i++)
 	{
 		m_vvdMeas_X[i].resize(0);
@@ -981,281 +1140,18 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		m_vviMeas_Cam[i].resize(0);
 		m_vvdMeas_Hdg[i].resize(0);
 	}
+
+    /* figure out which robots are in which camera and extract
+     * measurements from the blobs */
 	for(int i = 0; i < 4; i++)
 	{
-		for(unsigned int j = 0; j < m_SearchArea[i].size(); j++)
-		{
-//			printf("Tracking:   Collect Blobs\n");
-			/* blobs in search area */
-			std::vector<YABlob> blobs_this_rect;
-			blobs_this_rect.resize(0);
-			for(unsigned int k = 0; k < m_vBlobs[i].size(); k++)
-			{
-				if(pointInCvRect(m_vBlobs[i][k].COMx, m_vBlobs[i][k].COMy, m_SearchArea[i][j]))
-				{
-					blobs_this_rect.push_back(m_vBlobs[i][k]);
-				}
-			}
-
-			if(blobs_this_rect.size() == 0)
-			{
-				continue;
-			}
-
-//			printf("Tracking:   Setup matcher\n");
-			MT_HungarianMatcher matcher;
-			bool do_match = false;
-			if(blobs_this_rect.size() >= m_SearchIndexes[i][j].size() && blobs_this_rect.size() > 1)
-			{
-				do_match = true;
-				matcher.doInit(m_SearchIndexes[i][j].size(), blobs_this_rect.size());
-			}
-
-//			printf("Tracking:   Distance Loop (doMatch?  %s)\n", do_match ? "yes" : "no");
-			//for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
-			for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
-			{
-//				printf("\t\t\tm = %d\n", m);
-				double d2;
-				double d2min = 1e10;
-				int kmin = -1;
-				/* i'th camera, j'th rectangle, k'th index */
-				//for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
-				for(unsigned int k = 0; k < m_SearchIndexes[i][j].size(); k++)
-				{
-//					printf("\t\t\tk = %d\n", k);
-					unsigned int n = m_SearchIndexes[i][j][k];
-					double xk = m_vdaTracked_XC[i][n];
-					double yk = m_vdaTracked_YC[i][n];
-
-//					printf("\t\t\t   1\n");
-					d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
-						+ (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
-//					printf("d2 = %f\n", d2);
-
-					if(do_match)
-					{
-						matcher.setValue(k, m, d2);
-					}
-//					printf("\t\t\t   2\n");
-					if((!m_vbLastMeasValid[n] || 
-						(d2 < DEFAULT_GATE_DIST2) || 
-						(m_vdHistories_X[n].size() == 0)) 
-						&& d2 < d2min)
-					{
-						kmin = k;
-						d2min = d2;
-					}
-//					printf("\t\t\t   3\n");
-				}
-
-//				printf("\t\t\t    A\n");
-
-				if(kmin < 0)
-				{
-					kmin = 0;
-				}
-
-				unsigned int n = m_SearchIndexes[i][j][kmin];
-
-//				printf("\t\t\t    B\n");
-				if(kmin >= 0 && !do_match  && m_vvdMeas_X[n].size() == 0)
-				{
-//					printf("\t\t\tForce assign\n");
-					m_vvdMeas_X[n].push_back(blobs_this_rect[m].COMx);
-					m_vvdMeas_Y[n].push_back(blobs_this_rect[m].COMy);
-					m_vvdMeas_Hdg[n].push_back(blobs_this_rect[m].orientation);
-					m_vviMeas_A[n].push_back(blobs_this_rect[m].area);
-					m_vviMeas_Cam[n].push_back(i);
-//					printf("n = %d, i = %d\n", n, i); 
-				}
-
-//				printf("loop out\n");
-			}
-
-//			printf("Tracking:   Do match\n");
-			if(do_match)
-			{
-			std::vector<int> matches;
-			matches.resize(m_SearchIndexes[i][j].size());
-			matcher.doMatch(&matches);
-
-//			printf("Hungarian matches:  ");
-			for(unsigned int k = 0; k < matches.size(); k++)
-			{
-//				printf("%d -> %d ", k, matches[k]);
-				unsigned int n = m_SearchIndexes[i][j][k];
-				m_vvdMeas_X[n].push_back(blobs_this_rect[matches[k]].COMx);
-				m_vvdMeas_Y[n].push_back(blobs_this_rect[matches[k]].COMy);
-				m_vvdMeas_Hdg[n].push_back(blobs_this_rect[matches[k]].orientation);
-				m_vviMeas_A[n].push_back(blobs_this_rect[matches[k]].area);
-				m_vviMeas_Cam[n].push_back(i);
-			}
-//			printf("\n");
-			}
-
-		}
+        findMeasurementsInCamera(i);
 	}
-
-//	printf("Tracking:  UKF Update\n");
 
 	/* filtering */
 	for(int i =0; i < m_iNObj; i++)
 	{
-		unsigned int nmeas = m_vvdMeas_X[i].size();
-
-//		printf("Got %d Meas's for Object %d: ", m_vvdMeas_X[i].size(), i);
-/*		for(unsigned int j = 0; j < m_vvdMeas_X[i].size(); j++)
-		{
-			printf("(%f, %f, %f in Q%d) ", m_vvdMeas_X[i][j], m_vvdMeas_Y[i][j], m_vvdMeas_Hdg[i][j], m_vviMeas_Cam[i][j]);
-		}
-		printf("\n");
-*/
-
-//		printf("A\n");
-		if(nmeas)
-		{
-			adjustRMatrixAndZForMeasurementSize(m_pR, m_pz, nmeas);
-			MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
-			m_vpUKF[i]->m = m_pR->rows;
-		}
-
-        bool valid_meas = m_iFrameCounter > 1 && nmeas > 0;
-
-//		printf("B\n");
-        /* if any state is NaN, reset the UKF
-         * This shouldn't happen anymore, but it's a decent safety
-         * check.  It could probably be omitted if we want to
-         * optimize for speed... */
-        if(m_iFrameCounter > 1 &&
-           (!CvMatIsOk(m_vpUKF[i]->x) ||
-            !CvMatIsOk(m_vpUKF[i]->P)))
-        {
-//			printf("B.1\n");
-            MT_UKFFree(&(m_vpUKF[i]));
-//			printf("B.2 %d\n", m_pR->rows);
-            m_vpUKF[i] = MT_UKFInit(5, m_pR->rows, 0.1);
-//			printf("B.3\n");
-            MT_UKFCopyQR(m_vpUKF[i], m_pQ, m_pR);
-//			printf("B.4\n");
-            valid_meas = false;
-        }
-
-//		printf("C\n");
-
-		m_vbLastMeasValid[i] = valid_meas;
-
-        /* if we're going to accept this measurement */
-        if(valid_meas)
-        {
-            /* UKF prediction step, note we use function pointers to
-               the beluga_dynamics and beluga_measurement functions defined
-               above.  The final parameter would be for the control input
-               vector, which we don't use here so we pass a NULL pointer */
-//			printf("UKF Predict\n");
-            MT_UKFPredict(m_vpUKF[i],
-                          &beluga_dynamics,
-                          &beluga_measurement,
-                          NULL);
-
-//			printf("Meas assign\n");
-			/* build the measurement vector */
-			double x, y, z, th;
-			double th_prev = cvGetReal2D(m_vpUKF[i]->x, 3, 0);
-			unsigned int cam_no;
-			for(unsigned int j = 0; j < nmeas; j++)
-			{
-				cam_no = m_vviMeas_Cam[i][j];
-				m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[i][j],
-					m_vvdMeas_Y[i][j],
-					0, &x, &y, &z, false);
-				th = rectifyAngleMeasurement(m_vvdMeas_Hdg[i][j],
-					m_vdHistories_X[i],
-					m_vdHistories_Y[i],
-					N_hist,
-					th_prev);
-//				printf("%f, %f -> %f\n", m_vvdMeas_Hdg[i][j], MT_RAD2DEG*th_prev, MT_RAD2DEG*th);
-				m_vvdMeas_Hdg[i][j] = MT_RAD2DEG*th;
-				cvSetReal2D(m_pz, j*3 + 0, 0, x);
-				cvSetReal2D(m_pz, j*3 + 1, 0, y);
-				cvSetReal2D(m_pz, j*3 + 2, 0, th);
-			}
-			cvSetReal2D(m_pz, m_pz->rows - 1, 0, m_dWaterDepth);
-
-//			printf("UKF SetMeas\n");
-//			printf("z = [");
-/*			for(unsigned int r = 0; r < m_pz->rows; r++)
-			{
-				printf("%f ", cvGetReal2D(m_pz, r, 0));
-			}
-			printf("]\n");
-*/
-			MT_UKFSetMeasurement(m_vpUKF[i], m_pz);
-//			printf("UKF Correct\n");
-			MT_UKFCorrect(m_vpUKF[i]);
-
-/*			printf("x = [");
-			for(unsigned int r = 0; r < m_vpUKF[i]->x->rows; r++)
-			{
-				printf("%f ", cvGetReal2D(m_vpUKF[i]->x, r, 0));
-			}
-			printf("]\n");
-*/
-//			printf("constrain\n");
-			constrain_state(m_vpUKF[i]->x, m_vpUKF[i]->x1, 10.0, m_dWaterDepth);
-/*			printf("x = [");
-			for(unsigned int r = 0; r < m_vpUKF[i]->x->rows; r++)
-			{
-				printf("%f ", cvGetReal2D(m_vpUKF[i]->x, r, 0));
-			}
-			printf("]\n");
-*/
-
-		}
-		else
-		{
-			// on the first frame, take the average of the measurements
-			if(m_iFrameCounter == 1)
-			{
-				if(nmeas > 0)
-				{
-					double xavg = 0;
-					double yavg = 0;
-					double qx = 0;
-					double qy = 0;
-					double x, y, z;
-					unsigned int cam_no;
-					for(unsigned int j = 0; j < nmeas; j++)
-					{
-						cam_no = m_vviMeas_Cam[i][j];
-						m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[i][j],
-							m_vvdMeas_Y[i][j],
-							0, &x, &y, &z, false);
-						xavg += x;
-						yavg += y;
-						qx += cos(MT_DEG2RAD*m_vvdMeas_Hdg[i][j]);
-						qy += sin(MT_DEG2RAD*m_vvdMeas_Hdg[i][j]);
-					}
-					xavg /= (double) nmeas;
-					yavg /= (double) nmeas;
-					double th = atan2(qy, qx);
-//					printf("Should be initializing %d at %f %f %f %f 0\n", i, xavg, yavg, m_dWaterDepth, th);
-					cvSetReal2D(m_vpUKF[i]->x, 0, 0, xavg);
-					cvSetReal2D(m_vpUKF[i]->x, 1, 0, yavg);
-					cvSetReal2D(m_vpUKF[i]->x, 2, 0, m_dWaterDepth);
-					cvSetReal2D(m_vpUKF[i]->x, 3, 0, th);
-					cvSetReal2D(m_vpUKF[i]->x, 4, 0, 0);
-					m_vbLastMeasValid[i] = true;
-				}
-			}
-			else
-			{
-				// use the prediction
-				cvCopy(m_vpUKF[i]->x1, m_vpUKF[i]->x);
-			}
-		}
-
-//		printf("Tracking: State update\n");
+        updateObjectState(i);
 
 		rollHistories(&m_vdHistories_X[i], 
 			&m_vdHistories_Y[i], 
@@ -1272,7 +1168,6 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         m_vdTracked_Z[i] = cvGetReal2D(x, 2, 0);
         m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
         m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
-
 
 	}
 
