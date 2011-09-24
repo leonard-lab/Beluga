@@ -46,6 +46,17 @@ int indexInVector(const std::vector<T>& v, const T& value)
 }
 
 /**********************************************************************
+ * Segmenter Class
+ *********************************************************************/
+
+void BelugaSegmenter::usePrevious(MT_DSGYA_Blob* obj, unsigned int i)
+{
+    MT_DSGYA_Segmenter::usePrevious(obj, i);
+    m_pTracker->notifyNoMeasurement(i);
+}
+
+
+/**********************************************************************
  * Tracker Class
  *********************************************************************/
 
@@ -58,11 +69,13 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_iBlobValThresh(DEFAULT_BG_THRESH),
 	  m_iBlobAreaThreshLow(DEFAULT_MIN_BLOB_AREA),
 	  m_iBlobAreaThreshHigh(DEFAULT_MAX_BLOB_AREA),
+      m_dOverlapFactor(1.0),
 	  m_iVThresh(DEFAULT_V_THRESH),
 	  m_iHThresh_Low(DEFAULT_H_THRESH_LOW),
 	  m_iHThresh_High(DEFAULT_H_THRESH_HIGH),
 	  m_iSThresh_Low(DEFAULT_S_THRESH_LOW),
 	  m_iSThresh_High(DEFAULT_S_THRESH_HIGH),
+      m_bNoHistory(true),
 	  m_iSearchAreaPadding(DEFAULT_SEARCH_AREA_PADDING),
       m_iStartFrame(-1),
       m_iStopFrame(-1),
@@ -217,6 +230,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_pTranslationVectors[i] = NULL;
 
 		m_vBlobs[i].resize(0);
+        m_vPredictedBlobs[i].resize(0);
 	}
 
 	m_pUndistortMapX = NULL;
@@ -486,10 +500,6 @@ void BelugaTracker::createFrames()
 	m_pUndistortMapX = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
 	m_pUndistortMapY = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
 
-	//m_pGSThresholder = NULL;
-    /* Create the Thresholder and Blobber objects */
-    //m_pGSThresholder = new MT_GSThresholder(BG_frame);
-    //m_pGYBlobber = new GYBlobber(m_iNObj);
     /* Initialize the Hungarian Matcher */
     m_HungarianMatcher.doInit(m_iNObj);
 
@@ -816,10 +826,11 @@ void BelugaTracker::updateUKFParameters()
     
 }
 
-void BelugaTracker::doImageProcessingInCamera(unsigned int cam_number)
+void BelugaTracker::doImageProcessingInCamera(unsigned int cam_number,
+                                              const IplImage* frame)
 {
     /* correct for barrel distortion */
-    cvRemap(frames[cam_number],
+    cvRemap(frame,
             m_pUndistortedFrames[cam_number],
             m_pUndistortMapX,
             m_pUndistortMapY);
@@ -871,115 +882,70 @@ void BelugaTracker::doImageProcessingInCamera(unsigned int cam_number)
     }
 }
 
-void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
+void BelugaTracker::notifyNoMeasurement(unsigned int obj_num)
 {
-    m_vBlobs[cam_number] = m_YABlobber.FindBlobs(m_pThreshFrames[cam_number],
-                                                 5, /* min perimeter */
-                                                 m_iBlobAreaThreshLow,
-                                                 NO_MAX,
-                                                 m_iBlobAreaThreshHigh);
-    /* have to adjust the y coordinate because the image coordinates
-       are flipped */
-    for(unsigned int j = 0; j < m_vBlobs[cam_number].size(); j++)
-    {
-        m_vBlobs[cam_number][j].COMy = m_iFrameHeight - m_vBlobs[cam_number][j].COMy;
-    }
+    m_vbValidMeasCamObj[m_iCurrentCamera][obj_num] = false;
 }
 
-void BelugaTracker::findMeasurementsInCamera(unsigned int cam_number)
+void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
 {
-    for(unsigned int j = 0; j < m_SearchArea[cam_number].size(); j++)
+
+    m_iCurrentCamera = cam_number;
+    
+    BelugaSegmenter segmenter(this);
+    segmenter.setDebugFile(stdout);
+    segmenter.m_iMinBlobPerimeter = 1;
+    segmenter.m_iMinBlobArea = m_iBlobAreaThreshLow;
+    segmenter.m_iMaxBlobArea = m_iBlobAreaThreshHigh;
+    segmenter.m_dOverlapFactor = m_dOverlapFactor;
+
+    if(m_bNoHistory)
     {
-        /* blobs in search area */
-        std::vector<YABlob> blobs_this_rect;
-        blobs_this_rect.resize(0);
-        for(unsigned int k = 0; k < m_vBlobs[cam_number].size(); k++)
-        {
-            if(pointInCvRect(m_vBlobs[cam_number][k].COMx, m_vBlobs[cam_number][k].COMy, m_SearchArea[cam_number][j]))
-            {
-                blobs_this_rect.push_back(m_vBlobs[cam_number][k]);
-            }
-        }
-
-        if(blobs_this_rect.size() == 0)
-        {
-            continue;
-        }
-
-        MT_HungarianMatcher matcher;
-        bool do_match = false;
-        if(blobs_this_rect.size() >= m_SearchIndexes[cam_number][j].size() && blobs_this_rect.size() > 1)
-        {
-            do_match = true;
-            matcher.doInit(m_SearchIndexes[cam_number][j].size(), blobs_this_rect.size());
-        }
-
-        for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
-        {
-            double d2;
-            double d2min = 1e10;
-            int kmin = -1;
-            /* i'th camera, j'th rectangle, k'th index */
-            //for(unsigned int m = 0; m < blobs_this_rect.size(); m++)
-            for(unsigned int k = 0; k < m_SearchIndexes[cam_number][j].size(); k++)
-            {
-                unsigned int n = m_SearchIndexes[cam_number][j][k];
-                double xk = m_vdaTracked_XC[cam_number][n];
-                double yk = m_vdaTracked_YC[cam_number][n];
-
-                d2 = (blobs_this_rect[m].COMx - xk)*(blobs_this_rect[m].COMx - xk)
-                    + (blobs_this_rect[m].COMy - yk)*(blobs_this_rect[m].COMy - yk);
-
-                if(do_match)
-                {
-                    matcher.setValue(k, m, d2);
-                }
-                if((!m_vbLastMeasValid[n] || 
-                    (d2 < DEFAULT_GATE_DIST2) || 
-                    (m_vdHistories_X[n].size() == 0)) 
-                   && d2 < d2min)
-                {
-                    kmin = k;
-                    d2min = d2;
-                }
-            }
-
-            if(kmin < 0)
-            {
-                kmin = 0;
-            }
-
-            unsigned int n = m_SearchIndexes[cam_number][j][kmin];
-
-            if(kmin >= 0 && !do_match  && m_vvdMeas_X[n].size() == 0)
-            {
-                m_vvdMeas_X[n].push_back(blobs_this_rect[m].COMx);
-                m_vvdMeas_Y[n].push_back(blobs_this_rect[m].COMy);
-                m_vvdMeas_Hdg[n].push_back(blobs_this_rect[m].orientation);
-                m_vviMeas_A[n].push_back(blobs_this_rect[m].area);
-                m_vviMeas_Cam[n].push_back(i);
-            }
-
-        }
-
-        if(do_match)
-        {
-            std::vector<int> matches;
-            matches.resize(m_SearchIndexes[cam_number][j].size());
-            matcher.doMatch(&matches);
-
-            for(unsigned int k = 0; k < matches.size(); k++)
-            {
-                unsigned int n = m_SearchIndexes[cam_number][j][k];
-                m_vvdMeas_X[n].push_back(blobs_this_rect[matches[k]].COMx);
-                m_vvdMeas_Y[n].push_back(blobs_this_rect[matches[k]].COMy);
-                m_vvdMeas_Hdg[n].push_back(blobs_this_rect[matches[k]].orientation);
-                m_vviMeas_A[n].push_back(blobs_this_rect[matches[k]].area);
-                m_vviMeas_Cam[n].push_back(i);
-            }
-        }
-
+        // TODO:  Handle initial frame
     }
+    else
+    {
+        m_vbValidMeasCamObj[cam_number].assign(m_iNObj, true);
+        
+        m_vBlobs[cam_number] = segmenter.doSegmentation(m_pThreshFrames[cam_number],
+                                                        m_vPredictedBlobs[cam_number]);
+        m_viAssignments[cam_number] =
+            segmenter.getAssignmentVector(&m_iAssignmentRows[cam_number],
+                                          &m_iAssignmentCols[cam_number]);
+        m_vInitBlobs[cam_number] = segmenter.getInitialBlobs();
+    }
+
+    // POSSIBLY TODO: adjust for y axis flip
+
+}
+
+
+void BelugaTracker::getObjectMeasurements(unsigned int obj_number)
+{
+    m_vvdMeas_X[obj_number].resize(0);
+    m_vvdMeas_Y[obj_number].resize(0);
+    m_vvdMeas_Hdg[obj_number].resize(0);
+    m_vviMeas_A[obj_number].resize(0);
+    m_vviMeas_Cam[obj_number].resize(0);    
+
+    for(unsigned int c = 0; c < 4; c++)
+    {
+        if(m_vbValidMeasCamObj[c][obj_number])
+        {
+            /* valid measurement */
+            MT_DSGYA_Blob* p_blob = &m_vBlobs[c][obj_number];
+            m_vvdMeas_X[obj_number].push_back(p_blob->m_dXCenter);
+            m_vvdMeas_Y[obj_number].push_back(p_blob->m_dYCenter);
+            m_vvdMeas_Hdg[obj_number].push_back(p_blob->m_dOrientation);
+            m_vviMeas_A[obj_number].push_back(p_blob->m_dArea);
+            m_vviMeas_Cam[obj_number].push_back(c);
+        }
+        else
+        {
+            /* no measurement */
+        }
+    }
+
 }
 
 void BelugaTracker::updateObjectState(unsigned int obj_number)
@@ -1036,6 +1002,9 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
 
 void BelugaTracker::applyUKFToObject(unsigned int obj_number)
 {
+
+    unsigned int nmeas = m_vvdMeas_X[obj_number].size();
+    
     /* UKF prediction step, note we use function pointers to
        the beluga_dynamics and beluga_measurement functions defined
        above.  The final parameter would be for the control input
@@ -1075,6 +1044,8 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
 
 void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
 {
+    unsigned int nmeas = m_vvdMeas_X[obj_number].size();
+    
     double xavg = 0;
     double yavg = 0;
     double qx = 0;
@@ -1124,7 +1095,7 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 	/* preprocessing steps for each camera */
 	for(int i = 0; i < 4; i++)
 	{
-        doImageProcessingInCamera(i);
+        doImageProcessingInCamera(i, frames[i]);
         doBlobFindingInCamera(i);
 
         /* update the water depth from the GUI */
@@ -1141,16 +1112,11 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		m_vvdMeas_Hdg[i].resize(0);
 	}
 
-    /* figure out which robots are in which camera and extract
-     * measurements from the blobs */
-	for(int i = 0; i < 4; i++)
-	{
-        findMeasurementsInCamera(i);
-	}
-
 	/* filtering */
 	for(int i =0; i < m_iNObj; i++)
 	{
+        getObjectMeasurements(i);
+        
         updateObjectState(i);
 
 		rollHistories(&m_vdHistories_X[i], 
@@ -1293,14 +1259,14 @@ void BelugaTracker::doGLDrawing(int flags)
                to account for the window coordinates originating from the
                bottom left but the image coordinates originating from
                the top left */
-            blobcenter.setx(m_vBlobs[Q].at(i).COMx);
-            blobcenter.sety(VFLIP m_vBlobs[Q].at(i).COMy);
+            blobcenter.setx(m_vBlobs[Q].at(i).m_dXCenter);
+            blobcenter.sety(VFLIP m_vBlobs[Q].at(i).m_dYCenter);
             blobcenter.setz( 0 );
 
             /* draws an arrow using OpenGL */
             MT_DrawArrow(blobcenter,  // center of the base of the arrow
                          20.0,        // arrow length (pixels)
-                         MT_DEG2RAD*m_vBlobs[Q].at(i).orientation, // arrow angle
+                         MT_DEG2RAD*m_vBlobs[Q].at(i).m_dOrientation, // arrow angle
                          MT_White,//MT_Primaries[(i+1) % MT_NPrimaries], // color
                          1.0 // fixes the arrow width
                 );    

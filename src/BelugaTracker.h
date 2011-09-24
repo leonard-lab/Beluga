@@ -14,6 +14,22 @@ const double DEFAULT_SIGMA_SPEED = 1.0; /* pixels/frame */
 const double DEFAULT_SIGMA_POSITION_MEAS = 1.0; /* pixels */
 const double DEFAULT_SIGMA_HEADING_MEAS = 0.087; /* rad ~= 5 deg */
 
+
+/* we'll derive from the MT_DSGYA_Segmenter so that we can
+ * intercept the "usePrevious" method and use it to flag when
+ * an object is not found in a particular camera */
+class BelugaSegmenter : public MT_DSGYA_Segmenter
+{
+public:
+    BelugaSegmenter(class BelugaTracker* tracker)
+        : m_pTracker(tracker), MT_DSGYA_Segmenter() {};
+    ~BelugaSegmenter(){};
+
+    void usePrevious(MT_DSGYA_Blob* obj, unsigned int i);
+private:
+    class BelugaTracker* m_pTracker;
+};
+
 typedef std::vector<double> t_p_history;
 
 class BelugaTracker : public MT_TrackerBase
@@ -53,15 +69,21 @@ private:
     unsigned int m_iBlobValThresh;
 	unsigned int m_iBlobAreaThreshLow;
 	unsigned int m_iBlobAreaThreshHigh;
+    double m_dOverlapFactor;
 
 	unsigned int m_iVThresh;
 	unsigned int m_iHThresh_Low;
 	unsigned int m_iHThresh_High;
 	unsigned int m_iSThresh_Low;
 	unsigned int m_iSThresh_High;
-    
-	YABlobber m_YABlobber;
-	std::vector<YABlob> m_vBlobs[4];
+
+	std::vector<MT_DSGYA_Blob> m_vBlobs[4];
+	std::vector<MT_DSGYA_Blob> m_vPredictedBlobs[4];
+	std::vector<YABlob> m_vInitBlobs[4];    
+    unsigned int m_iAssignmentRows[4];
+    unsigned int m_iAssignmentCols[4];
+    std::vector<unsigned int> m_viAssignments[4];
+    bool m_bNoHistory;
 
 	std::vector<CvRect> m_SearchArea[4];
 	std::vector<std::vector<unsigned int> > m_SearchIndexes[4];
@@ -70,9 +92,6 @@ private:
     /* only used to add to XDF */
     int m_iStartFrame;
     int m_iStopFrame;
-
-    MT_GSThresholder* m_pGSThresholder[4];
-    GYBlobber* m_pGYBlobber[4];
 
     std::vector<MT_UKF_struct*> m_vpUKF;
     CvMat* m_pQ;
@@ -136,6 +155,9 @@ private:
 
     MT_TrackerFrameGroup* m_pAuxFrameGroups[3];
 
+    unsigned int m_iCurrentCamera;
+    std::vector<bool> m_vbValidMeasCamObj[4];
+
     ////////////////////////////////////////////////////////////
     /* functions that get called during each tracking step */
     
@@ -146,14 +168,14 @@ private:
     void updateUKFParameters();
 
     /* image processing step */
-    void doImageProcessingInCamera(unsigned int cam_number);
+    void doImageProcessingInCamera(unsigned int cam_number, const IplImage* frame);
 
     /* first finding step - i.e., find image connected components */
     void doBlobFindingInCamera(unsigned int cam_number);
 
-    /* resolves blob identities in each camera in order to
-     * generate measurements for the UKF */
-    void findMeasurementsInCamera(unsigned int cam_number);
+    /* extract measurements for each object and set up the UKF
+     * for updating */
+    void getObjectMeasurements(unsigned int obj_number);
 
     /* update the state for each object
      *   usually using the UKF but handling special cases */
@@ -168,7 +190,11 @@ private:
     /* handles when no measurement is available */
     void usePredictedStateForObject(unsigned int obj_number);
 
-    ////////////////////////////////////////////////////////////    
+    ////////////////////////////////////////////////////////////
+
+protected:
+    friend class BelugaSegmenter;
+    void notifyNoMeasurement(unsigned int obj_num);
     
 public:
     /* constructor */
