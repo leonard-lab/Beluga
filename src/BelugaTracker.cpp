@@ -29,6 +29,10 @@ const unsigned int N_hist = 5;
 
 const double DEFAULT_GATE_DIST2 = 100.0*100.0;
 
+/* defined for readability of assert(false), which DOES assert
+ * i.e., assert(BELUGA_DO_ASSERT) WILL assert and abort */
+const bool BELUGA_DO_ASSERT = false;
+
 //#define VFLIP m_iFrameHeight -
 #define VFLIP
 
@@ -99,7 +103,8 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_iNObj(n_obj),
 	  m_dCurrentTime(0),
       m_iFrameHeight(0),
-	  m_iFrameWidth(0)
+	  m_iFrameWidth(0),
+      m_iCurrentCamera(0)
 {
     doInit(ProtoFrame);
 }
@@ -285,6 +290,15 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	m_vdVerticalCommand.resize(0);
 	m_vdTurnCommand.resize(0);
 
+    /* these don't need to be resized to 4 because they're
+     * straight arrays, not std::vectors */
+    for(unsigned int i = 0; i < 4; i++)
+    {
+        m_vbValidMeasCamObj[i].resize(m_iNObj);
+        m_viAssignments[i].resize(0);
+        m_vInitBlobs[i].resize(0);
+    }
+    
     m_vdHistories_X.resize(m_iNObj);
     m_vdHistories_Y.resize(m_iNObj);
 	m_vbLastMeasValid.resize(m_iNObj);
@@ -350,6 +364,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	dg_blob->AddUInt("HSV S Threshold Low", &m_iSThresh_Low, MT_DATA_READWRITE, 0, 255);
 	dg_blob->AddUInt("HSV S Threshold High", &m_iSThresh_High, MT_DATA_READWRITE, 0, 255);
     dg_blob->AddDouble("Water Depth", &m_dWaterDepth, MT_DATA_READWRITE, 0);
+    dg_blob->AddDouble("Blobber Overlap", &m_dOverlapFactor, MT_DATA_READWRITE, 0);
     dg_blob->AddUInt("Difference Threshold", /* parameter name */
                      &m_iBlobValThresh,      /* pointer to variable */
                      MT_DATA_READWRITE,      /* read-only or not */
@@ -742,6 +757,8 @@ void BelugaTracker::setCalibrations(const char* calibfile1,
 	}
 }
 
+/* EVENTUALLY:  This could really be an
+ *  MT_HSVSplit(IplImage* frame, IplImage* H, IplImage* S, IplImage* V) */
 void BelugaTracker::HSVSplit(IplImage* frame, int i)
 {
 	cvCvtColor(frame, m_pHSVFrames[i], CV_RGB2HSV);
@@ -750,13 +767,6 @@ void BelugaTracker::HSVSplit(IplImage* frame, int i)
 		m_pSFrames[i], 
 		m_pVFrames[i],
 		NULL);
-}
-
-/* Main tracking function - gets called by MT_TrackerFrameBase every
- * time step when the application is not paused. */
-void BelugaTracker::doTracking(IplImage* frame)
-{
-	std::cerr << "ERROR:  This function should never get called!  BelugaTracker::doTracking(IplImage* frame)\n";
 }
 
 void BelugaTracker::doTimeKeeping()
@@ -905,17 +915,23 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
     }
     else
     {
+        /* by default, all measurements are valid */
         m_vbValidMeasCamObj[cam_number].assign(m_iNObj, true);
-        
+
+        /* TODO: m_vPredictedBlobs need to be generated */
         m_vBlobs[cam_number] = segmenter.doSegmentation(m_pThreshFrames[cam_number],
                                                         m_vPredictedBlobs[cam_number]);
         m_viAssignments[cam_number] =
             segmenter.getAssignmentVector(&m_iAssignmentRows[cam_number],
                                           &m_iAssignmentCols[cam_number]);
         m_vInitBlobs[cam_number] = segmenter.getInitialBlobs();
+
+        /* MAYBE needs to happen elsewhere, in case we get an invalid
+           frame? */
+        m_bNoHistory = false; 
     }
 
-    // POSSIBLY TODO: adjust for y axis flip
+    // MAYBE: adjust for y axis flip
 
 }
 
@@ -943,6 +959,8 @@ void BelugaTracker::getObjectMeasurements(unsigned int obj_number)
         else
         {
             /* no measurement */
+            /* MAYBE: there's no measurement in this camera - do we
+               need to do anything with that? I don't think so... */
         }
     }
 
@@ -985,11 +1003,16 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
     else
     {
        // on the first frame, take the average of the measurements
-        if(m_iFrameCounter == 1)
+        if(m_iFrameCounter <= 1)
         {
             if(nmeas > 0)
             {
                 useAverageMeasurementForObject(obj_number);
+            }
+            else
+            {
+                /* if there's no measurement to use, do nothing? */
+                // MAYBE not ok?
             }
         }
         else
@@ -1009,6 +1032,7 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
        the beluga_dynamics and beluga_measurement functions defined
        above.  The final parameter would be for the control input
        vector, which we don't use here so we pass a NULL pointer */
+    // TODO: We should be using the control input
     MT_UKFPredict(m_vpUKF[obj_number],
                   &beluga_dynamics,
                   &beluga_measurement,
@@ -1081,6 +1105,16 @@ void BelugaTracker::usePredictedStateForObject(unsigned int obj_number)
     cvCopy(m_vpUKF[obj_number]->x1, m_vpUKF[obj_number]->x);
 }
 
+/* Single-camera version of doTracking - should not get called */
+void BelugaTracker::doTracking(IplImage* frame)
+{
+	std::cerr << "ERROR:  This function should never get called!  BelugaTracker::doTracking(IplImage* frame)\n";
+    assert(BELUGA_DO_ASSERT);  /* assert regardless, because we've
+                                * gotten here via some error */
+}
+
+/* Main tracking function - gets called by MT_TrackerFrameBase every
+ * time step when the application is not paused. */
 void BelugaTracker::doTracking(IplImage* frames[4])
 {
     /* calculate time stamp */
