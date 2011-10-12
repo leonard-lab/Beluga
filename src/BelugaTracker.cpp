@@ -94,7 +94,7 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_dPrevSigmaHeadingMeas(0),
       m_bShowBlobs(true),
       m_bShowTracking(true),
-      m_dDt(0),
+      m_dDt(0.1),
       m_iFrameCounter(0),
       m_iNObj(n_obj),
 	  m_dCurrentTime(0),
