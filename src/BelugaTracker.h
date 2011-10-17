@@ -158,12 +158,21 @@ private:
     unsigned int m_iCurrentCamera;
     std::vector<bool> m_vbValidMeasCamObj[4];
 
+    double m_dInitAdjacencyThresh;
+    unsigned int testInitAdjacency(double x1, double y1, double x2, double y2);
+
+    void generatePredictedBlobs(unsigned int cam_number);    
+
     ////////////////////////////////////////////////////////////
     /* functions that get called during each tracking step */
     
     /* calculates a time stamp */
     void doTimeKeeping();
 
+    /* try to initialize the state vectors with whatever measurements
+     * we found, returns true on success */
+    bool tryInitStateVectors();
+    
     /* updates UKF parameters/matrices if they have changed */
     void updateUKFParameters();
 

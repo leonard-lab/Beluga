@@ -104,7 +104,8 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
 	  m_dCurrentTime(0),
       m_iFrameHeight(0),
 	  m_iFrameWidth(0),
-      m_iCurrentCamera(0)
+      m_iCurrentCamera(0),
+      m_dInitAdjacencyThresh(1.0) /* meters */
 {
     doInit(ProtoFrame);
 }
@@ -365,6 +366,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	dg_blob->AddUInt("HSV S Threshold High", &m_iSThresh_High, MT_DATA_READWRITE, 0, 255);
     dg_blob->AddDouble("Water Depth", &m_dWaterDepth, MT_DATA_READWRITE, 0);
     dg_blob->AddDouble("Blobber Overlap", &m_dOverlapFactor, MT_DATA_READWRITE, 0);
+    dg_blob->AddDouble("Init Adjacency Thresh", &m_dInitAdjacencyThresh, MT_DATA_READWRITE, 0);
     dg_blob->AddUInt("Difference Threshold", /* parameter name */
                      &m_iBlobValThresh,      /* pointer to variable */
                      MT_DATA_READWRITE,      /* read-only or not */
@@ -911,30 +913,62 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
 
     if(m_bNoHistory)
     {
-        // TODO:  Handle initial frame
+        /* on the first frame, we'll just find what we can in this
+           image and  copy them directly into the blobs */
+        YABlobber yaBlobber;
+        std::vector<YABlob> yblobs = yaBlobber.FindBlobs(m_pThreshFrames[cam_number],
+                                                         1, /* min perimeter */
+                                                         m_iBlobAreaThreshLow,
+                                                         -1, /* max perimeter (no limit) */
+                                                         m_iBlobAreaThreshHigh);
+        m_vBlobs[cam_number].resize(yblobs.size());
+        for(unsigned int blob = 0; blob < yblobs.size(); blob++)
+        {
+            m_vBlobs[cam_number][blob] = MT_DSGYA_Blob(yblobs[blob]);
+        }
     }
     else
     {
+
+        generatePredictedBlobs(cam_number);
+        
         /* by default, all measurements are valid */
         m_vbValidMeasCamObj[cam_number].assign(m_iNObj, true);
 
-        /* TODO: m_vPredictedBlobs need to be generated */
         m_vBlobs[cam_number] = segmenter.doSegmentation(m_pThreshFrames[cam_number],
                                                         m_vPredictedBlobs[cam_number]);
         m_viAssignments[cam_number] =
             segmenter.getAssignmentVector(&m_iAssignmentRows[cam_number],
                                           &m_iAssignmentCols[cam_number]);
         m_vInitBlobs[cam_number] = segmenter.getInitialBlobs();
-
-        /* MAYBE needs to happen elsewhere, in case we get an invalid
-           frame? */
-        m_bNoHistory = false; 
     }
 
     // MAYBE: adjust for y axis flip
 
 }
 
+void BelugaTracker::generatePredictedBlobs(unsigned int cam_number)
+{
+    double x, y, z, u, v;
+    MT_DSGYA_Blob* pb;
+    for(unsigned int obj = 0; obj < m_iNObj; obj++)
+    {
+        x = m_vdTracked_X[obj];
+        y = m_vdTracked_Y[obj];
+        z = m_vdTracked_Z[obj];
+        
+        m_CoordinateTransforms[cam_number].worldToImage(x, y, z, &u, &v, false);
+
+        /* for display */
+        m_vdaTracked_XC[cam_number][obj] = u;
+        m_vdaTracked_YC[cam_number][obj] = v;
+
+        pb = &m_vPredictedBlobs[cam_number][obj];
+        pb->m_dXCenter = u;
+        pb->m_dYCenter = z;
+        pb->m_dOrientation = m_vdTracked_Heading[obj];
+    }
+}
 
 void BelugaTracker::getObjectMeasurements(unsigned int obj_number)
 {
@@ -977,13 +1011,13 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
         m_vpUKF[obj_number]->m = m_pR->rows;
     }
 
-    bool valid_meas = m_iFrameCounter > 1 && nmeas > 0;
+    bool valid_meas = (!m_bNoHistory) && nmeas > 0;
 
     /* if any state is NaN, reset the UKF
      * This shouldn't happen anymore, but it's a decent safety
      * check.  It could probably be omitted if we want to
      * optimize for speed... */
-    if(m_iFrameCounter > 1 &&
+    if(!m_bNoHistory &&
        (!CvMatIsOk(m_vpUKF[obj_number]->x) ||
         !CvMatIsOk(m_vpUKF[obj_number]->P)))
     {
@@ -1002,8 +1036,9 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
     }
     else
     {
-       // on the first frame, take the average of the measurements
-        if(m_iFrameCounter <= 1)
+        // on the first frame, take the average of the measurements
+        // MAYBE:  Do we ever actually get here?
+        if(m_bNoHistory)
         {
             if(nmeas > 0)
             {
@@ -1105,6 +1140,126 @@ void BelugaTracker::usePredictedStateForObject(unsigned int obj_number)
     cvCopy(m_vpUKF[obj_number]->x1, m_vpUKF[obj_number]->x);
 }
 
+unsigned int BelugaTracker::testInitAdjacency(double x1, double y1, double x2, double y2)
+{
+    double d2 = (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1);
+    
+    if(d2 < m_dInitAdjacencyThresh*m_dInitAdjacencyThresh)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+bool BelugaTracker::tryInitStateVectors()
+{
+    bool result = false;
+    MT_DSGYA_Blob* pb;
+
+    /* world positions of every blob found */
+    std::vector<double> X(0, 0);
+    std::vector<double> Y(0, 0);
+    std::vector<double> Xc(0, 0);
+    std::vector<double> Yc(0, 0);
+    std::vector<double> TH(0, 0);
+    std::vector<double> A(0, 0);
+    std::vector<double> C(0, 0);
+    double x1, y1, z, th;
+    double x2, y2;
+
+    for(unsigned int c = 0; c < 4; c++)
+    {
+        for(unsigned int b = 0; b < m_vBlobs[c].size(); b++)
+        {
+            pb = &m_vBlobs[c][b];
+            
+            // convert image position to world, assuming depth = 0
+            m_CoordinateTransforms[c].imageAndDepthToWorld(pb->m_dXCenter,
+                                                           pb->m_dYCenter,
+                                                           0, &x1, &y1, &z, false);
+            X.push_back(x1);
+            Y.push_back(y1);
+
+            Xc.push_back(pb->m_dXCenter);
+            Yc.push_back(pb->m_dYCenter);
+            TH.push_back(pb->m_dOrientation);
+            A.push_back(pb->m_dArea);
+            C.push_back(c);
+        }
+    }
+
+    // BiCC the positions to figure out which ones are likely touching
+    unsigned int rows = X.size();
+    unsigned int cols = X.size();
+    MT_BiCC bicc(rows, cols);
+    std::vector<unsigned int> adj(rows*cols, 0);
+
+    // build the BiCC adjacency
+    for(unsigned int i = 0; i < X.size(); i++)
+    {
+        for(unsigned int j = 0; j < X.size(); j++)
+        {
+            if(i == j)
+            {
+                /* blob adjacent to itself => single blobs come out
+                 * as CCs */
+                adj[i*rows + j] = 1;
+            }
+            else
+            {
+                x1 = X[i];
+                y1 = Y[i];
+                x2 = X[j];
+                y2 = Y[j];
+                adj[i*rows + j] = testInitAdjacency(x1, y1, x2, y2);
+            }
+        }
+    }
+
+    int n_cc = bicc.findComponents(adj);
+
+    /* if the # connected components matches the # of objects we're
+       looking for, then we can use them! */
+    if(n_cc = m_iNObj)
+    {
+        /* find the blobs that were involved in each CC, stuff them
+           into the measurement vectors, then we'll use the averages to
+           set the initial state */
+        /* Note component labels 1-indexed, thus all the i-1's */
+        for(unsigned int i = 1; i <= min(n_cc, (int) rows); i++)
+        {
+            m_vvdMeas_X[i-1].resize(0);
+            m_vvdMeas_Y[i-1].resize(0);
+            m_vvdMeas_Hdg[i-1].resize(0);
+            m_vviMeas_A[i-1].resize(0);
+            m_vviMeas_Cam[i-1].resize(0);    
+            for(unsigned int k = 0; k < rows; k++)
+            {
+                if((int) bicc.getLabelElement(k) == i)
+                {
+                    m_vvdMeas_X[i-1].push_back(Xc[k]);
+                    m_vvdMeas_Y[i-1].push_back(Yc[k]);
+                    m_vvdMeas_Hdg[i-1].push_back(TH[k]);
+                    m_vviMeas_A[i-1].push_back(A[k]);
+                    m_vviMeas_Cam[i-1].push_back(C[k]);                                        
+                }
+            }
+            useAverageMeasurementForObject(i-1);
+        }
+
+        result = true;
+    }
+    else
+    {
+        result = false;
+    }
+    
+    return result;
+}
+
 /* Single-camera version of doTracking - should not get called */
 void BelugaTracker::doTracking(IplImage* frame)
 {
@@ -1146,30 +1301,43 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 		m_vvdMeas_Hdg[i].resize(0);
 	}
 
-	/* filtering */
-	for(int i =0; i < m_iNObj; i++)
-	{
-        getObjectMeasurements(i);
+    if(m_bNoHistory)
+    {
+        /* try to set the state vectors using what we have */
+        m_bNoHistory = !tryInitStateVectors();
+
+        //x = m_px0; // TODO fix?
+    }
+    else
+    {
+        /* filtering */    
+        for(int i = 0; i < m_iNObj; i++)
+        {
+            /* have a history and can use the UKF */
+            getObjectMeasurements(i);
         
-        updateObjectState(i);
+            updateObjectState(i);
 
-		rollHistories(&m_vdHistories_X[i], 
-			&m_vdHistories_Y[i], 
-			cvGetReal2D(m_vpUKF[i]->x, 0, 0),
-			cvGetReal2D(m_vpUKF[i]->x, 1, 0),
-			N_hist);
+            rollHistories(&m_vdHistories_X[i], 
+                          &m_vdHistories_Y[i], 
+                          cvGetReal2D(m_vpUKF[i]->x, 0, 0),
+                          cvGetReal2D(m_vpUKF[i]->x, 1, 0),
+                          N_hist);
 
-		/* grab the state estimate and store it in variables that will
-           make it convenient to save it to a file. */
-        CvMat* x = m_vpUKF[i]->x;
 
-        m_vdTracked_X[i] = cvGetReal2D(x, 0, 0);
-        m_vdTracked_Y[i] = cvGetReal2D(x, 1, 0);
-        m_vdTracked_Z[i] = cvGetReal2D(x, 2, 0);
-        m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
-        m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
+            /* grab the state estimate and store it in variables that will
+               make it convenient to save it to a file. */
+            CvMat* x = m_vpUKF[i]->x;
 
-	}
+            // MAYBE: move outside if
+            m_vdTracked_X[i] = cvGetReal2D(x, 0, 0);
+            m_vdTracked_Y[i] = cvGetReal2D(x, 1, 0);
+            m_vdTracked_Z[i] = cvGetReal2D(x, 2, 0);
+            m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
+            m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
+
+        }
+    }
 
 	writeData();
 
