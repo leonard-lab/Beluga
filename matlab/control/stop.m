@@ -1,3 +1,2 @@
-up(1,0,s)
-fwd(1,0,s)
-servo(68,s)
+sentence(0,0,0,0,70,s1);
+sentence(0,0,0,0,70,s2);

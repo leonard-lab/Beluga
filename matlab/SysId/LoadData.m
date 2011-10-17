@@ -3,7 +3,7 @@ clear all;  close all;
 addpath('d:\dsrc\MADTraC\xdf\matlab\');
 
 %f = ReadXDF(fullfile(getenv('USERPROFILE'), 'Desktop/test.xdf'));
-f = ReadXDF('./TestData.xdf');
+f = ReadXDF('./Data_horizontal4.xdf');
 
 % look at f.DataFiles.Name for a list of files available
 t = LoadXDFDataFileByName(f, 'Time');

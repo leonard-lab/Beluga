@@ -4,12 +4,12 @@ addpath('d:\dsrc\MADTraC\xdf\matlab\');
 addpath('../Calibration/');
 
 %f = ReadXDF(fullfile(getenv('USERPROFILE'), 'Desktop/test.xdf'));
-f = ReadXDF('./testdan.xdf');
-dataname = 'testdan';
+f = ReadXDF('./718a.xdf');
+dataname = '718a';
 
 % depth calibration info:
-depth_offset = 100;
-depth_scale = 0.5;
+depth_offset = 324;
+depth_scale = 2.5/173.47;
 water_depth = str2num(GetValueFromXDInfoByName(f, 'Water_Depth'));
 
 % how many objects were we tracking?
@@ -111,4 +111,41 @@ for ix = 1 : N,
     end
 end
 
-plot(X_all, Y_all); axis equal
+
+%%
+
+start = 1;
+
+X_mod = X_all(start:length(X_all),:);
+Y_mod = Y_all(start:length(Y_all),:);
+Z_mod = Z_all(start:length(Z_all),:);
+O_mod = rawO(start:length(rawO),:);
+
+X_mod2 = zeros(length(X_mod),1);
+Y_mod2 = zeros(length(X_mod),1);
+Z_mod2 = zeros(length(X_mod),1);
+O_mod2 = zeros(length(X_mod),1);
+
+for iter=1:length(X_mod)
+    count = 0;
+    avgX = 0;
+    avgY = 0;
+    avgZ = 0;
+    avgO = 0;
+    for bitter=1:4
+        if ~isnan(X_all(iter,bitter))
+            count = count+1;
+            avgX = avgX + X_mod(iter,bitter);
+            avgY = avgY + Y_mod(iter,bitter);
+            avgZ = avgZ + Z_mod(iter,bitter);
+            avgO = avgO + O_mod(iter,bitter);
+        end
+    end
+    X_mod2(iter) = avgX/count;
+    Y_mod2(iter) = avgY/count;
+    Z_mod2(iter) = avgZ/count;
+    O_mod2(iter) = avgO/count;
+    
+end
+
+plot(X_mod2, Y_mod2); axis equal
