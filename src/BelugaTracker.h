@@ -77,6 +77,8 @@ private:
 	unsigned int m_iSThresh_Low;
 	unsigned int m_iSThresh_High;
 
+	YABlobber m_YABlobber;
+
 	std::vector<MT_DSGYA_Blob> m_vBlobs[4];
 	std::vector<MT_DSGYA_Blob> m_vPredictedBlobs[4];
 	std::vector<YABlob> m_vInitBlobs[4];    

@@ -105,6 +105,10 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_iFrameHeight(0),
 	  m_iFrameWidth(0),
       m_iCurrentCamera(0),
+	  m_pQ(NULL),
+	  m_pR(NULL),
+	  m_px0(NULL),
+	  m_pz(NULL),
       m_dInitAdjacencyThresh(1.0) /* meters */
 {
     doInit(ProtoFrame);
@@ -215,6 +219,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	for(int i = 0; i < 4; i++)
 	{
 		m_pGSFrames[i] = NULL;
+		m_pUndistortedFrames[i] = NULL;
 		m_pThreshFrames[i] = NULL;
 
 		m_pHSVFrames[i] = NULL;
@@ -512,6 +517,7 @@ void BelugaTracker::createFrames()
 		m_pVThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
                                       IPL_DEPTH_8U, 1);
 	}
+
 	m_pTempFrame1 = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 
 	m_pUndistortMapX = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_32F, 1);
@@ -599,7 +605,7 @@ void BelugaTracker::writeData()
 	tmp3.resize(4*m_iNObj);
 	tmp4.resize(4*m_iNObj);
 
-    for(unsigned int i = 0; i < m_iNObj; i++)
+    for(int i = 0; i < m_iNObj; i++)
     {
         for(unsigned int c = 0; c < 4; c++)
         {
@@ -913,14 +919,15 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
 
     if(m_bNoHistory)
     {
+		printf("No history %d \n", cam_number);
         /* on the first frame, we'll just find what we can in this
            image and  copy them directly into the blobs */
-        YABlobber yaBlobber;
-        std::vector<YABlob> yblobs = yaBlobber.FindBlobs(m_pThreshFrames[cam_number],
+        std::vector<YABlob> yblobs = m_YABlobber.FindBlobs(m_pThreshFrames[cam_number],
                                                          1, /* min perimeter */
                                                          m_iBlobAreaThreshLow,
                                                          -1, /* max perimeter (no limit) */
                                                          m_iBlobAreaThreshHigh);
+		printf("YB done\n");
         m_vBlobs[cam_number].resize(yblobs.size());
         for(unsigned int blob = 0; blob < yblobs.size(); blob++)
         {
@@ -930,6 +937,7 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
     else
     {
 
+		printf("History\n");
         generatePredictedBlobs(cam_number);
         
         /* by default, all measurements are valid */
@@ -951,7 +959,7 @@ void BelugaTracker::generatePredictedBlobs(unsigned int cam_number)
 {
     double x, y, z, u, v;
     MT_DSGYA_Blob* pb;
-    for(unsigned int obj = 0; obj < m_iNObj; obj++)
+    for(int obj = 0; obj < m_iNObj; obj++)
     {
         x = m_vdTracked_X[obj];
         y = m_vdTracked_Y[obj];
@@ -1229,7 +1237,7 @@ bool BelugaTracker::tryInitStateVectors()
            into the measurement vectors, then we'll use the averages to
            set the initial state */
         /* Note component labels 1-indexed, thus all the i-1's */
-        for(unsigned int i = 1; i <= min(n_cc, (int) rows); i++)
+        for(int i = 1; i <= min(n_cc, (int) rows); i++)
         {
             m_vvdMeas_X[i-1].resize(0);
             m_vvdMeas_Y[i-1].resize(0);
@@ -1290,6 +1298,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         /* update the water depth from the GUI */
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
 	}
+
+	return;
 
 	/* reset measurement vectors to zero */
 	for(int i = 0; i < m_iNObj; i++)
