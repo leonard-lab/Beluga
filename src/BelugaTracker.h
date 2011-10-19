@@ -26,6 +26,7 @@ public:
     ~BelugaSegmenter(){};
 
     void usePrevious(MT_DSGYA_Blob* obj, unsigned int i);
+	bool areAdjacent(MT_DSGYA_Blob* obj, const YABlob& blob);
 private:
     class BelugaTracker* m_pTracker;
 };

@@ -33,8 +33,8 @@ const double DEFAULT_GATE_DIST2 = 100.0*100.0;
  * i.e., assert(BELUGA_DO_ASSERT) WILL assert and abort */
 const bool BELUGA_DO_ASSERT = false;
 
-//#define VFLIP m_iFrameHeight -
-#define VFLIP
+#define VFLIP m_iFrameHeight -
+//#define VFLIP
 
 template <class T>
 int indexInVector(const std::vector<T>& v, const T& value)
@@ -57,6 +57,19 @@ void BelugaSegmenter::usePrevious(MT_DSGYA_Blob* obj, unsigned int i)
 {
     MT_DSGYA_Segmenter::usePrevious(obj, i);
     m_pTracker->notifyNoMeasurement(i);
+}
+
+bool BelugaSegmenter::areAdjacent(MT_DSGYA_Blob* obj, const YABlob& blob)
+{
+    if(obj->m_dRhoContrib <= 0)
+    {
+        obj->m_dRhoContrib = obj->m_dMajorAxis;
+    }
+    double dx = obj->m_dXCenter - blob.COMx;
+    double dy = obj->m_dYCenter - blob.COMy;
+    double rho = m_dOverlapFactor*(obj->m_dRhoContrib + blob.major_axis);
+	printf("dx = %f, dy = %f\n", dx, dy);
+    return dx*dx + dy*dy < rho*rho;
 }
 
 
@@ -269,7 +282,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_pTranslationVectors[i] = NULL;
 
 		m_vBlobs[i].resize(0);
-        m_vPredictedBlobs[i].resize(0);
+        m_vPredictedBlobs[i].resize(m_iNObj);
 	}
 
 	m_pUndistortMapX = NULL;
@@ -930,6 +943,7 @@ void BelugaTracker::doImageProcessingInCamera(unsigned int cam_number,
 
 void BelugaTracker::notifyNoMeasurement(unsigned int obj_num)
 {
+	printf("No meas, cam %d, obj %d\n", m_iCurrentCamera, obj_num);
     m_vbValidMeasCamObj[m_iCurrentCamera][obj_num] = false;
 }
 
@@ -955,28 +969,38 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
                                                          m_iBlobAreaThreshLow,
                                                          -1, /* max perimeter (no limit) */
                                                          m_iBlobAreaThreshHigh);
+		printf("Origin is %d\n", m_pThreshFrames[cam_number]->origin);
 		printf("YB done\n");
         m_vBlobs[cam_number].resize(yblobs.size());
         for(unsigned int blob = 0; blob < yblobs.size(); blob++)
         {
             m_vBlobs[cam_number][blob] = MT_DSGYA_Blob(yblobs[blob]);
+			//m_vBlobs[cam_number][blob].m_dYCenter = m_iFrameHeight - m_vBlobs[cam_number][blob].m_dYCenter;
+			//double th = MT_DEG2RAD*m_vBlobs[cam_number][blob].m_dOrientation;
+			//m_vBlobs[cam_number][blob].m_dOrientation = MT_RAD2DEG*atan2(-sin(th),cos(th));
         }
     }
     else
     {
 
-		printf("History\n");
+		printf("Gen predicted\n");
         generatePredictedBlobs(cam_number);
         
+		printf("Assign false meas\n");
         /* by default, all measurements are valid */
         m_vbValidMeasCamObj[cam_number].assign(m_iNObj, true);
 
+		printf("Segment\n");
         m_vBlobs[cam_number] = segmenter.doSegmentation(m_pThreshFrames[cam_number],
                                                         m_vPredictedBlobs[cam_number]);
-        m_viAssignments[cam_number] =
+
+		printf("Get assignments \n");
+		m_viAssignments[cam_number] =
             segmenter.getAssignmentVector(&m_iAssignmentRows[cam_number],
                                           &m_iAssignmentCols[cam_number]);
+		printf("Get init blobs\n");
         m_vInitBlobs[cam_number] = segmenter.getInitialBlobs();
+		printf("done\n");
     }
 
     // MAYBE: adjust for y axis flip
@@ -989,19 +1013,25 @@ void BelugaTracker::generatePredictedBlobs(unsigned int cam_number)
     MT_DSGYA_Blob* pb;
     for(int obj = 0; obj < m_iNObj; obj++)
     {
+		printf("tx size %d\n", m_vdTracked_X.size());
         x = m_vdTracked_X[obj];
         y = m_vdTracked_Y[obj];
         z = m_vdTracked_Z[obj];
         
+		printf("Coord txfm\n");
         m_CoordinateTransforms[cam_number].worldToImage(x, y, z, &u, &v, false);
 
+		//v = m_iFrameHeight - v;
+
         /* for display */
+		printf("Tr XC\n");
         m_vdaTracked_XC[cam_number][obj] = u;
         m_vdaTracked_YC[cam_number][obj] = v;
 
+		printf("assign pb size %d\n", m_vPredictedBlobs[cam_number].size());
         pb = &m_vPredictedBlobs[cam_number][obj];
         pb->m_dXCenter = u;
-        pb->m_dYCenter = z;
+        pb->m_dYCenter = v;
         pb->m_dOrientation = m_vdTracked_Heading[obj];
     }
 }
@@ -1327,8 +1357,6 @@ void BelugaTracker::doTracking(IplImage* frames[4])
         m_CoordinateTransforms[i].setWaterDepth(m_dWaterDepth);
 	}
 
-	return;
-
 	/* reset measurement vectors to zero */
 	for(int i = 0; i < m_iNObj; i++)
 	{
@@ -1362,7 +1390,13 @@ void BelugaTracker::doTracking(IplImage* frames[4])
                           cvGetReal2D(m_vpUKF[i]->x, 1, 0),
                           N_hist);
 
+        }
+    }
 
+	if(!m_bNoHistory)
+	{
+		for(int i = 0; i < m_iNObj; i++)
+		{
             /* grab the state estimate and store it in variables that will
                make it convenient to save it to a file. */
             CvMat* x = m_vpUKF[i]->x;
@@ -1373,9 +1407,8 @@ void BelugaTracker::doTracking(IplImage* frames[4])
             m_vdTracked_Z[i] = cvGetReal2D(x, 2, 0);
             m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
             m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
-
-        }
-    }
+		}
+	}
 
 	writeData();
 
@@ -1511,6 +1544,25 @@ void BelugaTracker::doGLDrawing(int flags)
                          1.0 // fixes the arrow width
                 );    
         }
+
+		for(unsigned int i = 0; i < m_vInitBlobs[Q].size(); i++)
+		{
+            /* note that we have to subtract y from the frame_height
+               to account for the window coordinates originating from the
+               bottom left but the image coordinates originating from
+               the top left */
+            blobcenter.setx(m_vInitBlobs[Q].at(i).COMx);
+            blobcenter.sety(VFLIP m_vInitBlobs[Q].at(i).COMy);
+            blobcenter.setz( 0 );
+
+            /* draws an arrow using OpenGL */
+            MT_DrawArrow(blobcenter,  // center of the base of the arrow
+                         20.0,        // arrow length (pixels)
+                         MT_DEG2RAD*m_vInitBlobs[Q].at(i).orientation, // arrow angle
+                         MT_Blue,//MT_Primaries[(i+1) % MT_NPrimaries], // color
+                         1.0 // fixes the arrow width
+                );   
+		}
     }
 
     /* essentially the same as above, but with the tracked positions
