@@ -82,7 +82,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                const wxSize& size,     
                                long style)
   : MT_RobotFrameBase(parent, id, title, pos, size, style),
-    m_iNToTrack(1),
+    m_iNToTrack(2),
 	m_dGotoDist(50.0),
 	m_dGotoMaxSpeed(15.0),
 	m_dGotoTurningGain(25.0),
@@ -303,9 +303,7 @@ void BelugaTrackerFrame::runTracker()
 		}
 		m_pBelugaTracker->setRobotData(depth, speed, vert, turn);
 
-		printf("Tracking start\n");
 		m_pBelugaTracker->doTracking(m_pCameraFrames);
-		printf("Tracking done\n");
 
 		if(m_bConnectSocket && !m_Socket.IsConnected())
 		{

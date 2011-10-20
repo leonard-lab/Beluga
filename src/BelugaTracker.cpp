@@ -33,10 +33,13 @@ const double DEFAULT_GATE_DIST2 = 100.0*100.0;
  * i.e., assert(BELUGA_DO_ASSERT) WILL assert and abort */
 const bool BELUGA_DO_ASSERT = false;
 
+/* VFLIP needs to be defined as "m_iFrameHeight -" on Pod because of 
+ * the way that the screen and camera coordinates index from the top
+ * of the image rather than the bottom. */
 #define VFLIP m_iFrameHeight -
+/* On other systems (suspect OS X and *nix), you may need to
+ * do this instead */
 //#define VFLIP
-
-#define ATT "================================================="
 
 template <class T>
 int indexInVector(const std::vector<T>& v, const T& value)
@@ -57,23 +60,21 @@ int indexInVector(const std::vector<T>& v, const T& value)
 
 void BelugaSegmenter::usePrevious(MT_DSGYA_Blob* obj, unsigned int i)
 {
-	printf("use previous\n");
     MT_DSGYA_Segmenter::usePrevious(obj, i);
-	obj->m_dRhoContrib = 4;
     m_pTracker->notifyNoMeasurement(i);
+	// TODO:  Handling rho contribution when a measurement goes missing
 }
 
 bool BelugaSegmenter::areAdjacent(MT_DSGYA_Blob* obj, const YABlob& blob)
 {
     if(obj->m_dRhoContrib > 0)
     {
-        obj->m_dRhoContrib *= blob.major_axis;
+        // TODO see usePrevious
     }
 
     double dx = obj->m_dXCenter - blob.COMx;
     double dy = obj->m_dYCenter - blob.COMy;
     double rho = m_dOverlapFactor*(obj->m_dRhoContrib + blob.major_axis);
-	printf("dx = %f, dy = %f, rho = %f, rhoc = %f\n", dx, dy, rho, obj->m_dRhoContrib);
     return dx*dx + dy*dy < rho*rho;
 }
 
@@ -101,8 +102,6 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
 	  m_iSearchAreaPadding(DEFAULT_SEARCH_AREA_PADDING),
       m_iStartFrame(-1),
       m_iStopFrame(-1),
-//      m_pGSThresholder(            NULL                        ),
- //     m_pGYBlobber(NULL),
       m_vpUKF(n_obj, NULL),
       m_dSigmaPosition(DEFAULT_SIGMA_POSITION),
       m_dSigmaHeading(DEFAULT_SIGMA_HEADING),
@@ -160,28 +159,11 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
     doInit(ProtoFrame);
 }
 
-/* Destructor - basically the opposite of the destructor, gets called
+/* Destructor - basically the opposite of the constructor, gets called
  * whenever an object is deleted or goes out of scope.  It should
  * de-allocate any memory that was allocated */
 BelugaTracker::~BelugaTracker()
 {
-	/*
-    if(m_pGSThresholder[0])
-    {
-		for(int i = 0; i < 4; i++)
-		{
-			delete m_pGSThresholder[i];
-		}
-    }
-
-    if(m_pGYBlobber[0])
-    {
-		for(int i = 0; i < 4; i++)
-		{
-			delete m_pGYBlobber[i];
-		}
-    }*/
-
     /* cvReleaseMat deallocates matrices given to it */
     cvReleaseMat(&m_px0);
     cvReleaseMat(&m_pz);
@@ -192,7 +174,6 @@ BelugaTracker::~BelugaTracker()
 	{
 		for(int i = 0; i < 4; i++)
 		{
-			//cvReleaseImage(&m_pGSFrames[i]);
 			cvReleaseImage(&m_pUndistortedFrames[i]);
 			cvReleaseImage(&m_pHSVFrames[i]);
 			cvReleaseImage(&m_pHFrames[i]);
@@ -256,12 +237,15 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 	}
 
     /* Not using the built-in tracked objects functions - setting
-     * this pointer to N ULL will ensure that the appropriate code is
+     * this pointer to NULL will ensure that the appropriate code is
      * disabled  */
     m_pTrackedObjects = NULL;
 
     /* It's always a good idea to initialize pointers to NULL so that
-       other pieces of code can use e.g. if(p) to check for allocation */
+       other pieces of code can use e.g. if(p) to check for allocation 
+	   NOTE that normally you should do this in the constructor's 
+	    initializer list, but we have to do these here because they're
+		arrays */
 	for(int i = 0; i < 4; i++)
 	{
 		m_pGSFrames[i] = NULL;
@@ -278,8 +262,6 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
 		m_pMasks[i] = NULL;
 
-		m_pTempFrame1 = NULL;
-
 		m_pCameraMatrices[i] = NULL;
 		m_pDistortionCoeffs[i] = NULL;
 		m_pRotationVectors[i] = NULL;
@@ -289,9 +271,6 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_vBlobs[i].resize(0);
         m_vPredictedBlobs[i].resize(m_iNObj);
 	}
-
-	m_pUndistortMapX = NULL;
-	m_pUndistortMapY = NULL;
 
     /* grab the frame height */
     m_iFrameHeight = ProtoFrame->height;
@@ -346,6 +325,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
      * straight arrays, not std::vectors */
     for(unsigned int i = 0; i < 4; i++)
     {
+		/* but their elements do need to be resized */
         m_vbValidMeasCamObj[i].resize(m_iNObj);
         m_viAssignments[i].resize(0);
         m_vInitBlobs[i].resize(0);
@@ -367,7 +347,6 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
     /* sets up the frames that are available in the "view" menu */
     m_pTrackerFrameGroup = new MT_TrackerFrameGroup();
-    //m_pTrackerFrameGroup->pushFrame(&m_pDiffFrames[0],      "Diff Frame");
 	m_pTrackerFrameGroup->pushFrame(&m_pUndistortedFrames[0], "Undistorted");
     m_pTrackerFrameGroup->pushFrame(&m_pThreshFrames[0],    "Threshold Frame");
 	m_pTrackerFrameGroup->pushFrame(&m_pHSVFrames[0], "HSV");
@@ -483,30 +462,16 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 
 }
 
+/* this would normally be where we capture e.g. a background
+   image, but we're not using background subtraction here
+   we DO, however, need to grab the correct image sizes */
 void BelugaTracker::doTrain(IplImage* frame)
 {
-	printf("Training.\n");
 	m_iFrameWidth = frame->width;
 	m_iFrameHeight = frame->height;
 	CvSize fsize = cvSize(m_iFrameWidth, m_iFrameHeight);
 
 	MT_TrackerBase::doTrain(frame);
-
-	//HSVSplit(frame);
-
-	//cvCopy(m_pVFrame, BG_frame);
-
-	/*if(m_pGSThresholder)
-	{
-		delete m_pGSThresholder;
-	}*/
-
-	//m_pGSThresholder = new MT_GSThresholder(BG_frame);
-    /* The thresholder manages these frames, but by grabbing pointers
-       to them we can pass them to the GUI. */
-	/*m_pGSFrame = m_pGSThresholder->getGSFrame();
-    m_pDiffFrame = m_pGSThresholder->getDiffFrame();
-    m_pThreshFrame = m_pGSThresholder->getThreshFrame();*/
 }
 
 /* This gets called by MT_TrackerBase::doInit.  I use it here more to
@@ -521,7 +486,6 @@ void BelugaTracker::createFrames()
 	{
 		for(int i = 0; i < 4; i++)
 		{
-			//cvReleaseImage(&m_pGSFrames[i]);
 			cvReleaseImage(&m_pUndistortedFrames[i]);
 			cvReleaseImage(&m_pHSVFrames[i]);
 			cvReleaseImage(&m_pHFrames[i]);
@@ -543,7 +507,6 @@ void BelugaTracker::createFrames()
 
 	for(int i = 0; i < 4; i++)
 	{
-		//m_pGSFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight), IPL_DEPTH_8U, 1);
 		m_pUndistortedFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
 			IPL_DEPTH_8U, 3);
 		m_pThreshFrames[i] = cvCreateImage(cvSize(m_iFrameWidth, m_iFrameHeight),
@@ -593,10 +556,7 @@ void BelugaTracker::createFrames()
 /* this gets called during the destructor */
 void BelugaTracker::releaseFrames()
 {
-    
-    /* Nothing really to do here.  BG_Frame is managed by the base
-     * class and the GS, Diff, and Thresh frames are managed by
-     * m_pGSThresholder */
+	/* we're doing this elsewhere - it should eventually be moved here */
 }
 
 /* Initialize a data file for output.  Gets called from the GUI or
@@ -948,7 +908,6 @@ void BelugaTracker::doImageProcessingInCamera(unsigned int cam_number,
 
 void BelugaTracker::notifyNoMeasurement(unsigned int obj_num)
 {
-	printf("No meas, cam %d, obj %d\n", m_iCurrentCamera, obj_num);
     m_vbValidMeasCamObj[m_iCurrentCamera][obj_num] = false;
 }
 
@@ -958,7 +917,8 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
     m_iCurrentCamera = cam_number;
     
     BelugaSegmenter segmenter(this);
-    segmenter.setDebugFile(stdout);
+	/* uncomment to see debugging info for the segmenter module */
+    //segmenter.setDebugFile(stdout);
     segmenter.m_iMinBlobPerimeter = 1;
     segmenter.m_iMinBlobArea = m_iBlobAreaThreshLow;
     segmenter.m_iMaxBlobArea = m_iBlobAreaThreshHigh;
@@ -966,7 +926,6 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
 
     if(m_bNoHistory)
     {
-		printf("No history %d \n", cam_number);
         /* on the first frame, we'll just find what we can in this
            image and  copy them directly into the blobs */
         std::vector<YABlob> yblobs = m_YABlobber.FindBlobs(m_pThreshFrames[cam_number],
@@ -974,42 +933,27 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
                                                          m_iBlobAreaThreshLow,
                                                          -1, /* max perimeter (no limit) */
                                                          m_iBlobAreaThreshHigh);
-		printf("Origin is %d\n", m_pThreshFrames[cam_number]->origin);
-		printf("YB done\n");
         m_vBlobs[cam_number].resize(yblobs.size());
         for(unsigned int blob = 0; blob < yblobs.size(); blob++)
         {
             m_vBlobs[cam_number][blob] = MT_DSGYA_Blob(yblobs[blob]);
-			//m_vBlobs[cam_number][blob].m_dYCenter = m_iFrameHeight - m_vBlobs[cam_number][blob].m_dYCenter;
-			//double th = MT_DEG2RAD*m_vBlobs[cam_number][blob].m_dOrientation;
-			//m_vBlobs[cam_number][blob].m_dOrientation = MT_RAD2DEG*atan2(-sin(th),cos(th));
         }
     }
     else
     {
-
-		printf("Gen predicted\n");
         generatePredictedBlobs(cam_number);
         
-		printf("Assign false meas\n");
         /* by default, all measurements are valid */
         m_vbValidMeasCamObj[cam_number].assign(m_iNObj, true);
 
-		printf("Segment\n");
         m_vBlobs[cam_number] = segmenter.doSegmentation(m_pThreshFrames[cam_number],
                                                         m_vPredictedBlobs[cam_number]);
 
-		printf("Get assignments \n");
 		m_viAssignments[cam_number] =
             segmenter.getAssignmentVector(&m_iAssignmentRows[cam_number],
                                           &m_iAssignmentCols[cam_number]);
-		printf("Get init blobs\n");
         m_vInitBlobs[cam_number] = segmenter.getInitialBlobs();
-		printf("done\n");
     }
-
-    // MAYBE: adjust for y axis flip
-
 }
 
 void BelugaTracker::generatePredictedBlobs(unsigned int cam_number)
@@ -1048,8 +992,7 @@ void BelugaTracker::calculatePositionOfObjectInCamera(unsigned int obj_num, unsi
 	z = m_vdTracked_Z[obj_num];
         
 	m_CoordinateTransforms[cam_num].worldToImage(x, y, z, u, v, false);
-	*v = m_iFrameHeight - *v;
-	printf("Calculated position is %f, %f\n", *u, *v);
+	*v = VFLIP *v;
 }
 
 void BelugaTracker::getObjectMeasurements(unsigned int obj_number)
@@ -1085,7 +1028,6 @@ void BelugaTracker::getObjectMeasurements(unsigned int obj_number)
 void BelugaTracker::updateObjectState(unsigned int obj_number)
 {
     unsigned int nmeas = m_vvdMeas_X[obj_number].size();
-	printf("----- object %d has %d measurements\n", obj_number,  nmeas);
 
     if(nmeas)
     {
@@ -1115,7 +1057,6 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
     /* if we're going to accept this measurement */
     if(valid_meas)
     {
-		printf(ATT "UKF\n");
         applyUKFToObject(obj_number);
     }
     else
@@ -1126,18 +1067,15 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
         {
             if(nmeas > 0)
             {
-				printf(ATT "AVG\n");
                 useAverageMeasurementForObject(obj_number);
             }
             else
             {
-				printf(ATT "WTF\n");
                 /* should never get here */
             }
         }
         else
         {
-			printf(ATT "PRE\n");
             usePredictedStateForObject(obj_number);
         }
     }
@@ -1167,7 +1105,7 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
     {
         cam_no = m_vviMeas_Cam[obj_number][j];
         m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
-                                                            m_iFrameHeight - m_vvdMeas_Y[obj_number][j],
+                                                            VFLIP m_vvdMeas_Y[obj_number][j],
                                                             0, &x, &y, &z, false);
         th = rectifyAngleMeasurement(m_vvdMeas_Hdg[obj_number][j],
                                      m_vdHistories_X[obj_number],
@@ -1178,8 +1116,6 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
         cvSetReal2D(m_pz, j*3 + 0, 0, x);
         cvSetReal2D(m_pz, j*3 + 1, 0, y);
         cvSetReal2D(m_pz, j*3 + 2, 0, th);
-
-		printf("meas pos %f, %f converts to %f, %f\n", m_vvdMeas_X[obj_number][j], m_vvdMeas_Y[obj_number][j], x, y);
     }
     cvSetReal2D(m_pz, m_pz->rows - 1, 0, m_dWaterDepth);
 
@@ -1203,7 +1139,7 @@ void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
     {
         cam_no = m_vviMeas_Cam[obj_number][j];
         m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
-                                                            m_iFrameHeight - m_vvdMeas_Y[obj_number][j],
+                                                            VFLIP m_vvdMeas_Y[obj_number][j],
                                                             0, &x, &y, &z, false);
         xavg += x;
         yavg += y;
@@ -1225,24 +1161,7 @@ void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
 void BelugaTracker::usePredictedStateForObject(unsigned int obj_number)
 {
     // use the prediction
-	CvMat* x = m_vpUKF[obj_number]->x;
-	printf("state was: %f %f %f %f %f\n",
-		cvGetReal2D(x, 0, 0),
-		cvGetReal2D(x, 1, 0),
-		cvGetReal2D(x, 2, 0),
-		cvGetReal2D(x, 3, 0),
-		cvGetReal2D(x, 4, 0)
-		);
-	x = m_vpUKF[obj_number]->x1;
-	printf("predicted: %f %f %f %f %f\n",
-		cvGetReal2D(x, 0, 0),
-		cvGetReal2D(x, 1, 0),
-		cvGetReal2D(x, 2, 0),
-		cvGetReal2D(x, 3, 0),
-		cvGetReal2D(x, 4, 0)
-		);
     cvCopy(m_vpUKF[obj_number]->x1, m_vpUKF[obj_number]->x);
-
 }
 
 unsigned int BelugaTracker::testInitAdjacency(double x1, double y1, double x2, double y2)
@@ -1283,7 +1202,7 @@ bool BelugaTracker::tryInitStateVectors()
             
             // convert image position to world, assuming depth = 0
             m_CoordinateTransforms[c].imageAndDepthToWorld(pb->m_dXCenter,
-                                                           m_iFrameHeight - pb->m_dYCenter,
+                                                           VFLIP pb->m_dYCenter,
                                                            0, &x1, &y1, &z, false);
             X.push_back(x1);
             Y.push_back(y1);
@@ -1447,10 +1366,10 @@ void BelugaTracker::doTracking(IplImage* frames[4])
             m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
             m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
 
-			printf("tracked position, speed: %f, %f, %f\n", m_vdTracked_X[i], m_vdTracked_Y[i], m_vdTracked_Speed[i]);
+/*			printf("tracked position, speed: %f, %f, %f\n", m_vdTracked_X[i], m_vdTracked_Y[i], m_vdTracked_Speed[i]);
 			printf("predicted position, speed: %f, %f, %f\n", cvGetReal2D(m_vpUKF[i]->x1, 0, 0),
 				cvGetReal2D(m_vpUKF[i]->x1, 1, 0),
-				cvGetReal2D(m_vpUKF[i]->x1, 4, 0));
+				cvGetReal2D(m_vpUKF[i]->x1, 4, 0)); */
 		}
 
 		calculateTrackedPositionsInCameras();
@@ -1507,7 +1426,7 @@ void BelugaTracker::getWorldXYZFromImageXYAndDepthInCamera(double* x,
 		return;
 	}
 
-	m_CoordinateTransforms[camera].imageAndDepthToWorld(u, m_iFrameHeight - v, d, x, y, z, undistort);
+	m_CoordinateTransforms[camera].imageAndDepthToWorld(u, VFLIP v, d, x, y, z, undistort);
 
 }
 
@@ -1536,7 +1455,7 @@ void BelugaTracker::getCameraXYFromWorldXYandDepth(int* camera, double* u, doubl
 	}
 
 	m_CoordinateTransforms[*camera].worldToImage(x, y, m_dWaterDepth-depth, u, v, distort);
-	*v = m_iFrameHeight - *v;
+	*v = VFLIP *v;
 }
 
 /* Drawing function - gets called by the GUI
