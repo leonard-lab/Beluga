@@ -36,6 +36,8 @@ const bool BELUGA_DO_ASSERT = false;
 #define VFLIP m_iFrameHeight -
 //#define VFLIP
 
+#define ATT "================================================="
+
 template <class T>
 int indexInVector(const std::vector<T>& v, const T& value)
 {
@@ -55,20 +57,23 @@ int indexInVector(const std::vector<T>& v, const T& value)
 
 void BelugaSegmenter::usePrevious(MT_DSGYA_Blob* obj, unsigned int i)
 {
+	printf("use previous\n");
     MT_DSGYA_Segmenter::usePrevious(obj, i);
+	obj->m_dRhoContrib = 4;
     m_pTracker->notifyNoMeasurement(i);
 }
 
 bool BelugaSegmenter::areAdjacent(MT_DSGYA_Blob* obj, const YABlob& blob)
 {
-    if(obj->m_dRhoContrib <= 0)
+    if(obj->m_dRhoContrib > 0)
     {
-        obj->m_dRhoContrib = obj->m_dMajorAxis;
+        obj->m_dRhoContrib *= blob.major_axis;
     }
+
     double dx = obj->m_dXCenter - blob.COMx;
     double dy = obj->m_dYCenter - blob.COMy;
     double rho = m_dOverlapFactor*(obj->m_dRhoContrib + blob.major_axis);
-	printf("dx = %f, dy = %f\n", dx, dy);
+	printf("dx = %f, dy = %f, rho = %f, rhoc = %f\n", dx, dy, rho, obj->m_dRhoContrib);
     return dx*dx + dy*dy < rho*rho;
 }
 
@@ -1009,31 +1014,42 @@ void BelugaTracker::doBlobFindingInCamera(unsigned int cam_number)
 
 void BelugaTracker::generatePredictedBlobs(unsigned int cam_number)
 {
-    double x, y, z, u, v;
     MT_DSGYA_Blob* pb;
     for(int obj = 0; obj < m_iNObj; obj++)
     {
-		printf("tx size %d\n", m_vdTracked_X.size());
-        x = m_vdTracked_X[obj];
-        y = m_vdTracked_Y[obj];
-        z = m_vdTracked_Z[obj];
-        
-		printf("Coord txfm\n");
-        m_CoordinateTransforms[cam_number].worldToImage(x, y, z, &u, &v, false);
-
-		//v = m_iFrameHeight - v;
-
-        /* for display */
-		printf("Tr XC\n");
-        m_vdaTracked_XC[cam_number][obj] = u;
-        m_vdaTracked_YC[cam_number][obj] = v;
-
-		printf("assign pb size %d\n", m_vPredictedBlobs[cam_number].size());
         pb = &m_vPredictedBlobs[cam_number][obj];
-        pb->m_dXCenter = u;
-        pb->m_dYCenter = v;
+        pb->m_dXCenter = m_vdaTracked_XC[cam_number][obj];
+        pb->m_dYCenter = m_vdaTracked_YC[cam_number][obj];
         pb->m_dOrientation = m_vdTracked_Heading[obj];
     }
+}
+
+void BelugaTracker::calculateTrackedPositionsInCameras()
+{
+	double u, v;
+	for(unsigned int c = 0; c < 4; c++)
+	{
+		for(int obj = 0; obj < m_iNObj; obj++)
+		{
+			calculatePositionOfObjectInCamera(obj, c, &u, &v);
+			/* for display */
+			m_vdaTracked_XC[c][obj] = u;
+			m_vdaTracked_YC[c][obj] = v;
+		}
+	}
+}
+
+void BelugaTracker::calculatePositionOfObjectInCamera(unsigned int obj_num, unsigned int cam_num, double* u, double* v)
+{
+	double x, y, z;
+	x = y = z = 0;
+	x = m_vdTracked_X[obj_num];
+	y = m_vdTracked_Y[obj_num];
+	z = m_vdTracked_Z[obj_num];
+        
+	m_CoordinateTransforms[cam_num].worldToImage(x, y, z, u, v, false);
+	*v = m_iFrameHeight - *v;
+	printf("Calculated position is %f, %f\n", *u, *v);
 }
 
 void BelugaTracker::getObjectMeasurements(unsigned int obj_number)
@@ -1069,6 +1085,7 @@ void BelugaTracker::getObjectMeasurements(unsigned int obj_number)
 void BelugaTracker::updateObjectState(unsigned int obj_number)
 {
     unsigned int nmeas = m_vvdMeas_X[obj_number].size();
+	printf("----- object %d has %d measurements\n", obj_number,  nmeas);
 
     if(nmeas)
     {
@@ -1098,6 +1115,7 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
     /* if we're going to accept this measurement */
     if(valid_meas)
     {
+		printf(ATT "UKF\n");
         applyUKFToObject(obj_number);
     }
     else
@@ -1108,16 +1126,18 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
         {
             if(nmeas > 0)
             {
+				printf(ATT "AVG\n");
                 useAverageMeasurementForObject(obj_number);
             }
             else
             {
-                /* if there's no measurement to use, do nothing? */
-                // MAYBE not ok?
+				printf(ATT "WTF\n");
+                /* should never get here */
             }
         }
         else
         {
+			printf(ATT "PRE\n");
             usePredictedStateForObject(obj_number);
         }
     }
@@ -1147,7 +1167,7 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
     {
         cam_no = m_vviMeas_Cam[obj_number][j];
         m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
-                                                            m_vvdMeas_Y[obj_number][j],
+                                                            m_iFrameHeight - m_vvdMeas_Y[obj_number][j],
                                                             0, &x, &y, &z, false);
         th = rectifyAngleMeasurement(m_vvdMeas_Hdg[obj_number][j],
                                      m_vdHistories_X[obj_number],
@@ -1158,6 +1178,8 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
         cvSetReal2D(m_pz, j*3 + 0, 0, x);
         cvSetReal2D(m_pz, j*3 + 1, 0, y);
         cvSetReal2D(m_pz, j*3 + 2, 0, th);
+
+		printf("meas pos %f, %f converts to %f, %f\n", m_vvdMeas_X[obj_number][j], m_vvdMeas_Y[obj_number][j], x, y);
     }
     cvSetReal2D(m_pz, m_pz->rows - 1, 0, m_dWaterDepth);
 
@@ -1181,7 +1203,7 @@ void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
     {
         cam_no = m_vviMeas_Cam[obj_number][j];
         m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
-                                                            m_vvdMeas_Y[obj_number][j],
+                                                            m_iFrameHeight - m_vvdMeas_Y[obj_number][j],
                                                             0, &x, &y, &z, false);
         xavg += x;
         yavg += y;
@@ -1203,7 +1225,24 @@ void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
 void BelugaTracker::usePredictedStateForObject(unsigned int obj_number)
 {
     // use the prediction
+	CvMat* x = m_vpUKF[obj_number]->x;
+	printf("state was: %f %f %f %f %f\n",
+		cvGetReal2D(x, 0, 0),
+		cvGetReal2D(x, 1, 0),
+		cvGetReal2D(x, 2, 0),
+		cvGetReal2D(x, 3, 0),
+		cvGetReal2D(x, 4, 0)
+		);
+	x = m_vpUKF[obj_number]->x1;
+	printf("predicted: %f %f %f %f %f\n",
+		cvGetReal2D(x, 0, 0),
+		cvGetReal2D(x, 1, 0),
+		cvGetReal2D(x, 2, 0),
+		cvGetReal2D(x, 3, 0),
+		cvGetReal2D(x, 4, 0)
+		);
     cvCopy(m_vpUKF[obj_number]->x1, m_vpUKF[obj_number]->x);
+
 }
 
 unsigned int BelugaTracker::testInitAdjacency(double x1, double y1, double x2, double y2)
@@ -1244,7 +1283,7 @@ bool BelugaTracker::tryInitStateVectors()
             
             // convert image position to world, assuming depth = 0
             m_CoordinateTransforms[c].imageAndDepthToWorld(pb->m_dXCenter,
-                                                           pb->m_dYCenter,
+                                                           m_iFrameHeight - pb->m_dYCenter,
                                                            0, &x1, &y1, &z, false);
             X.push_back(x1);
             Y.push_back(y1);
@@ -1407,7 +1446,14 @@ void BelugaTracker::doTracking(IplImage* frames[4])
             m_vdTracked_Z[i] = cvGetReal2D(x, 2, 0);
             m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
             m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
+
+			printf("tracked position, speed: %f, %f, %f\n", m_vdTracked_X[i], m_vdTracked_Y[i], m_vdTracked_Speed[i]);
+			printf("predicted position, speed: %f, %f, %f\n", cvGetReal2D(m_vpUKF[i]->x1, 0, 0),
+				cvGetReal2D(m_vpUKF[i]->x1, 1, 0),
+				cvGetReal2D(m_vpUKF[i]->x1, 4, 0));
 		}
+
+		calculateTrackedPositionsInCameras();
 	}
 
 	writeData();
@@ -1461,7 +1507,7 @@ void BelugaTracker::getWorldXYZFromImageXYAndDepthInCamera(double* x,
 		return;
 	}
 
-	m_CoordinateTransforms[camera].imageAndDepthToWorld(u, v, d, x, y, z, undistort);
+	m_CoordinateTransforms[camera].imageAndDepthToWorld(u, m_iFrameHeight - v, d, x, y, z, undistort);
 
 }
 
@@ -1490,6 +1536,7 @@ void BelugaTracker::getCameraXYFromWorldXYandDepth(int* camera, double* u, doubl
 	}
 
 	m_CoordinateTransforms[*camera].worldToImage(x, y, m_dWaterDepth-depth, u, v, distort);
+	*v = m_iFrameHeight - *v;
 }
 
 /* Drawing function - gets called by the GUI

@@ -165,6 +165,8 @@ private:
     unsigned int testInitAdjacency(double x1, double y1, double x2, double y2);
 
     void generatePredictedBlobs(unsigned int cam_number);    
+	void calculateTrackedPositionsInCameras();
+	void calculatePositionOfObjectInCamera(unsigned int obj_num, unsigned int cam_num, double* u, double* v);
 
     ////////////////////////////////////////////////////////////
     /* functions that get called during each tracking step */
