@@ -22,6 +22,7 @@ enum
     ID_MENU_FILE_CAM_SETUP
 };
 
+/* TODO: Replace with rhubarb code */
 void writeLineToSocket(const char* str, wxSocketBase* sock)
 {
 	char* c = (char *)calloc(strlen(str)+1, sizeof(char));
@@ -119,7 +120,6 @@ void BelugaTrackerFrame::doUserQuit()
 	{
 		if(m_pSlaves[i])
 		{
-			//MT_CameraSlaveFrame* f = dynamic_cast<MT_CameraSlaveFrame*>(m_pSlaves[i]);
 			m_pSlaves[i]->setImage(NULL);
 			m_pSlaves[i]->prepareToClose();
 
@@ -194,7 +194,7 @@ void BelugaTrackerFrame::initUserData()
     m_pSetupInfo->AddString("Quadrant IV Mask",
                             &m_sQuad4MaskPath);
                             
-    
+    /* TODO: separate robot and tracking timers */
     setTimer(FRAME_PERIOD_MSEC);
 }
 
@@ -276,6 +276,7 @@ void BelugaTrackerFrame::acquireFrames()
 
 void BelugaTrackerFrame::runTracker()
 {
+    /* TODO: refactor */
 	if(m_pCameraFrames[0])
 	{
 		std::vector<double> depth, speed, vert, turn, u, z;
