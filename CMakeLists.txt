@@ -7,6 +7,7 @@
 #   * Simplied significantly - DTS 7/14/10
 #   * Modified from SimpleBWTracker - DTS 8/26/10
 #   * Modified from KilliTracker - DTS 9/10/10
+#   * Remove BelugaServer (using ruby IPC now)
 #   
 ##################################################
 
@@ -21,11 +22,6 @@ set(MT_ROOT "../MADTraC/build" CACHE PATH "MADTraC root directory")
 # sets variables related to MT
 include(${MT_ROOT}/cmake/MT_Config.cmake)
 
-option(WITH_SERVER "Build with server module" OFF)
-if(WITH_SERVER)
-  add_definitions("-DWITH_SERVER")
-endif(WITH_SERVER)
-
 # set the name of the built target
 set(APP_NAME BelugaTracker)
 
@@ -35,8 +31,6 @@ set(APP_SRC
   src/BelugaTrackerGUI.h
   src/BelugaTracker.cpp
   src/BelugaTracker.h
-  src/BelugaServer.cpp
-  src/BelugaServer.h
   src/BelugaRobot.cpp
   src/BelugaRobot.h
   src/BelugaVideoSetupDialog.h

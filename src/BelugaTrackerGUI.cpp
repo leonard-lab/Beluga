@@ -88,7 +88,6 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_dGotoTurningGain(25.0),
 	m_bControlActive(false),
 	m_iGrabbedTrackedObj(NO_ROBOT),
-    m_pServer(NULL),
 	m_bGotoActive(false),
 	m_iGotoCam(0),
 	m_dGotoXC(0),
@@ -107,7 +106,6 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 
 BelugaTrackerFrame::~BelugaTrackerFrame()
 {
-	if(m_pServer) delete m_pServer;
 }
 
 void BelugaTrackerFrame::doUserQuit()
@@ -430,14 +428,6 @@ void BelugaTrackerFrame::initTracker()
 			m_sQuad2CalibrationPath.c_str(),
 			m_sQuad3CalibrationPath.c_str(),
 			m_sQuad4CalibrationPath.c_str());
-
-#ifdef WITH_SERVER    
-    m_pServer = new MT_Server;
-    // m_pServer->enableDebugOutput();
-    m_pServer->doInit();
-    m_pServer->registerModule(new MT_SM_BelugaTracker(m_pServer,
-                                                        m_pBelugaTracker));
-#endif /* WITH_SERVER */    
 
     for(unsigned int i = 1; i < 4; i++)
     {

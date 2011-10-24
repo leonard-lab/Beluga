@@ -13,7 +13,6 @@
 
 #include "BelugaRobot.h"
 #include "BelugaTracker.h"
-#include "BelugaServer.h"
 
 /**********************************************************************
  * GUI Frame Class
@@ -23,7 +22,6 @@ class BelugaTrackerFrame : public MT_RobotFrameBase
 {
 protected:
     BelugaTracker* m_pBelugaTracker;
-    MT_Server* m_pServer;
 
 	double m_dGotoDist;
 	double m_dGotoMaxSpeed;
