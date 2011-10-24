@@ -6,10 +6,10 @@
 const std::string RobotNames[] = {"Beluga 1",
                                   "Beluga 2",
                                   "LifePreserver",
-                                  "N/A",
-                                  "N/A",
-                                  "N/A",
-                                  "N/A"};
+                                  "Dummy1",
+                                  "Dummy2",
+                                  "Dummy3",
+                                  "Dummy4"};
 
 
 const int NO_ROBOT = -1;
