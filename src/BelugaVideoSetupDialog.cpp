@@ -16,19 +16,25 @@
 class imageCanvas : public wxWindow
 {
 protected:
+    IplImage* m_pImage;
 	wxBitmap m_Bitmap;
 	int w, h;
 public:
 	imageCanvas(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size)
 		: wxWindow(parent, id, pos, size),
-		m_Bitmap(size.x, size.y),
-		w(size.x),
-		h(size.y)
+          m_pImage(NULL),
+          m_Bitmap(size.x, size.y),
+          w(size.x),
+          h(size.y)
 	{
 	};
 
 	~imageCanvas()
 	{
+        if(m_pImage)
+        {
+            cvReleaseImage(&m_pImage);
+        }
 	};
 
 	void OnPaint(wxPaintEvent& event)
@@ -41,7 +47,14 @@ public:
 
 	void setImage(IplImage* image)
 	{
-		wxImage tmp = wxImage(image->width, image->height, (unsigned char*)image->imageData, true);
+        if(!m_pImage || (m_pImage->width != image->width) || (m_pImage->height != image->height))
+        {
+            if(m_pImage){cvReleaseImage(&m_pImage);}
+            m_pImage = cvCreateImage(cvSize(image->width, image->height), IPL_DEPTH_8U, 3);
+        }
+        cvConvertImage(image, m_pImage, CV_CVTIMG_SWAP_RB );
+		wxImage tmp = wxImage(m_pImage->width, m_pImage->height,
+                              (unsigned char*)m_pImage->imageData, true);
 		m_Bitmap = wxBitmap(tmp.Scale(w,h));
 		this->Refresh();
 	}
