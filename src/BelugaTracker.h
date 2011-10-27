@@ -145,11 +145,13 @@ private:
 
     std::vector<double> m_vdTracked_X;
     std::vector<double> m_vdTracked_Y;
-	std::vector<double> m_vdTracked_Z;
 	std::vector<double> m_vdaTracked_XC[4];
 	std::vector<double> m_vdaTracked_YC[4];
+	std::vector<double> m_vdTracked_Z;
+    std::vector<double> m_vdTracked_ZDot;
+    std::vector<double> m_vdTracked_Speed;    
     std::vector<double> m_vdTracked_Heading;
-    std::vector<double> m_vdTracked_Speed;
+    std::vector<double> m_vdTracked_Omega;
 
 	std::vector<std::vector<double> > m_vvdMeas_X;
 	std::vector<std::vector<double> > m_vvdMeas_Y;

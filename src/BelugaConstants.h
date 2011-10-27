@@ -123,21 +123,6 @@ const unsigned char BELUGA_LINEFEED = 10;
 const unsigned int BELUGA_UP_BUTTON = 2;
 const unsigned int BELUGA_DOWN_BUTTON = 1;
 
-// TODO: This needs to be rectified w/ the above
-/* enum
- * {
- * 	BELUGA_STATE_X = 0,
- * 	BELUGA_STATE_Y,
- * 	BELUGA_STATE_Z,
- * 	BELUGA_STATE_HEADING,
- * 	BELUGA_STATE_SPEED,
- * 	BELUGA_STATE_ORIENTATION,
- * 
- * 	BELUGA_STATE_SIZE /\* must always be the last one *\/
- * }; */
-
-const unsigned int BELUGA_STATE_SIZE = 6; // TODO: remove
-
 enum
 {
 	BELUGA_CONTROL_FWD_SPEED = 0,
@@ -149,9 +134,9 @@ enum
 
 enum
 {
-	BELUGA_MEASUREMENT_DEPTH = 0,
+	BELUGA_ROBOT_MEASUREMENT_DEPTH = 0,
 
-	BELUGA_MEASUREMENT_SIZE /* must always be the last one */
+	BELUGA_ROBOT_MEASUREMENT_SIZE /* must always be the last one */
 };
 
 

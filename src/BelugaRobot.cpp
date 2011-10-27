@@ -52,12 +52,12 @@ void Beluga::doCommonInit()
     m_dTurnDeadBand = BELUGA_DEFAULT_TURN_DEADBAND;
     m_dVertSpeed = 0;
 
+	m_vdState.resize(BELUGA_NUM_STATES, 0.0),
+	m_vdControls.resize(BELUGA_CONTROL_SIZE, 0.0),
+
     /* Adding these as an MT_DataGroup enables GUI adjustment and
      * persistence via XML.  The XML file is keyed on the robot name,
      * so the robot name needs to be unique */
-	m_vdState.resize(BELUGA_STATE_SIZE, 0.0),
-	m_vdControls.resize(BELUGA_CONTROL_SIZE, 0.0),
-
     m_pParameters = new MT_DataGroup(std::string(m_sName));
     m_pParameters->AddDouble("Max Speed",
                              &m_dMaxSpeed,
@@ -92,8 +92,6 @@ void Beluga::doCommonInit()
 
 }
 
-/* function to construct a vertical speed command.  speed is a signed
- * double number */
 void Beluga::Update(std::vector<double> state)
 {
 	SetState(state);
@@ -101,8 +99,11 @@ void Beluga::Update(std::vector<double> state)
 
 void Beluga::SetState(std::vector<double> state)
 {
-	if(state.size() != BELUGA_STATE_SIZE)
+	if(state.size() != BELUGA_NUM_STATES)
 	{
+        fprintf(stderr, "Beluga Error:  Supplied state size is the wrong size in SetState."
+                "  Expect %d, got %ld.  Ignoring this update.\n",
+                BELUGA_NUM_STATES, (unsigned long) state.size());
 		return;
 	}
 
@@ -116,9 +117,8 @@ std::vector<double> Beluga::GetState()
 
 std::vector<double> Beluga::GetMeasurements()
 {
-	std::vector<double> r;
-	r.resize(1);
-	r[0] = m_dDepth;
+	std::vector<double> r(BELUGA_ROBOT_MEASUREMENT_SIZE);
+	r[BELUGA_ROBOT_MEASUREMENT_DEPTH] = m_dDepth;
 	return r;
 }
 
@@ -134,13 +134,16 @@ double Beluga::GetY() const
 
 double Beluga::GetTheta() const
 {
-	return m_vdState[BELUGA_STATE_ORIENTATION];
+	return m_vdState[BELUGA_STATE_THETA];
 }
 
 void Beluga::SetControl(std::vector<double> u)
 {
 	if(u.size() != BELUGA_CONTROL_SIZE)
 	{
+        fprintf(stderr, "Beluga Error:  Supplied control size is the wrong size in SetControl."
+                "  Expect %d, got %ld.  Ignoring this control.\n",
+                BELUGA_CONTROL_SIZE, (unsigned long) u.size());
 		return;
 	}
 

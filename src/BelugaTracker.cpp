@@ -139,8 +139,10 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_vdTracked_X(0),
       m_vdTracked_Y(0),
       m_vdTracked_Z(0),
+      m_vdTracked_ZDot(0),
+      m_vdTracked_Speed(0),      
       m_vdTracked_Heading(0),
-      m_vdTracked_Speed(0),
+      m_vdTracked_Omega(0),
       m_vvdMeas_X(0),
       m_vvdMeas_Y(0),
       m_vvdMeas_Hdg(0),
@@ -294,16 +296,20 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     m_vdTracked_X.resize(m_iNObj);
     m_vdTracked_Y.resize(m_iNObj);
     m_vdTracked_Z.resize(m_iNObj);
+    m_vdTracked_ZDot.resize(m_iNObj);
+    m_vdTracked_Speed.resize(m_iNObj);    
     m_vdTracked_Heading.resize(m_iNObj);
-    m_vdTracked_Speed.resize(m_iNObj);
+    m_vdTracked_Omega.resize(m_iNObj);
     for(unsigned int i = 0; i < m_iNObj; i++)
     {
         /* assume we start on the surface */
-        m_vdTracked_Z[i] = m_dWaterDepth;
         m_vdTracked_X[i] = 0;
         m_vdTracked_Y[i] = 0;
+        m_vdTracked_Z[i] = m_dWaterDepth;
+        m_vdTracked_ZDot[i] = 0;
         m_vdTracked_Speed[i] = 0;
         m_vdTracked_Heading[i] = 0;
+        m_vdTracked_Omega[i] = 0;
     }
 	m_vvdMeas_X.resize(m_iNObj);
 	m_vvdMeas_Y.resize(m_iNObj);
@@ -606,9 +612,11 @@ void BelugaTracker::initDataFile()
 
     m_XDF.addDataStream("Tracked X", "tracked_x.dat");
     m_XDF.addDataStream("Tracked Y", "tracked_y.dat");  
-    m_XDF.addDataStream("Tracked Z", "tracked_z.dat");  
-    m_XDF.addDataStream("Tracked Heading", "tracked_heading.dat");    
-    m_XDF.addDataStream("Tracked Speed", "tracked_speed.dat");
+    m_XDF.addDataStream("Tracked Z", "tracked_z.dat");
+    m_XDF.addDataStream("Tracked ZDot", "tracked_zdot.dat");
+    m_XDF.addDataStream("Tracked Speed", "tracked_speed.dat");    
+    m_XDF.addDataStream("Tracked Heading", "tracked_heading.dat");
+    m_XDF.addDataStream("Tracked Omega", "tracked_omega.dat");
 
 	m_XDF.addDataStream("Tracked Camera X", "tracked_camera_x.dat");
 	m_XDF.addDataStream("Tracked Camera Y", "tracked_camera_y.dat");
@@ -665,9 +673,11 @@ void BelugaTracker::writeData()
 
     m_XDF.writeData("Tracked X"        , m_vdTracked_X); 
     m_XDF.writeData("Tracked Y"        , m_vdTracked_Y); 
-    m_XDF.writeData("Tracked Z"        , m_vdTracked_Z); 
+    m_XDF.writeData("Tracked Z"        , m_vdTracked_Z);
+    m_XDF.writeData("Tracked ZDot"     , m_vdTracked_ZDot);
+    m_XDF.writeData("Tracked Speed"    , m_vdTracked_Speed);     
     m_XDF.writeData("Tracked Heading"  , m_vdTracked_Heading); 
-    m_XDF.writeData("Tracked Speed"    , m_vdTracked_Speed); 
+    m_XDF.writeData("Tracked Omega"    , m_vdTracked_Omega); 
 
 	tmp1.resize(0);
 	tmp2.resize(0);
@@ -1422,11 +1432,13 @@ void BelugaTracker::doTracking(IplImage* frames[4])
             CvMat* x = m_vpUKF[i]->x;
 
             // MAYBE: move outside if
-            m_vdTracked_X[i] = cvGetReal2D(x, 0, 0);
-            m_vdTracked_Y[i] = cvGetReal2D(x, 1, 0);
-            m_vdTracked_Z[i] = cvGetReal2D(x, 2, 0);
-            m_vdTracked_Heading[i] = cvGetReal2D(x, 3, 0);
-            m_vdTracked_Speed[i] = cvGetReal2D(x, 4, 0);
+            m_vdTracked_X[i] = cvGetReal2D(x, BELUGA_STATE_X, 0);
+            m_vdTracked_Y[i] = cvGetReal2D(x, BELUGA_STATE_Y, 0);
+            m_vdTracked_Z[i] = cvGetReal2D(x, BELUGA_STATE_Z, 0);
+            m_vdTracked_ZDot[i] = cvGetReal2D(x, BELUGA_STATE_ZDOT, 0);
+            m_vdTracked_Speed[i] = cvGetReal2D(x, BELUGA_STATE_SPEED, 0);            
+            m_vdTracked_Heading[i] = cvGetReal2D(x, BELUGA_STATE_THETA, 0);
+            m_vdTracked_Omega[i] = cvGetReal2D(x, BELUGA_STATE_OMEGA, 0);
 
 /*			printf("tracked position, speed: %f, %f, %f\n", m_vdTracked_X[i], m_vdTracked_Y[i], m_vdTracked_Speed[i]);
 			printf("predicted position, speed: %f, %f, %f\n", cvGetReal2D(m_vpUKF[i]->x1, 0, 0),
@@ -1452,13 +1464,14 @@ std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
 		return r;
 	}
 
-	r.resize(BELUGA_STATE_SIZE);
+	r.resize(BELUGA_NUM_STATES);
 	r[BELUGA_STATE_X] = m_vdTracked_X[i];
 	r[BELUGA_STATE_Y] = m_vdTracked_Y[i];
 	r[BELUGA_STATE_Z] = m_vdTracked_Z[i];
+    r[BELUGA_STATE_ZDOT] = m_vdTracked_ZDot[i];
+	r[BELUGA_STATE_SPEED] = m_vdTracked_Speed[i];    
 	r[BELUGA_STATE_HEADING] = m_vdTracked_Heading[i];
-	r[BELUGA_STATE_SPEED] = m_vdTracked_Speed[i];
-	r[BELUGA_STATE_ORIENTATION] = m_vdTracked_Heading[i];
+	r[BELUGA_STATE_ORIENTATION] = m_vdTracked_Omega[i];
 
 	return r;
 }
