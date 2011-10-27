@@ -3,52 +3,6 @@
 
 #include "MT_Robot.h"
 
-const double BELUGA_MAX_SPEED = 45;
-const double BELUGA_MAX_VERT_SPEED = 45;
-const double BELUGA_MAX_TURN = 68.5;
-const double BELUGA_DEFAULT_SPEED_DEADBAND = 0.05;
-const double BELUGA_DEFAULT_TURN_DEADBAND = 0.05;
-
-const unsigned int BELUGA_SERVO_MIN = 0;
-const unsigned int BELUGA_SERVO_MAX = 137;
-
-const unsigned int BELUGA_MAX_COMMAND_LENGTH = 30;
-
-
-const unsigned char BELUGA_LINEFEED = 10;
-
-/* UP / DOWN buttons (windows only) */
-const unsigned int BELUGA_UP_BUTTON = 2;
-const unsigned int BELUGA_DOWN_BUTTON = 1;
-
-enum
-{
-	BELUGA_STATE_X = 0,
-	BELUGA_STATE_Y,
-	BELUGA_STATE_Z,
-	BELUGA_STATE_HEADING,
-	BELUGA_STATE_SPEED,
-	BELUGA_STATE_ORIENTATION,
-
-	BELUGA_STATE_SIZE /* must always be the last one */
-};
-
-enum
-{
-	BELUGA_CONTROL_FWD_SPEED = 0,
-	BELUGA_CONTROL_STEERING,
-	BELUGA_CONTROL_VERT_SPEED,
-
-	BELUGA_CONTROL_SIZE /* must always be the last one */
-};
-
-enum
-{
-	BELUGA_MEASUREMENT_DEPTH = 0,
-
-	BELUGA_MEASUREMENT_SIZE /* must always be the last one */
-};
-
 class Beluga : public MT_RobotBase
 {
 public:

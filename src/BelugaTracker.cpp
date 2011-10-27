@@ -5,21 +5,11 @@
 #include "TrackerExtras.h"
 #include "BelugaDynamics.h"
 
-/* default parameter values */
-const unsigned int DEFAULT_BG_THRESH = 60;
-const double DEFAULT_MIN_BLOB_PERIMETER = 10;   
-const double DEFAULT_MIN_BLOB_AREA = 10;        
-const double DEFAULT_MAX_BLOB_PERIMETER = 1000; 
-const double DEFAULT_MAX_BLOB_AREA = 1000;
-const unsigned int DEFAULT_SEARCH_AREA_PADDING = 100;
+#include "BelugaConstants.h"
 
-const unsigned int DEFAULT_V_THRESH = 40;
-const unsigned int DEFAULT_H_THRESH_HIGH = 130;
-const unsigned int DEFAULT_H_THRESH_LOW = 10;
-const unsigned int DEFAULT_S_THRESH_LOW = 0;
-const unsigned int DEFAULT_S_THRESH_HIGH = 255;
 
-const double DEFAULT_WATER_DEPTH = 2.286;
+/* used for readability of grabbing the last row of a CvMat */
+#define LAST_ROW(a_cv_mat) (a_cv_mat)->rows - 1
 
 /* default color to draw blobs */
 const MT_Color DEFAULT_BLOB_COLOR = MT_Red;
@@ -41,6 +31,7 @@ const bool BELUGA_DO_ASSERT = false;
  * do this instead */
 //#define VFLIP
 
+/* TODO:  This could be in MT */
 template <class T>
 int indexInVector(const std::vector<T>& v, const T& value)
 {
@@ -104,14 +95,22 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
       m_iStopFrame(-1),
       m_vpUKF(n_obj, NULL),
       m_dSigmaPosition(DEFAULT_SIGMA_POSITION),
+      m_dSigmaZ(DEFAULT_SIGMA_Z),
+      m_dSigmaZDot(DEFAULT_SIGMA_ZDOT),
+      m_dSigmaSpeed(DEFAULT_SIGMA_SPEED),      
       m_dSigmaHeading(DEFAULT_SIGMA_HEADING),
-      m_dSigmaSpeed(DEFAULT_SIGMA_SPEED),
+      m_dSigmaOmega(DEFAULT_SIGMA_OMEGA),
       m_dSigmaPositionMeas(DEFAULT_SIGMA_POSITION_MEAS),
       m_dSigmaHeadingMeas(DEFAULT_SIGMA_HEADING_MEAS),
+      m_dSigmaZMeas(DEFAULT_SIGMA_Z_MEAS),
       m_dPrevSigmaPosition(0),
+      m_dPrevSigmaZ(0),
+      m_dPrevSigmaZDot(0),
+      m_dPrevSigmaSpeed(0),      
       m_dPrevSigmaHeading(0),
-      m_dPrevSigmaSpeed(0),
+      m_dPrevSigmaOmega(0),      
       m_dPrevSigmaPositionMeas(0),
+      m_dPrevSigmaZMeas(0),
       m_dPrevSigmaHeadingMeas(0),
       m_bShowBlobs(true),
       m_bShowTracking(true),
@@ -295,6 +294,17 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     m_vdTracked_X.resize(m_iNObj);
     m_vdTracked_Y.resize(m_iNObj);
     m_vdTracked_Z.resize(m_iNObj);
+    m_vdTracked_Heading.resize(m_iNObj);
+    m_vdTracked_Speed.resize(m_iNObj);
+    for(unsigned int i = 0; i < m_iNObj; i++)
+    {
+        /* assume we start on the surface */
+        m_vdTracked_Z[i] = m_dWaterDepth;
+        m_vdTracked_X[i] = 0;
+        m_vdTracked_Y[i] = 0;
+        m_vdTracked_Speed[i] = 0;
+        m_vdTracked_Heading[i] = 0;
+    }
 	m_vvdMeas_X.resize(m_iNObj);
 	m_vvdMeas_Y.resize(m_iNObj);
 	m_vviMeas_A.resize(m_iNObj);
@@ -313,8 +323,6 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_vviMeas_Cam[i].resize(0);
 		m_vvdMeas_Hdg[i].resize(0);
 	}
-    m_vdTracked_Heading.resize(m_iNObj);
-    m_vdTracked_Speed.resize(m_iNObj);
 
 	m_vdDepthMeasurement.resize(0);
 	m_vdSpeedCommand.resize(0);
@@ -418,16 +426,32 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
                        &m_dSigmaPosition,
                        MT_DATA_READWRITE,
                        0);
-    dg_blob->AddDouble("Heading Disturbance Sigma",
-                       &m_dSigmaHeading,
+    dg_blob->AddDouble("Vertical Disturbance Sigma",
+                       &m_dSigmaZ,
+                       MT_DATA_READWRITE,
+                       0);
+    dg_blob->AddDouble("Vertical Speed Disturbance Sigma",
+                       &m_dSigmaZDot,
                        MT_DATA_READWRITE,
                        0);
     dg_blob->AddDouble("Speed Disturbance Sigma",
                        &m_dSigmaSpeed,
                        MT_DATA_READWRITE,
                        0);
+    dg_blob->AddDouble("Heading Disturbance Sigma",
+                       &m_dSigmaHeading,
+                       MT_DATA_READWRITE,
+                       0);
+    dg_blob->AddDouble("Omega Disturbance Sigma",
+                       &m_dSigmaOmega,
+                       MT_DATA_READWRITE,
+                       0);
     dg_blob->AddDouble("Position Measurement Sigma",
                        &m_dSigmaPositionMeas,
+                       MT_DATA_READWRITE,
+                       0);
+    dg_blob->AddDouble("Z Measurement Sigma",
+                       &m_dSigmaZMeas,
                        MT_DATA_READWRITE,
                        0);
     dg_blob->AddDouble("Heading Measurement Sigma",
@@ -536,19 +560,20 @@ void BelugaTracker::createFrames()
     m_HungarianMatcher.doInit(m_iNObj);
 
     /* Initialize some of the matrices used for tracking */
-    m_pQ = cvCreateMat(5, 5, CV_64FC1);
-    m_pR = cvCreateMat(4, 4, CV_64FC1);
+    m_pQ = cvCreateMat(BELUGA_NUM_STATES, BELUGA_NUM_STATES, CV_64FC1);
+    m_pR = cvCreateMat(BELUGA_NUM_MEAS, BELUGA_NUM_MEAS, CV_64FC1);
     cvSetIdentity(m_pQ);
     cvSetIdentity(m_pR);
-    m_px0 = cvCreateMat(5, 1, CV_64FC1);
-    m_pz = cvCreateMat(4, 1, CV_64FC1);
+    m_px0 = cvCreateMat(BELUGA_NUM_STATES, 1, CV_64FC1);
+    m_pz = cvCreateMat(BELUGA_NUM_MEAS, 1, CV_64FC1);
 
     /* Create the UKF objects */
     m_vpUKF.resize(m_iNObj);
     for(int i = 0; i < m_iNObj; i++)
     {
-        m_vpUKF[i] = MT_UKFInit(5, 4, 0.1); /* 5 states, 4
-                                        * measurements, 0.1 is a parameter */
+        m_vpUKF[i] = MT_UKFInit(BELUGA_NUM_STATES,
+                                BELUGA_NUM_MEAS,
+                                BELUGA_UKF_ALPHA); 
     }
 
 } /* endof createFrames */
@@ -802,27 +827,34 @@ void BelugaTracker::updateUKFParameters()
        objects I'm not sure how else to do it. */ 
     if(
         m_dSigmaPosition != m_dPrevSigmaPosition ||
+        m_dSigmaZ != m_dPrevSigmaZ ||
+        m_dSigmaZDot != m_dPrevSigmaZDot ||
+        m_dSigmaSpeed != m_dPrevSigmaSpeed ||        
         m_dSigmaHeading != m_dPrevSigmaHeading ||
-        m_dSigmaSpeed != m_dPrevSigmaSpeed ||
+        m_dSigmaOmega != m_dPrevSigmaOmega ||
         m_dSigmaPositionMeas != m_dPrevSigmaPositionMeas ||
+        m_dSigmaZMeas != m_dPrevSigmaZMeas ||
         m_dSigmaHeadingMeas != m_dPrevSigmaHeadingMeas
         )
     {
         /* these are the diagonal entries of the "Q" matrix, which
            represents the variances of the process noise.  They're
            modeled here as being independent and uncorrellated. */
-        cvSetReal2D(m_pQ, 0, 0, m_dSigmaPosition*m_dSigmaPosition);
-        cvSetReal2D(m_pQ, 1, 1, m_dSigmaPosition*m_dSigmaPosition);
-        cvSetReal2D(m_pQ, 2, 2, m_dSigmaPosition*m_dSigmaPosition);
-        cvSetReal2D(m_pQ, 3, 3, m_dSigmaHeading*m_dSigmaHeading);
-        cvSetReal2D(m_pQ, 4, 4, m_dSigmaSpeed*m_dSigmaSpeed);        
+        cvSetReal2D(m_pQ, BELUGA_STATE_X, BELUGA_STATE_X, m_dSigmaPosition*m_dSigmaPosition);
+        cvSetReal2D(m_pQ, BELUGA_STATE_Y, BELUGA_STATE_Y, m_dSigmaPosition*m_dSigmaPosition);
+        cvSetReal2D(m_pQ, BELUGA_STATE_Z, BELUGA_STATE_Z, m_dSigmaZ*m_dSigmaZ);
+        cvSetReal2D(m_pQ, BELUGA_STATE_ZDOT, BELUGA_STATE_ZDOT, m_dSigmaZDot*m_dSigmaZDot);
+        cvSetReal2D(m_pQ, BELUGA_STATE_SPEED, BELUGA_STATE_SPEED, m_dSigmaSpeed*m_dSigmaSpeed);
+        cvSetReal2D(m_pQ, BELUGA_STATE_THETA, BELUGA_STATE_THETA, m_dSigmaHeading*m_dSigmaHeading);
+        cvSetReal2D(m_pQ, BELUGA_STATE_OMEGA, BELUGA_STATE_OMEGA, m_dSigmaOmega*m_dSigmaOmega);
 
         /* these are the diagonal entries of the "R matrix, also
            assumed to be uncorrellated. */
-        cvSetReal2D(m_pR, 0, 0, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
-        cvSetReal2D(m_pR, 1, 1, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
-        cvSetReal2D(m_pR, 3, 3, m_dSigmaHeadingMeas*m_dSigmaHeadingMeas);
-        cvSetReal2D(m_pR, 2, 2, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
+        cvSetReal2D(m_pR, BELUGA_MEAS_X, BELUGA_MEAS_X, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
+        cvSetReal2D(m_pR, BELUGA_MEAS_Y, BELUGA_MEAS_Y, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
+        cvSetReal2D(m_pR, BELUGA_MEAS_THETA, BELUGA_MEAS_THETA,
+                    m_dSigmaHeadingMeas*m_dSigmaHeadingMeas);
+        cvSetReal2D(m_pR, BELUGA_MEAS_Z, BELUGA_MEAS_Z, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
 
 		/* makes sure we only have to copy the numbers once - it will
 		 * automatically get copied again later if necessary */
@@ -833,9 +865,13 @@ void BelugaTracker::updateUKFParameters()
 		}
 
 		m_dPrevSigmaPosition = m_dSigmaPosition;
+        m_dPrevSigmaZ = m_dSigmaZ;
+        m_dPrevSigmaZDot = m_dSigmaZDot;
+		m_dPrevSigmaSpeed = m_dSigmaSpeed;        
 		m_dPrevSigmaHeading = m_dSigmaHeading;
-		m_dPrevSigmaSpeed = m_dSigmaSpeed;
+        m_dPrevSigmaOmega = m_dSigmaOmega;
 		m_dPrevSigmaPositionMeas = m_dSigmaPositionMeas;
+        m_dPrevSigmaZMeas = m_dSigmaZMeas;
 		m_dPrevSigmaHeadingMeas = m_dSigmaHeadingMeas;
 
         /* this step actually copies the Q and R matrices to the UKF
@@ -1047,7 +1083,9 @@ void BelugaTracker::updateObjectState(unsigned int obj_number)
         !CvMatIsOk(m_vpUKF[obj_number]->P)))
     {
         MT_UKFFree(&(m_vpUKF[obj_number]));
-        m_vpUKF[obj_number] = MT_UKFInit(5, m_pR->rows, 0.1);
+        m_vpUKF[obj_number] = MT_UKFInit(BELUGA_NUM_STATES,
+                                         m_pR->rows,
+                                         BELUGA_UKF_ALPHA);
         MT_UKFCopyQR(m_vpUKF[obj_number], m_pQ, m_pR);
         valid_meas = false;
     }
@@ -1087,42 +1125,55 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
 
     unsigned int nmeas = m_vvdMeas_X[obj_number].size();
     
+    /* build the control input vector to be used in the UKF */
+    CvMat* u = cvCreateMat(BELUGA_NUM_INPUTS, 0, CV_64FC1);
+    cvSetReal2D(u, BELUGA_INPUT_VERTICAL_SPEED, 0, m_vdVerticalCommand[obj_number]);
+    cvSetReal2D(u, BELUGA_INPUT_FORWARD_SPEED,  0, m_vdSpeedCommand[obj_number]);
+    cvSetReal2D(u, BELUGA_INPUT_STEERING,       0, m_vdTurnCommand[obj_number]);    
+    
     /* UKF prediction step, note we use function pointers to
        the beluga_dynamics and beluga_measurement functions defined
-       above.  The final parameter would be for the control input
-       vector, which we don't use here so we pass a NULL pointer */
-    // TODO: We should be using the control input
+       above.  */
+    BelugaDynamicsParameters::m_dDt = m_dDt;
+    BelugaDynamicsParameters::m_dWaterDepth = m_dWaterDepth;
     MT_UKFPredict(m_vpUKF[obj_number],
                   &beluga_dynamics,
                   &beluga_measurement,
-                  NULL);
+                  u);
 
     /* build the measurement vector */
     double x, y, z, th;
-    double th_prev = cvGetReal2D(m_vpUKF[obj_number]->x, 3, 0);
+    double th_prev = cvGetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_THETA, 0);
     unsigned int cam_no;
+    /* we're using the tracked Z to estimate position.  we could use
+     *  the depth measurement, but that would be more prone to errors */
+    double d_last = m_dWaterDepth - m_vdTracked_Z[obj_number];
     for(unsigned int j = 0; j < nmeas; j++)
     {
         cam_no = m_vviMeas_Cam[obj_number][j];
         m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
                                                             VFLIP m_vvdMeas_Y[obj_number][j],
-                                                            0, &x, &y, &z, false);
+                                                            d_last, &x, &y, &z, false);
         th = rectifyAngleMeasurement(m_vvdMeas_Hdg[obj_number][j],
                                      m_vdHistories_X[obj_number],
                                      m_vdHistories_Y[obj_number],
                                      N_hist,
                                      th_prev);
         m_vvdMeas_Hdg[obj_number][j] = MT_RAD2DEG*th;
-        cvSetReal2D(m_pz, j*3 + 0, 0, x);
-        cvSetReal2D(m_pz, j*3 + 1, 0, y);
-        cvSetReal2D(m_pz, j*3 + 2, 0, th);
+        cvSetReal2D(m_pz, j*(BELUGA_NUM_MEAS - 1) + BELUGA_MEAS_X, 0, x);
+        cvSetReal2D(m_pz, j*(BELUGA_NUM_MEAS - 1) + BELUGA_MEAS_Y, 0, y);
+        cvSetReal2D(m_pz, j*(BELUGA_NUM_MEAS - 1) + BELUGA_MEAS_THETA, 0, th);
     }
-    cvSetReal2D(m_pz, m_pz->rows - 1, 0, m_dWaterDepth);
+    double z_new = m_dWaterDepth - m_vdDepthMeasurement[obj_number];
+    cvSetReal2D(m_pz, LAST_ROW(m_pz), 0, z_new);
 
     MT_UKFSetMeasurement(m_vpUKF[obj_number], m_pz);
     MT_UKFCorrect(m_vpUKF[obj_number]);
 
-    constrain_state(m_vpUKF[obj_number]->x, m_vpUKF[obj_number]->x1, 10.0, m_dWaterDepth);
+    constrain_state(m_vpUKF[obj_number]->x,
+                    m_vpUKF[obj_number]->x1,
+                    BELUGA_TANK_RADIUS,
+                    m_dWaterDepth);
 }
 
 void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
@@ -1131,30 +1182,41 @@ void BelugaTracker::useAverageMeasurementForObject(unsigned int obj_number)
     
     double xavg = 0;
     double yavg = 0;
+    double zavg = 0;
     double qx = 0;
     double qy = 0;
     double x, y, z;
     unsigned int cam_no;
+    double d_last = m_dWaterDepth - m_vdTracked_Z[obj_number];    
     for(unsigned int j = 0; j < nmeas; j++)
     {
         cam_no = m_vviMeas_Cam[obj_number][j];
         m_CoordinateTransforms[cam_no].imageAndDepthToWorld(m_vvdMeas_X[obj_number][j],
                                                             VFLIP m_vvdMeas_Y[obj_number][j],
-                                                            0, &x, &y, &z, false);
+                                                            d_last, &x, &y, &z, false);
         xavg += x;
         yavg += y;
+        zavg += z;
         qx += cos(MT_DEG2RAD*m_vvdMeas_Hdg[obj_number][j]);
         qy += sin(MT_DEG2RAD*m_vvdMeas_Hdg[obj_number][j]);
     }
     xavg /= (double) nmeas;
     yavg /= (double) nmeas;
+    zavg /= (double) nmeas;
     double th = atan2(qy, qx);
 
-    cvSetReal2D(m_vpUKF[obj_number]->x, 0, 0, xavg);
-    cvSetReal2D(m_vpUKF[obj_number]->x, 1, 0, yavg);
-    cvSetReal2D(m_vpUKF[obj_number]->x, 2, 0, m_dWaterDepth);
-    cvSetReal2D(m_vpUKF[obj_number]->x, 3, 0, th);
-    cvSetReal2D(m_vpUKF[obj_number]->x, 4, 0, 0);
+    // MAYBE:  We're using the last known depth here.  We could
+    // concievably use the depth measurements, since we're calling
+    // this function mainly when we don't have valid tracking data but
+    // we may have valid depth data.
+    
+    cvSetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_X, 0, xavg);
+    cvSetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_Y, 0, yavg);
+    cvSetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_Z, 0, zavg);
+    cvSetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_ZDOT, 0, 0);
+    cvSetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_SPEED, 0, 0);    
+    cvSetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_THETA, 0, th);
+    cvSetReal2D(m_vpUKF[obj_number]->x, BELUGA_STATE_OMEGA, 0, 0);
     m_vbLastMeasValid[obj_number] = true;
 }
 

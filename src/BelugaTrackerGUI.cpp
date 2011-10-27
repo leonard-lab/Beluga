@@ -1,7 +1,8 @@
-
 #include "BelugaTrackerGUI.h"
 
 #include "BelugaVideoSetupDialog.h"
+
+#include "BelugaConstants.h"
 
 const std::string RobotNames[] = {"Beluga 1",
                                   "Beluga 2",

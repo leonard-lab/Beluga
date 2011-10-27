@@ -8,11 +8,15 @@
 
 #include "CoordinateTransforms.h"
 
-const double DEFAULT_SIGMA_POSITION = 4.0; /* pixels */
-const double DEFAULT_SIGMA_HEADING = 0.26; /* rad ~= 15 deg */
-const double DEFAULT_SIGMA_SPEED = 1.0; /* pixels/frame */
-const double DEFAULT_SIGMA_POSITION_MEAS = 1.0; /* pixels */
-const double DEFAULT_SIGMA_HEADING_MEAS = 0.087; /* rad ~= 5 deg */
+const double DEFAULT_SIGMA_POSITION = 4.0; 
+const double DEFAULT_SIGMA_Z = 1.0;
+const double DEFAULT_SIGMA_ZDOT = 1.0;
+const double DEFAULT_SIGMA_SPEED = 0.1;
+const double DEFAULT_SIGMA_HEADING = 0.26; 
+const double DEFAULT_SIGMA_OMEGA = 2.6; 
+const double DEFAULT_SIGMA_POSITION_MEAS = 1.0;
+const double DEFAULT_SIGMA_Z_MEAS = 1.0; 
+const double DEFAULT_SIGMA_HEADING_MEAS = 0.087;
 
 
 /* we'll derive from the MT_DSGYA_Segmenter so that we can
@@ -102,16 +106,26 @@ private:
     CvMat* m_px0;
     CvMat* m_pz;
     double m_dSigmaPosition;
+    double m_dSigmaZ;
+    double m_dSigmaZDot;
+    double m_dSigmaSpeed;    
     double m_dSigmaHeading;
-    double m_dSigmaSpeed;
+    double m_dSigmaOmega;
+    
     double m_dSigmaPositionMeas;
-    double m_dSigmaHeadingMeas;
+    double m_dSigmaHeadingMeas;    
+    double m_dSigmaZMeas;
     
     double m_dPrevSigmaPosition;
+    double m_dPrevSigmaZ;
+    double m_dPrevSigmaZDot;
     double m_dPrevSigmaHeading;
     double m_dPrevSigmaSpeed;
+    double m_dPrevSigmaOmega;
+    
     double m_dPrevSigmaPositionMeas;
     double m_dPrevSigmaHeadingMeas;
+    double m_dPrevSigmaZMeas;    
 
     bool m_bShowBlobs;
     bool m_bShowTracking;

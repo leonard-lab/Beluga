@@ -3,6 +3,13 @@
 
 #include <cv.h>
 
+class BelugaDynamicsParameters
+{
+public:
+    static double m_dDt;
+    static double m_dWaterDepth;
+};
+
 void beluga_dynamics(const CvMat* x_k,
                           const CvMat* u_k,
                           const CvMat* v_k,

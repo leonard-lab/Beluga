@@ -1,7 +1,6 @@
 #include "BelugaRobot.h"
 
-/* Beluga doesn't use any handshaking on the COM port */
-const bool BELUGA_HANDSHAKING = false;
+#include "BelugaConstants.h"
 
 /* "Dummy" Constructor -- used for debugging only */
 Beluga::Beluga()

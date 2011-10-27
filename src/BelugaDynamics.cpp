@@ -1,6 +1,28 @@
 #include "BelugaDynamics.h"
 
+#include "BelugaConstants.h"
+
 #include "MT/MT_Core/support/mathsupport.h"
+
+double BelugaDynamicsParameters::m_dDt = 1.0;
+double BelugaDynamicsParameters::m_dWaterDepth = DEFAULT_WATER_DEPTH;
+
+double check_nan(double value, double predicted, double default_val)
+{
+    double value_out = value;
+    if(MT_isnan(value))
+    {
+        if(MT_isnan(predicted))
+        {
+            value_out = default_val;
+        }
+        else
+        {
+            value_out = predicted;
+        }
+    }
+    return value_out;
+}
 
 /* This is the state mapping used by the Unscented Kalman Filter
  * (UKF).  I.e.
@@ -22,30 +44,71 @@ void beluga_dynamics(const CvMat* x_k,
                           const CvMat* v_k,
                           CvMat* x_kplus1)
 {
-    /* Assuming that the time-step is one frame rather than e.g.
-     * 33 msec - I take the actual time step into account in
-     * analysis. */
-    double dT = 1.0;
+    // TODO: We need the RIGHT dt
+    double dT = BelugaDynamicsParameters::m_dDt;
 
-    /* cvGetReal2D is useful to get an element of a 2D matrix
-     * cvGetReal2D(x_k, i, j) gets the (i,k)^th element
-     * Note that x_k is a 4x1 matrix here */
-    double x = cvGetReal2D(x_k, 0, 0);
-    double y = cvGetReal2D(x_k, 1, 0);
-	double z = cvGetReal2D(x_k, 2, 0);
-    double hdg = cvGetReal2D(x_k, 3, 0); /* heading [rad] */
-    double spd = cvGetReal2D(x_k, 4, 0); /* speed */
+    double x     = cvGetReal2D(x_k, BELUGA_STATE_X, 0);
+    double y     = cvGetReal2D(x_k, BELUGA_STATE_Y, 0);
+    double z     = cvGetReal2D(x_k, BELUGA_STATE_Z, 0);
+    double zdot  = cvGetReal2D(x_k, BELUGA_STATE_ZDOT, 0);
+    double v     = cvGetReal2D(x_k, BELUGA_STATE_SPEED, 0);
+    double theta = cvGetReal2D(x_k, BELUGA_STATE_THETA, 0);
+    double omega = cvGetReal2D(x_k, BELUGA_STATE_OMEGA, 0);
 
-    /* position(t + 1) = position(t) + dT*velocity */
-    x += dT*spd*cos(hdg);
-    y += dT*spd*sin(hdg);
+    double u_z = 0;
+    double u_h = 0;
+    double u_steer = 0;
+    if(u_k)
+    {
+        u_z		= cvGetReal2D(u_k, BELUGA_INPUT_VERTICAL_SPEED, 0);
+		u_h		= cvGetReal2D(u_k, BELUGA_INPUT_FORWARD_SPEED, 0);
+		u_steer = cvGetReal2D(u_k, BELUGA_INPUT_STEERING, 0);
+    }
 
+    /* horizontal dynamics */
+    x += dT*v*cos(theta);
+    y += dT*v*sin(theta);
+
+    /* vdot dynamics */
+    double vdot = (K_t*u_h - K_d1*v)/m_eff;
+    v += dT*vdot;
+
+    /* steering dynamics */
+    theta += dT*omega;
+
+    double omegadot = (r_1*u_steer*K_t*u_h - K_omega*omega)/J;
+    omega += dT*omegadot;
+
+    /* vertical dynamics */
+    z += dT*zdot;
+    double u_up = 0;
+    double u_down = 0;
+    // MAYBE: is this sign right?
+    if(u_h > 0)
+    {
+        u_up = u_h;
+        u_down = 0;
+    }
+    else
+    {
+        u_down = u_h;
+        u_up = 0;
+    }
+    double v_vert_inv = 1.0/(fabs(zdot) + v_off);
+    double zddot = (1/m_eff)*(eta_up*v_vert_inv*(u_up*u_up + k_vp*u_up)
+                              + eta_down*v_vert_inv*(u_down + k_vp*u_down)
+                              - k_d*fabs(zdot)*zdot
+                              + k_teth*(z_off - z));
+    zdot += dT*zddot;
+    
     /* works just like cvGetReal2D */
-    cvSetReal2D(x_kplus1, 0, 0, x);
-    cvSetReal2D(x_kplus1, 1, 0, y);
-    cvSetReal2D(x_kplus1, 2, 0, z);
-    cvSetReal2D(x_kplus1, 3, 0, hdg);
-    cvSetReal2D(x_kplus1, 4, 0, fabs(spd));
+    cvSetReal2D(x_kplus1, BELUGA_STATE_X, 0, x);
+	cvSetReal2D(x_kplus1, BELUGA_STATE_Y, 0, y);
+	cvSetReal2D(x_kplus1, BELUGA_STATE_Z, 0, z);
+	cvSetReal2D(x_kplus1, BELUGA_STATE_ZDOT, 0, zdot);
+	cvSetReal2D(x_kplus1, BELUGA_STATE_SPEED, 0, v);
+	cvSetReal2D(x_kplus1, BELUGA_STATE_THETA, 0, theta);
+	cvSetReal2D(x_kplus1, BELUGA_STATE_OMEGA, 0, omega);
 
     /* this allows v_k to be a NULL pointer, in which case
      * this step is skipped */
@@ -63,8 +126,8 @@ void beluga_dynamics(const CvMat* x_k,
  * In this case, z is a vector with (x,y) position and heading and
  * noise is additive. */
 void beluga_measurement(const CvMat* x_k,
-                             const CvMat* n_k,
-                             CvMat* z_k)
+                        const CvMat* n_k,
+                        CvMat* z_k)
 {
 	unsigned int nrows = z_k->rows;
 	unsigned int nmeas = (nrows-1)/3;
@@ -78,17 +141,49 @@ void beluga_measurement(const CvMat* x_k,
 	/* measurement should be (x, y, theta) repeated nmeas times then z */
 	for(unsigned int i = 0; i < nmeas; i++)
 	{
-		cvSetReal2D(z_k, 3*i+0, 0, cvGetReal2D(x_k, 0, 0));
-		cvSetReal2D(z_k, 3*i+1, 0, cvGetReal2D(x_k, 1, 0));
-		cvSetReal2D(z_k, 3*i+2, 0, cvGetReal2D(x_k, 3, 0));
-	}
-    cvSetReal2D(z_k, nrows-1, 0, cvGetReal2D(x_k, 2, 0));
+        double x = cvGetReal2D(x_k, BELUGA_STATE_X, 0);
+        double y = cvGetReal2D(x_k, BELUGA_STATE_Y, 0);
+        double theta = cvGetReal2D(x_k, BELUGA_STATE_THETA, 0);
 
-    /* as above, skip this step when n_k is null */
+        double x_noise = 0;
+        double y_noise = 0;
+        double theta_noise = 0;
+        if(n_k)
+        {
+            x_noise = cvGetReal2D(n_k, (BELUGA_NUM_MEAS-1)*i + BELUGA_MEAS_X, 0);
+            y_noise = cvGetReal2D(n_k, (BELUGA_NUM_MEAS-1)*i + BELUGA_MEAS_Y, 0);
+            theta_noise = cvGetReal2D(n_k, (BELUGA_NUM_MEAS-1)*i + BELUGA_MEAS_THETA, 0);
+        }
+
+        x += x_noise;
+        y += y_noise;
+        theta += theta_noise;
+        
+		cvSetReal2D(z_k, (BELUGA_NUM_MEAS-1)*i+BELUGA_MEAS_X,     0, x);
+		cvSetReal2D(z_k, (BELUGA_NUM_MEAS-1)*i+BELUGA_MEAS_Y,     0, y);
+		cvSetReal2D(z_k, (BELUGA_NUM_MEAS-1)*i+BELUGA_MEAS_THETA, 0, theta);
+	}
+    double z = cvGetReal2D(x_k, BELUGA_STATE_Z, 0);    
+    double z_noise = 0;
     if(n_k)
     {
-        cvAdd(z_k, n_k, z_k);
+        /* z noise will be the last element */
+        z_noise = cvGetReal2D(n_k, n_k->rows - 1, 0);
     }
+
+    z += z_noise;
+    if(z < 0)
+    {
+        z = 0;
+    }
+
+    // MAYBE: not strictly necessary
+    if(z > BelugaDynamicsParameters::m_dWaterDepth)
+    {
+        z = BelugaDynamicsParameters::m_dWaterDepth;
+    }
+    
+    cvSetReal2D(z_k, nrows-1, 0, z);
 }
 
 /* Using this function below to constrain the state estimate.  The
@@ -104,21 +199,34 @@ void beluga_measurement(const CvMat* x_k,
  *          0, speed is set to 0.1 
  */
 void constrain_state(CvMat* x_k,
-                            CvMat* X_p,
-							double tank_radius,
-							double water_depth)
+                     CvMat* X_p,
+                     double tank_radius,
+                     double water_depth)
 {
-    double x = cvGetReal2D(x_k, 0, 0);
-    double y = cvGetReal2D(x_k, 1, 0);
-    double z = cvGetReal2D(x_k, 2, 0);
-    double hdg = cvGetReal2D(x_k, 3, 0);
-    double spd = cvGetReal2D(x_k, 4, 0);
+    double x     = cvGetReal2D(x_k, BELUGA_STATE_X, 0);
+    double y     = cvGetReal2D(x_k, BELUGA_STATE_Y, 0);
+    double z     = cvGetReal2D(x_k, BELUGA_STATE_Z, 0);
+    double zdot  = cvGetReal2D(x_k, BELUGA_STATE_ZDOT, 0);
+    double speed = cvGetReal2D(x_k, BELUGA_STATE_SPEED, 0);
+    double theta = cvGetReal2D(x_k, BELUGA_STATE_THETA, 0);
+    double omega = cvGetReal2D(x_k, BELUGA_STATE_OMEGA, 0);    
 
-    double x_p = cvGetReal2D(X_p, 0, 0);
-    double y_p = cvGetReal2D(X_p, 1, 0);
-    double z_p = cvGetReal2D(X_p, 2, 0);
-    double hdg_p = cvGetReal2D(X_p, 3, 0);
-    double spd_p = cvGetReal2D(X_p, 4, 0);
+    double x_p     = cvGetReal2D(X_p, BELUGA_STATE_X, 0);
+	double y_p	   = cvGetReal2D(X_p, BELUGA_STATE_Y, 0);
+	double z_p	   = cvGetReal2D(X_p, BELUGA_STATE_Z, 0);
+	double zdot_p  = cvGetReal2D(X_p, BELUGA_STATE_ZDOT, 0);
+	double speed_p = cvGetReal2D(X_p, BELUGA_STATE_SPEED, 0);
+	double theta_p = cvGetReal2D(X_p, BELUGA_STATE_THETA, 0);
+	double omega_p = cvGetReal2D(X_p, BELUGA_STATE_OMEGA, 0);	 
+
+
+    x = check_nan(x, x_p, 0);
+    y = check_nan(y, y_p, 0);
+    z = check_nan(z, z_p, water_depth);
+    zdot = check_nan(zdot, zdot_p, 0);
+    speed = check_nan(speed, speed_p, 0.1);
+    theta = check_nan(theta, theta_p, 0);
+    omega = check_nan(omega, omega_p, 0);
 
 	if(x*x + y*y > tank_radius)
 	{
@@ -128,68 +236,18 @@ void constrain_state(CvMat* x_k,
 	}
 
     z = MT_CLAMP(z, 0, water_depth);
-    spd = MT_CLAMP(spd, 0, 100);
-
-    /* MT_isnan(x) returns true if x is NaN */
-    if(MT_isnan(x))
-    {
-        if(!MT_isnan(x_p))
-        {
-            x = x_p;
-        }
-        else
-        {
-            x = 0;
-        }
-    }
-    if(MT_isnan(y))
-    {
-        if(!MT_isnan(y_p))
-        {
-            y = y_p;
-        }
-        else
-        {
-            y = 0;
-        }
-    }
-    if(MT_isnan(z))
-    {
-        if(!MT_isnan(z_p))
-        {
-            z = z_p;
-        }
-        else
-        {
-            z = water_depth;
-        }
-    }
-    if(MT_isnan(hdg))
-    {
-        if(!MT_isnan(hdg_p))
-        {
-            hdg = hdg_p;
-        }
-        else
-        {
-            hdg = 0;
-        }
-    }
-    if(MT_isnan(spd))
-    {
-        if(!MT_isnan(spd_p))
-        {
-            spd = spd_p;
-        }
-        else
-        {
-            spd = 0.1;            
-        }
-    }
+    zdot = MT_CLAMP(zdot, -BELUGA_CONSTRAINT_MAX_VERTICAL_SPEED,
+                    BELUGA_CONSTRAINT_MAX_VERTICAL_SPEED);
+    speed = MT_CLAMP(speed, 0, BELUGA_CONSTRAINT_MAX_SPEED);
+    omega = MT_CLAMP(omega, -BELUGA_CONSTRAINT_MAX_TURN_RATE,
+                     BELUGA_CONSTRAINT_MAX_TURN_RATE);
     
-    cvSetReal2D(x_k, 0, 0, x);
-    cvSetReal2D(x_k, 1, 0, y);
-    cvSetReal2D(x_k, 2, 0, z);
-    cvSetReal2D(x_k, 3, 0, hdg);
-    cvSetReal2D(x_k, 4, 0, fabs(spd));
+    cvSetReal2D(x_k, BELUGA_STATE_X, 0, x);		 
+	cvSetReal2D(x_k, BELUGA_STATE_Y, 0, y);		 
+	cvSetReal2D(x_k, BELUGA_STATE_Z, 0, z);		 
+	cvSetReal2D(x_k, BELUGA_STATE_ZDOT, 0, zdot);		 
+	cvSetReal2D(x_k, BELUGA_STATE_SPEED, 0, speed);	 
+	cvSetReal2D(x_k, BELUGA_STATE_THETA, 0, theta);	 
+	cvSetReal2D(x_k, BELUGA_STATE_OMEGA, 0, omega);	 
+                
 }
