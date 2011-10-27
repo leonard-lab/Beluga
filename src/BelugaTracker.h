@@ -105,6 +105,7 @@ private:
     CvMat* m_pR;
     CvMat* m_px0;
     CvMat* m_pz;
+    CvMat* m_pu;
     double m_dSigmaPosition;
     double m_dSigmaZ;
     double m_dSigmaZDot;

@@ -125,6 +125,7 @@ BelugaTracker::BelugaTracker(IplImage* ProtoFrame, unsigned int n_obj)
 	  m_pR(NULL),
 	  m_px0(NULL),
 	  m_pz(NULL),
+      m_pu(NULL),
       m_pTempFrame1(NULL),
       m_pUndistortMapX(NULL),
       m_pUndistortMapY(NULL),
@@ -168,6 +169,7 @@ BelugaTracker::~BelugaTracker()
     /* cvReleaseMat deallocates matrices given to it */
     cvReleaseMat(&m_px0);
     cvReleaseMat(&m_pz);
+    cvReleaseMat(&m_pu);    
     cvReleaseMat(&m_pQ);
     cvReleaseMat(&m_pR);
 
@@ -330,10 +332,11 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
 		m_vvdMeas_Hdg[i].resize(0);
 	}
 
-	m_vdDepthMeasurement.resize(0);
-	m_vdSpeedCommand.resize(0);
-	m_vdVerticalCommand.resize(0);
-	m_vdTurnCommand.resize(0);
+	m_vdDepthMeasurement.resize(m_iNObj, 0.0);
+    
+	m_vdSpeedCommand.resize(m_iNObj, 0.0);
+	m_vdVerticalCommand.resize(m_iNObj, 0.0);
+	m_vdTurnCommand.resize(m_iNObj, 0.0);
 
     /* these don't need to be resized to 4 because they're
      * straight arrays, not std::vectors */
@@ -572,7 +575,8 @@ void BelugaTracker::createFrames()
     cvSetIdentity(m_pR);
     m_px0 = cvCreateMat(BELUGA_NUM_STATES, 1, CV_64FC1);
     m_pz = cvCreateMat(BELUGA_NUM_MEAS, 1, CV_64FC1);
-
+    m_pu = cvCreateMat(BELUGA_NUM_INPUTS, 1, CV_64FC1);
+    
     /* Create the UKF objects */
     m_vpUKF.resize(m_iNObj);
     for(int i = 0; i < m_iNObj; i++)
@@ -1134,12 +1138,12 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
 {
 
     unsigned int nmeas = m_vvdMeas_X[obj_number].size();
-    
+
     /* build the control input vector to be used in the UKF */
-    CvMat* u = cvCreateMat(BELUGA_NUM_INPUTS, 0, CV_64FC1);
-    cvSetReal2D(u, BELUGA_INPUT_VERTICAL_SPEED, 0, m_vdVerticalCommand[obj_number]);
-    cvSetReal2D(u, BELUGA_INPUT_FORWARD_SPEED,  0, m_vdSpeedCommand[obj_number]);
-    cvSetReal2D(u, BELUGA_INPUT_STEERING,       0, m_vdTurnCommand[obj_number]);    
+    cvSetReal2D(m_pu, BELUGA_INPUT_VERTICAL_SPEED, 0, m_vdVerticalCommand[obj_number]);
+    cvSetReal2D(m_pu, BELUGA_INPUT_FORWARD_SPEED,  0, m_vdSpeedCommand[obj_number]);
+    cvSetReal2D(m_pu, BELUGA_INPUT_STEERING,       0, m_vdTurnCommand[obj_number]);
+
     
     /* UKF prediction step, note we use function pointers to
        the beluga_dynamics and beluga_measurement functions defined
@@ -1149,7 +1153,7 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
     MT_UKFPredict(m_vpUKF[obj_number],
                   &beluga_dynamics,
                   &beluga_measurement,
-                  u);
+                  m_pu);
 
     /* build the measurement vector */
     double x, y, z, th;
