@@ -185,6 +185,8 @@ private:
 	void calculateTrackedPositionsInCameras();
 	void calculatePositionOfObjectInCamera(unsigned int obj_num, unsigned int cam_num, double* u, double* v);
 
+	void dumpStates(unsigned int i);
+
     ////////////////////////////////////////////////////////////
     /* functions that get called during each tracking step */
     

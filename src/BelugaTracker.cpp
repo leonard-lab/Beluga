@@ -7,6 +7,8 @@
 
 #include "BelugaConstants.h"
 
+/* uncomment to see extra output from the tracker in the console */
+#define DEBUG_VERBOSE
 
 /* used for readability of grabbing the last row of a CvMat */
 #define LAST_ROW(a_cv_mat) (a_cv_mat)->rows - 1
@@ -1139,12 +1141,15 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
 
     unsigned int nmeas = m_vvdMeas_X[obj_number].size();
 
+#ifdef DEBUG_VERBOSE
+	printf("Applying UKF to object %d with %d measurements\n", obj_number, nmeas);
+#endif // DEBUG_VERBOSE
+
     /* build the control input vector to be used in the UKF */
     cvSetReal2D(m_pu, BELUGA_INPUT_VERTICAL_SPEED, 0, m_vdVerticalCommand[obj_number]);
     cvSetReal2D(m_pu, BELUGA_INPUT_FORWARD_SPEED,  0, m_vdSpeedCommand[obj_number]);
     cvSetReal2D(m_pu, BELUGA_INPUT_STEERING,       0, m_vdTurnCommand[obj_number]);
 
-    
     /* UKF prediction step, note we use function pointers to
        the beluga_dynamics and beluga_measurement functions defined
        above.  */
@@ -1444,10 +1449,10 @@ void BelugaTracker::doTracking(IplImage* frames[4])
             m_vdTracked_Heading[i] = cvGetReal2D(x, BELUGA_STATE_THETA, 0);
             m_vdTracked_Omega[i] = cvGetReal2D(x, BELUGA_STATE_OMEGA, 0);
 
-/*			printf("tracked position, speed: %f, %f, %f\n", m_vdTracked_X[i], m_vdTracked_Y[i], m_vdTracked_Speed[i]);
-			printf("predicted position, speed: %f, %f, %f\n", cvGetReal2D(m_vpUKF[i]->x1, 0, 0),
-				cvGetReal2D(m_vpUKF[i]->x1, 1, 0),
-				cvGetReal2D(m_vpUKF[i]->x1, 4, 0)); */
+#ifdef DEBUG_VERBOSE
+			dumpStates(i);
+#endif // DEBUG_VERBOSE
+
 		}
 
 		calculateTrackedPositionsInCameras();
@@ -1455,6 +1460,23 @@ void BelugaTracker::doTracking(IplImage* frames[4])
 
 	writeData();
 
+}
+
+void BelugaTracker::dumpStates(unsigned int i)
+{
+	CvMat* xp = m_vpUKF[i]->x1;
+	printf("\t\t x\ty\tz\tzdot\tspd\ttheta\tomega\n");
+	printf("T:\t\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\n", 
+		m_vdTracked_X[i], m_vdTracked_Y[i], m_vdTracked_Z[i], m_vdTracked_ZDot[i],
+		m_vdTracked_Speed[i], m_vdTracked_Heading[i], m_vdTracked_Omega[i]);
+	printf("P:\t\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\n", 
+		cvGetReal2D(xp, BELUGA_STATE_X, 0), 
+		cvGetReal2D(xp, BELUGA_STATE_Y, 0), 
+		cvGetReal2D(xp, BELUGA_STATE_Z, 0), 
+		cvGetReal2D(xp, BELUGA_STATE_ZDOT, 0), 
+		cvGetReal2D(xp, BELUGA_STATE_SPEED, 0), 
+		cvGetReal2D(xp, BELUGA_STATE_THETA, 0), 
+		cvGetReal2D(xp, BELUGA_STATE_OMEGA, 0));
 }
 
 std::vector<double> BelugaTracker::getBelugaState(unsigned int i)

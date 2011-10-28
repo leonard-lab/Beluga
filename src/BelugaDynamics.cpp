@@ -84,7 +84,7 @@ void beluga_dynamics(const CvMat* x_k,
     double u_up = 0;
     double u_down = 0;
     // MAYBE: is this sign right?
-    if(u_h > 0)
+    if(u_h < 0)
     {
         u_up = u_h;
         u_down = 0;

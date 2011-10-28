@@ -99,7 +99,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                const wxSize& size,     
                                long style)
   : MT_RobotFrameBase(parent, id, title, pos, size, style),
-    m_iNToTrack(2),
+    m_iNToTrack(1),
 	m_dGotoDist(50.0),
 	m_dGotoMaxSpeed(15.0),
 	m_dGotoTurningGain(25.0),
@@ -306,9 +306,9 @@ void BelugaTrackerFrame::setRobotTimer(int period_msec)
 
 void BelugaTrackerFrame::doUserStep()
 {
-    printf("DUS %ld\n", wxThread::GetCurrentId());
+    //printf("DUS %ld\n", wxThread::GetCurrentId());
 	MT_RobotFrameBase::doUserStep();
-    printf("DUS-done\n");
+    //printf("DUS-done\n");
 }
 
 void BelugaTrackerFrame::acquireFrames()
@@ -329,15 +329,18 @@ void BelugaTrackerFrame::acquireFrames()
 
 void BelugaTrackerFrame::runTracker()
 {
-    printf("Tracker\n");
+    //printf("Tracker\n");
     /* TODO: refactor */
 	if(m_pCameraFrames[0])
 	{
 		std::vector<double> depth, speed, vert, turn, u, z;
-		depth.resize(0);
-		speed.resize(0);
-		vert.resize(0);
-		turn.resize(0);
+
+		/* we want values for each object we're tracking, even if
+         * we don't have actual values - a value of zero should be OK */
+		depth.resize(m_iNToTrack, 0.0);
+		speed.resize(m_iNToTrack, 0.0);
+		vert.resize(m_iNToTrack, 0.0);
+		turn.resize(m_iNToTrack, 0.0);
 
 		int ti;
 		for(unsigned int i = 0; i < MT_MAX_NROBOTS; i++)
@@ -346,12 +349,12 @@ void BelugaTrackerFrame::runTracker()
 			if(ti != MT_NOT_TRACKED)
 			{
 				z = m_Robots[i]->GetMeasurements();
-				depth.push_back(z[BELUGA_ROBOT_MEASUREMENT_DEPTH]);
+				depth[ti] = 0;//z[BELUGA_ROBOT_MEASUREMENT_DEPTH];
 
 				u = m_Robots[i]->GetControl();
-				speed.push_back(u[BELUGA_CONTROL_FWD_SPEED]);
-				vert.push_back(u[BELUGA_CONTROL_VERT_SPEED]);
-				turn.push_back(u[BELUGA_CONTROL_STEERING]);
+				speed[ti] = u[BELUGA_CONTROL_FWD_SPEED];
+				vert[ti] = u[BELUGA_CONTROL_VERT_SPEED];
+				turn[ti] = u[BELUGA_CONTROL_STEERING];
 			}
 		}
 		m_pBelugaTracker->setRobotData(depth, speed, vert, turn);
