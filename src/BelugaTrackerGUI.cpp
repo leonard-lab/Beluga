@@ -15,7 +15,8 @@ const std::string RobotNames[] = {"Beluga 1",
 
 const int NO_ROBOT = -1;
 
-const unsigned int FRAME_PERIOD_MSEC = 200;
+const unsigned int FRAME_PERIOD_MSEC = 50;
+const unsigned int ROBOT_FRAME_PERIOD_MSEC = 200;
 
 enum
 {
@@ -74,6 +75,20 @@ void parseCommandFromSocket(std::string cmd, int* id, double* x, double* y, doub
 }
 
 /**********************************************************************
+ * Robot Timer Class
+ *********************************************************************/
+
+BelugaRobotTimer::BelugaRobotTimer(BelugaTrackerFrame* parent_frame)
+    : m_pFrame(parent_frame)
+{
+}
+
+void BelugaRobotTimer::Notify()
+{
+    if(m_pFrame){m_pFrame->doRobotTimedEvents();}
+}
+
+/**********************************************************************
  * GUI Frame Class
  *********************************************************************/
 
@@ -97,7 +112,10 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_dGotoXW(0),
 	m_dGotoYW(0),
 	m_bCamerasReady(false),
-	m_bConnectSocket(false)
+	m_bConnectSocket(false),
+    m_pRobotTimer(NULL),
+    m_iRobotFramePeriod_msec(ROBOT_FRAME_PERIOD_MSEC),
+    m_bDoRobotTimedEvents(false)
 {
 	for(unsigned int i = 0; i < 4; i++)
 	{
@@ -108,6 +126,10 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 
 BelugaTrackerFrame::~BelugaTrackerFrame()
 {
+    if(m_pRobotTimer)
+    {
+        delete m_pRobotTimer;
+    }
 }
 
 void BelugaTrackerFrame::doUserQuit()
@@ -197,6 +219,11 @@ void BelugaTrackerFrame::initUserData()
                             
     /* TODO: separate robot and tracking timers */
     setTimer(FRAME_PERIOD_MSEC);
+
+    m_pRobotTimer = new BelugaRobotTimer(this);
+    setRobotTimer(ROBOT_FRAME_PERIOD_MSEC);
+    
+
 }
 
 void BelugaTrackerFrame::writeUserXML()
@@ -254,9 +281,34 @@ MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* na
     return thebot;
 }
 
+void BelugaTrackerFrame::setRobotTimer(int period_msec)
+{
+	if(!m_pRobotTimer)
+	{
+        fprintf(stderr, "BelugaTrackerFrame Error: No robot timer "
+                "and setRobotTimer was called.  Ignoring.\n");
+		return;
+	}
+
+	if((period_msec == 0) && (m_iRobotFramePeriod_msec == 0))
+	{
+		m_iRobotFramePeriod_msec = MT_DEFAULT_FRAME_PERIOD;
+	}
+
+	if(period_msec > 0)
+	{
+		m_iRobotFramePeriod_msec = period_msec;
+	}
+
+	m_bDoRobotTimedEvents = true;
+	m_pRobotTimer->Start(m_iRobotFramePeriod_msec);
+}
+
 void BelugaTrackerFrame::doUserStep()
 {
+    printf("DUS %ld\n", wxThread::GetCurrentId());
 	MT_RobotFrameBase::doUserStep();
+    printf("DUS-done\n");
 }
 
 void BelugaTrackerFrame::acquireFrames()
@@ -277,6 +329,7 @@ void BelugaTrackerFrame::acquireFrames()
 
 void BelugaTrackerFrame::runTracker()
 {
+    printf("Tracker\n");
     /* TODO: refactor */
 	if(m_pCameraFrames[0])
 	{
@@ -443,6 +496,11 @@ void BelugaTrackerFrame::initTracker()
 
 	setTimer(FRAME_PERIOD_MSEC);
 
+}
+
+void BelugaTrackerFrame::doRobotTimedEvents()
+{
+    printf("Robot - %ld\n", wxThread::GetCurrentId());
 }
 
 void BelugaTrackerFrame::updateRobotStatesFromTracker()
