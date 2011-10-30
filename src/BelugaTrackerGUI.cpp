@@ -311,36 +311,97 @@ void BelugaTrackerFrame::runTracker()
 
 		m_pBelugaTracker->doTracking(m_pCameraFrames);
 
-		if(m_bConnectSocket && !m_Socket.IsConnected())
-		{
-			wxIPV4address addr;
-			addr.Hostname(wxT("127.0.0.1"));
-			addr.Service(1234);
-
-			m_Socket.Connect(addr, false);
-			m_Socket.WaitOnConnect(2);
-			if(!m_Socket.IsConnected())
-			{
-				MT_ShowErrorDialog(this, wxT("Could not connect to IPC server."));
-				m_bConnectSocket = false;
-			}
-			else
-			{
-				std::string serverMessage = readLineFromSocket(&m_Socket);
-				printf("Success connecting to IPC server, server says:\n%s\n", serverMessage.c_str());
-			}
-		}
-		if(!m_bConnectSocket && m_Socket.IsConnected())
-		{
-			m_Socket.Close();
-		}
-
 	}
 
 }
 
+bool BelugaTrackerFrame::tryIPCConnect()
+{
+    // TODO:  replace with rhubarb code
+
+    bool connected = false;
+    
+    wxIPV4address addr;
+    addr.Hostname(wxT("127.0.0.1"));
+    addr.Service(1234);
+
+    m_Socket.Connect(addr, false);
+    m_Socket.WaitOnConnect(2);
+    if(!m_Socket.IsConnected())
+    {
+        MT_ShowErrorDialog(this, wxT("Could not connect to IPC server."));
+        connected = false;
+    }
+    else
+    {
+        std::string serverMessage = readLineFromSocket(&m_Socket);
+        printf("Success connecting to IPC server, server says:\n%s\n", serverMessage.c_str());
+        connected = true;
+    }
+    
+    return connected;
+}
+
+void BelugaTrackerFrame::manageIPCConnection()
+{
+    /* determine if we need to establish a connection */
+    if(m_bConnectSocket && !m_Socket.IsConnected())
+    {
+        m_bConnectSocket = tryIPCConnect();
+    }
+
+    /* or we need to close the connection */
+    if(!m_bConnectSocket && m_Socket.IsConnected())
+    {
+        m_Socket.Close();
+    }
+}
+
+void BelugaTrackerFrame::doIPCExchange()
+{
+    manageIPCConnection();
+
+	if(m_Socket.IsConnected())
+	{
+
+        /* TODO: update wrt new server protocol */
+		std::ostringstream ss;
+		ss << "set position";
+		for(int i = 0; i < m_iNToTrack; i++)
+		{
+			ss << " " << i;
+			ss << " " << m_pBelugaTracker->getBelugaX(i);
+			ss << " " << m_pBelugaTracker->getBelugaY(i);
+			ss << " " << m_pBelugaTracker->getBelugaZ(i);
+		}
+		writeLineToSocket(ss.str().c_str(), &m_Socket);
+		std::string response = readLineFromSocket(&m_Socket);
+		writeLineToSocket("get command 0", &m_Socket);
+		response = readLineFromSocket(&m_Socket);
+		int id = -1;
+		double x = -100;
+		double y = -100;
+		double z = -100;
+		parseCommandFromSocket(response, &id, &x, &y, &z);
+
+		if(id == 0)
+		{
+			if(x != m_dGotoXW || y!= m_dGotoYW)
+			{
+				m_dGotoXW = x;
+				m_dGotoYW = y;
+				m_pBelugaTracker->getCameraXYFromWorldXYandDepth(&m_iGotoCam, &m_dGotoXC, &m_dGotoYC, m_dGotoXW, m_dGotoYW, 0, false);
+			}
+		}
+	}
+    
+}
+
 void BelugaTrackerFrame::doUserControl()
 {
+
+    doIPCExchange();
+    
 	std::vector<double> u;
 	u.resize(BELUGA_CONTROL_SIZE, 0.0);
 
@@ -476,37 +537,6 @@ void BelugaTrackerFrame::updateRobotStatesFromTracker()
         }
     }
 
-	if(m_Socket.IsConnected())
-	{
-		std::ostringstream ss;
-		ss << "set position";
-		for(int i = 0; i < m_iNToTrack; i++)
-		{
-			ss << " " << i;
-			ss << " " << m_pBelugaTracker->getBelugaX(i);
-			ss << " " << m_pBelugaTracker->getBelugaY(i);
-			ss << " " << m_pBelugaTracker->getBelugaZ(i);
-		}
-		writeLineToSocket(ss.str().c_str(), &m_Socket);
-		std::string response = readLineFromSocket(&m_Socket);
-		writeLineToSocket("get command 0", &m_Socket);
-		response = readLineFromSocket(&m_Socket);
-		int id = -1;
-		double x = -100;
-		double y = -100;
-		double z = -100;
-		parseCommandFromSocket(response, &id, &x, &y, &z);
-
-		if(id == 0)
-		{
-			if(x != m_dGotoXW || y!= m_dGotoYW)
-			{
-				m_dGotoXW = x;
-				m_dGotoYW = y;
-				m_pBelugaTracker->getCameraXYFromWorldXYandDepth(&m_iGotoCam, &m_dGotoXC, &m_dGotoYC, m_dGotoXW, m_dGotoYW, 0, false);
-			}
-		}
-	}
 }
 
 bool BelugaTrackerFrame::doSlaveKeyboardCallback(wxKeyEvent& event, int slave_index)

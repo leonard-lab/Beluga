@@ -65,6 +65,9 @@ protected:
 	void acquireFrames();
 	void runTracker();
 
+    void manageIPCConnection();
+    bool tryIPCConnect();
+
 public:
     BelugaTrackerFrame(wxFrame* parent,
                          wxWindowID id = wxID_ANY,
@@ -88,6 +91,8 @@ public:
 	void doUserControl();
 	void doUserGLDrawing();
 	void doSlaveGLDrawing(int slave_index);
+
+    void doIPCExchange();
 
     void readUserXML();
     void writeUserXML();
