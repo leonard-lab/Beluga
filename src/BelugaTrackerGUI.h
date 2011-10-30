@@ -15,25 +15,6 @@
 #include "BelugaTracker.h"
 
 /**********************************************************************
- * Robot Timer Class
- *
- * The tracker runs on a timer that is inherited with
- * MT_RobotFrameBase.  We use a separate timer for the robots so that
- * the two can run at different rates.  The robots can't update too
- * fast or they'll have COM issues, whereas the tracker can run much
- * faster.
- *********************************************************************/
-class BelugaTrackerFrame;
-class BelugaRobotTimer : public wxTimer
-{
-private:
-    BelugaTrackerFrame* m_pFrame;
-public:
-    BelugaRobotTimer(BelugaTrackerFrame* parent_frame);
-    void Notify();
-};
-
-/**********************************************************************
  * GUI Frame Class
  *********************************************************************/
 
@@ -41,8 +22,6 @@ class BelugaTrackerFrame : public MT_RobotFrameBase
 {
 protected:
     BelugaTracker* m_pBelugaTracker;
-
-    BelugaRobotTimer* m_pRobotTimer;
 
 	double m_dGotoDist;
 	double m_dGotoMaxSpeed;
@@ -85,9 +64,6 @@ protected:
 
 	void acquireFrames();
 	void runTracker();
-    void setRobotTimer(int period_msec);
-    int m_iRobotFramePeriod_msec;
-    bool m_bDoRobotTimedEvents;
 
 public:
     BelugaTrackerFrame(wxFrame* parent,
