@@ -7,7 +7,8 @@ Beluga::Beluga()
     : MT_RobotBase("Anonymous"),
       m_COMPort("stderr", BELUGA_HANDSHAKING),
       m_sPort("stderr"),
-      m_bIsConnected(false)
+      m_bIsConnected(false),
+      m_dMinCommandPeriod_msec(BELUGA_MIN_COMMAND_PERIOD_MSEC)
 {
     doCommonInit();
 }
@@ -59,6 +60,10 @@ void Beluga::doCommonInit()
      * persistence via XML.  The XML file is keyed on the robot name,
      * so the robot name needs to be unique */
     m_pParameters = new MT_DataGroup(std::string(m_sName));
+    m_pParameters->AddDouble("Min Command Period msec",
+                             &m_dMinCommandPeriod_msec,
+                             MT_DATA_READWRITE,
+                             BELUGA_MIN_COMMAND_PERIOD_MSEC);
     m_pParameters->AddDouble("Max Speed",
                              &m_dMaxSpeed,
                              MT_DATA_READWRITE,
@@ -192,28 +197,36 @@ void Beluga::SendCommand(const char* command)
 	m_vdControls[BELUGA_CONTROL_FWD_SPEED] = f;
 	m_vdControls[BELUGA_CONTROL_STEERING] = t;
 	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = v;
-
-    /* uncomment to see output in console */
-	//printf("Sending %s\n", cmd);
     
-    m_COMPort.SendCommand(cmd);
+    /* command rate throttling */
+    static double t_last_command = MT_getTimeSec();
+    double t_now = MT_getTimeSec();
+    if(1000.0*(t_now - t_last_command) > m_dMinCommandPeriod_msec)
+    {
+        t_last_command = MT_getTimeSec();
+        
+        /* uncomment to see output in console */
+        //printf("Sending %s\n", cmd);
 
-	int r;
-	r = m_COMPort.ReadData(m_ucDepthByte, 6);
+        m_COMPort.SendCommand(cmd);
+
+        int r;
+        r = m_COMPort.ReadData(m_ucDepthByte, 6);
 
 /*	printf("Got %d %d %d %d %d %d %d\n", 
-		r,
-		m_ucDepthByte[0], 
-		m_ucDepthByte[1], 
-		m_ucDepthByte[2], 
-		m_ucDepthByte[3],
-        m_ucDepthByte[4],
-		m_ucDepthByte[5]); */
-	m_ucDepthByte[4] = 0;
-	int d;
-	sscanf((const char*) m_ucDepthByte, "%d", &d);
-	m_dDepth = d;
-	printf("\t -> %f\n", m_dDepth);
+    r,
+    m_ucDepthByte[0], 
+    m_ucDepthByte[1], 
+    m_ucDepthByte[2], 
+    m_ucDepthByte[3],
+    m_ucDepthByte[4],
+    m_ucDepthByte[5]); */
+        m_ucDepthByte[4] = 0;
+        int d;
+        sscanf((const char*) m_ucDepthByte, "%d", &d);
+        m_dDepth = d;
+        printf("\t -> %f\n", m_dDepth);
+    }
 }
 
 double Beluga::getDepth()

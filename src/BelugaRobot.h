@@ -58,6 +58,8 @@ private:
     double m_dTurnDeadBand;
 
     double m_dVertSpeed;
+
+    double m_dMinCommandPeriod_msec;
     
 };
 
