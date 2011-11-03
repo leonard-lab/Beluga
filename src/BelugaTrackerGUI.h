@@ -67,6 +67,7 @@ protected:
 
     void manageIPCConnection();
     bool tryIPCConnect();
+    void sendRobotDataToTracker();
 
 public:
     BelugaTrackerFrame(wxFrame* parent,

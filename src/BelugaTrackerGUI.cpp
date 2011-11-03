@@ -277,40 +277,42 @@ void BelugaTrackerFrame::acquireFrames()
 	}
 }
 
+void BelugaTrackerFrame::sendRobotDataToTracker()
+{
+    std::vector<double> depth, speed, vert, turn, u, z;
+
+    /* we want values for each object we're tracking, even if
+     * we don't have actual values - a value of zero should be OK */
+    depth.resize(m_iNToTrack, 0.0);
+    speed.resize(m_iNToTrack, 0.0);
+    vert.resize(m_iNToTrack, 0.0);
+    turn.resize(m_iNToTrack, 0.0);
+
+    int ti;
+    for(unsigned int i = 0; i < MT_MAX_NROBOTS; i++)
+    {
+        ti = m_Robots.TrackingIndex[i];
+        if(ti != MT_NOT_TRACKED)
+        {
+            z = m_Robots[i]->GetMeasurements();
+            depth[ti] = 0;//z[BELUGA_ROBOT_MEASUREMENT_DEPTH];
+
+            u = m_Robots[i]->GetControl();
+            speed[ti] = u[BELUGA_CONTROL_FWD_SPEED];
+            vert[ti] = u[BELUGA_CONTROL_VERT_SPEED];
+            turn[ti] = u[BELUGA_CONTROL_STEERING];
+        }
+    }
+    m_pBelugaTracker->setRobotData(depth, speed, vert, turn);    
+}
+
 void BelugaTrackerFrame::runTracker()
 {
     //printf("Tracker\n");
-    /* TODO: refactor */
 	if(m_pCameraFrames[0])
 	{
-		std::vector<double> depth, speed, vert, turn, u, z;
-
-		/* we want values for each object we're tracking, even if
-         * we don't have actual values - a value of zero should be OK */
-		depth.resize(m_iNToTrack, 0.0);
-		speed.resize(m_iNToTrack, 0.0);
-		vert.resize(m_iNToTrack, 0.0);
-		turn.resize(m_iNToTrack, 0.0);
-
-		int ti;
-		for(unsigned int i = 0; i < MT_MAX_NROBOTS; i++)
-		{
-			ti = m_Robots.TrackingIndex[i];
-			if(ti != MT_NOT_TRACKED)
-			{
-				z = m_Robots[i]->GetMeasurements();
-				depth[ti] = 0;//z[BELUGA_ROBOT_MEASUREMENT_DEPTH];
-
-				u = m_Robots[i]->GetControl();
-				speed[ti] = u[BELUGA_CONTROL_FWD_SPEED];
-				vert[ti] = u[BELUGA_CONTROL_VERT_SPEED];
-				turn[ti] = u[BELUGA_CONTROL_STEERING];
-			}
-		}
-		m_pBelugaTracker->setRobotData(depth, speed, vert, turn);
-
+        sendRobotDataToTracker();
 		m_pBelugaTracker->doTracking(m_pCameraFrames);
-
 	}
 
 }
