@@ -8,16 +8,29 @@
 const bool mt_CONTROLLER_DO_GC = true;
 const bool mt_CONTROLLER_NO_GC = false;
 
+/* mt_dVector_t and mt_dVectorCollection_t are typedefs defined in ControlLaw.h.
+ * they are just shorthand for std::vector<double> and
+ * std::vector<std::vector<double>>, i.e., vector-of-doubles and
+ * vector-of-vector-of-doubles, respectively. */
+const mt_dVector_t mt_CONTROLLER_EMPTY_VECTOR = std::vector<double>(0,0.0);
+const mt_dVectorCollection_t mt_CONTROLLER_EMPTY_DBL_VECTOR = std::vector<mt_dVector_t>(0);
+
 typedef std::deque<mt_ControlLaw*> mt_pControlLawContainer_t;
 
 class mt_Controller {
 public:
     mt_Controller();
-    virtual ~mt_Controller();
-        
-    void doControl();
+    ~mt_Controller();
 
-    mt_dVector_t calculateControlFor(unsigned int bot_num);
+    mt_dVectorCollection_t doControl(const mt_dVectorCollection_t& states,
+                                     const mt_dVectorCollection_t& pre_inputs
+                                     = mt_CONTROLLER_EMPTY_DBL_VECTOR);
+
+    const mt_ControlLaw* getControlLaw(unsigned int bot_num, unsigned int law_num) const;
+
+    mt_dVector_t calculateControlFor(unsigned int bot_num,
+                                     const mt_dVector_t& state,
+                                     const mt_dVector_t& u_to_now = mt_CONTROLLER_EMPTY_VECTOR);
 
     unsigned int getNumControlInputsFor(unsigned int bot_num) const;
     unsigned int getNumLawsFor(unsigned int bot_num) const;
@@ -64,8 +77,8 @@ public:
 protected:
     mt_dVector_t runControlLaw(unsigned int bot_num,
                                unsigned int law_num,
-                               const mt_dVector_t& u_to_now,
-                               const mt_dVector_t& state);
+                               const mt_dVector_t& state,
+                               const mt_dVector_t& u_to_now);
     
     std::vector<mt_pControlLawContainer_t> m_vqpControlLaws;
 

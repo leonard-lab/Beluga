@@ -37,19 +37,52 @@ bool mt_Controller::addManagedControlLaw(mt_ControlLaw* c)
     return true;
 }
 
-void mt_Controller::doControl()
+const mt_ControlLaw* mt_Controller::getControlLaw(unsigned int bot_num, unsigned int law_num) const
 {
+    if(bot_num >= getNumBots())
+    {
+        fprintf(stderr, "mt_Controller::getControlLaw error.  Requested "
+                "controller for bot %d. Only have %d\n",
+                bot_num, getNumBots());
+        return NULL;
+    }
+    if(law_num > getNumLawsFor(bot_num))
+    {
+        fprintf(stderr, "mt_Controller::getControlLaw error.  Requested "
+                "law %d for bot %d, but bot %d only has %d laws.\n",
+                law_num, bot_num, bot_num, getNumLawsFor(bot_num));
+        return NULL;
+    }
+    return m_vqpControlLaws[bot_num][law_num];
+}
+
+/* Note: It may be more efficient to pass in an already-allocated input
+ * and return a reference to that same variable.  I've chosen not
+ * to do that because we aren't experiencing any major performance
+ * issues. */
+mt_dVectorCollection_t mt_Controller::doControl(const mt_dVectorCollection_t& states,
+                                                const mt_dVectorCollection_t& pre_inputs)
+{
+    mt_dVectorCollection_t control_out(getNumBots(), mt_CONTROLLER_EMPTY_VECTOR);
     for(unsigned int bot_num = 0; bot_num < getNumBots(); bot_num++)
     {
-        mt_dVector_t control_for_bot = calculateControlFor(bot_num);
+        control_out[bot_num] = calculateControlFor(bot_num,
+                                                   states[bot_num],
+                                                   pre_inputs[bot_num]);
     }
 }
 
-mt_dVector_t mt_Controller::calculateControlFor(unsigned int bot_num)
+mt_dVector_t mt_Controller::calculateControlFor(unsigned int bot_num,
+                                     const mt_dVector_t& state,
+                                     const mt_dVector_t& u_in)
 {
-    mt_dVector_t u_to_now(getNumControlInputsFor(bot_num), 0.0);
-    mt_dVector_t state(0, 0.0); // TODO: how do we know how big the
-                                // state is?
+    unsigned int m = getNumControlInputsFor(bot_num);
+    mt_dVector_t u_to_now(m, 0.0);
+    if(u_in.size() == m)
+    {
+        u_to_now = u_in;
+    }
+    
     for(unsigned int law_num = 0; law_num < getNumLawsFor(bot_num); law_num++)
     {
         u_to_now = runControlLaw(bot_num, law_num, u_to_now, state);
@@ -101,10 +134,10 @@ unsigned int mt_Controller::getNumBots() const
 
 mt_dVector_t mt_Controller::runControlLaw(unsigned int bot_num,
                                           unsigned int law_num,
-                                          const mt_dVector_t& u_to_now,
-                                          const mt_dVector_t& state)
+                                          const mt_dVector_t& state,
+                                          const mt_dVector_t& u_to_now)
 {
-    return m_vqpControlLaws[bot_num][law_num]->doControl(u_to_now, state);
+    return m_vqpControlLaws[bot_num][law_num]->doControl(state, u_to_now);
 }
 
 bool mt_Controller::ensureControlLawProperties(unsigned int bot_num,

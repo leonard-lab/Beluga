@@ -7,6 +7,7 @@
 
 // shorthand for a vector of doubles
 typedef std::vector<double> mt_dVector_t;
+typedef std::vector<mt_dVector_t> mt_dVectorCollection_t;
 
 class mt_ControlUIEvent
 {
@@ -67,8 +68,8 @@ public:
 
     bool getNumControlInputs() const {return m_iNumControlInputs;};
 
-    mt_dVector_t doControl(const mt_dVector_t& u_to_now,
-                           const mt_dVector_t& state)
+    mt_dVector_t doControl(const mt_dVector_t& state,
+                           const mt_dVector_t& u_to_now)
     {return u_to_now;};
 
     /* for garbage collection */
