@@ -43,7 +43,11 @@ set(APP_SRC
   src/TrackerExtras.cpp
   src/BelugaDynamics.h
   src/BelugaDynamics.cpp
-  src/BelugaConstants.h)
+  src/BelugaConstants.h
+  src/ControlLaw.cpp
+  src/ControlLaw.h
+  src/Controller.cpp
+  src/Controller.h)
 
 # adds src to the header search path
 include_directories(src)
