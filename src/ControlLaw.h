@@ -14,13 +14,13 @@ class mt_ControlLaw
 public:
     mt_ControlLaw(unsigned int num_control_inputs, unsigned int num_parameters);
 
-    bool setParameters(const mt_dVector_t& new_params);
-    mt_dVector_t getParameters() const;
+    virtual bool setParameters(const mt_dVector_t& new_params);
+    virtual mt_dVector_t getParameters() const;
 
-    bool getNumControlInputs() const {return m_iNumControlInputs;};
+    virtual bool getNumControlInputs() const {return m_iNumControlInputs;};
 
-    mt_dVector_t doControl(const mt_dVector_t& state,
-                           const mt_dVector_t& u_to_now)
+    virtual mt_dVector_t doControl(const mt_dVector_t& state,
+                                   const mt_dVector_t& u_to_now)
     {return u_to_now;};
 
     std::string getName() const {return s_sName;};
