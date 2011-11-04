@@ -8,18 +8,21 @@ mt_ControlUIEvent::mt_ControlUIEvent(eventType type,
                                      double screenY,
                                      double worldX,
                                      double worldY,
-                                     int camera_id)
+                                     int camera_id,
+                                     int event_info)
     : m_eventType(type),
       m_dScreenX(screenX),
       m_dScreenY(screenY),
       m_dWorldX(worldX),
       m_dWorldY(worldY),
-      m_iCameraID(camera_id)
+      m_iCameraID(camera_id),
+      m_iEventInfo(event_info)
 {
 }
 
 
-mt_ControlUIEvent mt_ControlUIEvent::keyboardEvent(double screenX,
+mt_ControlUIEvent mt_ControlUIEvent::keyboardEvent(char key,
+                                                   double screenX,
                                                    double screenY,
                                                    double worldX,
                                                    double worldY,
@@ -28,7 +31,8 @@ mt_ControlUIEvent mt_ControlUIEvent::keyboardEvent(double screenX,
     return mt_ControlUIEvent(keyboard, screenX, screenY, worldX, worldY, camera_id);
 }
     
-mt_ControlUIEvent mt_ControlUIEvent::mouseEvent(double screenX,
+mt_ControlUIEvent mt_ControlUIEvent::mouseEvent(mouseEventInfo button,
+                                                double screenX,
                                                 double screenY,
                                                 double worldX,
                                                 double worldY,

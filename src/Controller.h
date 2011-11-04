@@ -32,7 +32,6 @@ public:
                                      const mt_dVector_t& state,
                                      const mt_dVector_t& u_to_now = mt_CONTROLLER_EMPTY_VECTOR);
 
-
     mt_dVector_t getParameters(unsigned int bot_num, unsigned int law_num) const;
     bool setParameters(unsigned int bot_num,
                        unsigned int law_num,

@@ -12,17 +12,27 @@ typedef std::vector<mt_dVector_t> mt_dVectorCollection_t;
 class mt_ControlUIEvent
 {
 public:
-    enum eventType { none, keyboard, mouse };
+    enum eventType { none = 0, keyboard, mouse };
+    enum mouseEventInfo { none = 0,
+                          left_button,
+                          middle_button,
+                          right_button };
+                          
 
     mt_ControlUIEvent(eventType type,
                       double screenX,
                       double screenY,
                       double worldX = 0,
                       double worldY = 0,
-                      int camera_id = 0);
+                      int camera_id = 0,
+                      int event_info = -1);
 
     bool isKeyboard() const {return m_eventType == keyboard;};
     bool isMouse() const {return m_eventType == mouse;};
+
+    bool isLeftMouse() const {return (m_eventType == mouse && m_iEventInfo == left_button);};
+    bool isMiddleMouse() const {return (m_eventType == mouse && m_iEventInfo == middle_button);};
+    bool isRightMouse() const {return (m_eventType == mouse && m_iEventInfo == right_button);};
 
     double getScreenX() const {return m_dScreenX;};
     double getScreenY() const {return m_dScreenY;};
@@ -32,13 +42,15 @@ public:
     int getCameraID() const {return m_iCameraID;};
 
     /* factory methods */
-    static mt_ControlUIEvent keyboardEvent(double screenX,
+    static mt_ControlUIEvent keyboardEvent(char key,
+                                           double screenX,
                                            double screenY,
                                            double worldX = 0,
                                            double worldY = 0,
                                            int camera_id = 0);
     
-    static mt_ControlUIEvent mouseEvent(double screenX,
+    static mt_ControlUIEvent mouseEvent(mouseEventInfo button,
+                                        double screenX,
                                         double screenY,
                                         double worldX = 0,
                                         double worldY = 0,
@@ -51,6 +63,8 @@ private:
     double m_dScreenY;
     double m_dWorldX;
     double m_dWorldY;
+
+    unsigned int m_iEventInfo;
 
     int m_iCameraID;
 };
