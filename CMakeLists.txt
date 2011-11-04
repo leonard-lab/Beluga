@@ -44,6 +44,8 @@ set(APP_SRC
   src/BelugaDynamics.h
   src/BelugaDynamics.cpp
   src/BelugaConstants.h
+  src/BelugaControl.cpp
+  src/BelugaControl.h
   src/ControlLaw.cpp
   src/ControlLaw.h
   src/Controller.cpp
