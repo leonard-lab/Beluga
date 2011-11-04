@@ -72,11 +72,14 @@ public:
                            const mt_dVector_t& u_to_now)
     {return u_to_now;};
 
+    std::string getName() const {return s_sName;};
+
     /* for garbage collection */
     unsigned int getControlLawID() const {return m_iID;};
 
 protected:
     mt_dVector_t m_vParameters;
+    static std::string s_sName;
     
 private:
     unsigned int m_iNumControlInputs;

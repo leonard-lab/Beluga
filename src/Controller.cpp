@@ -37,23 +37,65 @@ bool mt_Controller::addManagedControlLaw(mt_ControlLaw* c)
     return true;
 }
 
-const mt_ControlLaw* mt_Controller::getControlLaw(unsigned int bot_num, unsigned int law_num) const
+bool mt_Controller::validateBotAndLawNum(unsigned int bot_num, unsigned int law_num) const
 {
     if(bot_num >= getNumBots())
     {
-        fprintf(stderr, "mt_Controller::getControlLaw error.  Requested "
+        fprintf(stderr, "mt_Controller::validateBotAndLawNum error.  Requested "
                 "controller for bot %d. Only have %d\n",
                 bot_num, getNumBots());
-        return NULL;
+        return false;
     }
     if(law_num > getNumLawsFor(bot_num))
     {
-        fprintf(stderr, "mt_Controller::getControlLaw error.  Requested "
+        fprintf(stderr, "mt_Controller::validateBotAndLawNum error.  Requested "
                 "law %d for bot %d, but bot %d only has %d laws.\n",
                 law_num, bot_num, bot_num, getNumLawsFor(bot_num));
+        return false;
+    }
+    return true;
+}
+
+mt_ControlLaw* const mt_Controller::getControlLaw(unsigned int bot_num, unsigned int law_num) const
+{
+    if(!validateBotAndLawNum(bot_num, law_num))
+    {
+        fprintf(stderr, "\t In mt_Controller::getControlLaw\n");
         return NULL;
     }
     return m_vqpControlLaws[bot_num][law_num];
+}
+
+mt_dVector_t mt_Controller::getParameters(unsigned int bot_num, unsigned int law_num) const
+{
+    if(!validateBotAndLawNum(bot_num, law_num))
+    {
+        fprintf(stderr, "\t In mt_Controller::getParameters\n");
+        return mt_CONTROLLER_EMPTY_VECTOR;
+    }
+    return m_vqpControlLaws[bot_num][law_num]->getParameters();
+}
+
+bool mt_Controller::setParameters(unsigned int bot_num,
+                                  unsigned int law_num,
+                                  const mt_dVector_t& parameters)
+{
+    if(!validateBotAndLawNum(bot_num, law_num))
+    {
+        fprintf(stderr, "\t In mt_Controller::setParameters\n");
+        return false;
+    }
+    return m_vqpControlLaws[bot_num][law_num]->setParameters(parameters);
+}
+
+std::string mt_Controller::getName(unsigned int bot_num, unsigned int law_num) const
+{
+    if(!validateBotAndLawNum(bot_num, law_num))
+    {
+        fprintf(stderr, "\t In mt_Controller::getName\n");
+        return std::string("ERROR");
+    }
+    return m_vqpControlLaws[bot_num][law_num]->getName();
 }
 
 /* Note: It may be more efficient to pass in an already-allocated input
@@ -141,7 +183,7 @@ mt_dVector_t mt_Controller::runControlLaw(unsigned int bot_num,
 }
 
 bool mt_Controller::ensureControlLawProperties(unsigned int bot_num,
-                                               const mt_ControlLaw* p_control_law)
+                                               const mt_ControlLaw* p_control_law) const
 {
     if(bot_num >= getNumBots())
     {

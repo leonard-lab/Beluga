@@ -1,6 +1,7 @@
 #include "ControlLaw.h"
 
 unsigned int mt_ControlLaw::s_iMaxControlLawID = 0;
+std::string mt_ControlLaw::s_sName = std::string("mt_ControlLaw Base");
 
 mt_ControlUIEvent::mt_ControlUIEvent(eventType type,
                                      double screenX,

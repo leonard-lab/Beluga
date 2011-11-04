@@ -26,11 +26,18 @@ public:
                                      const mt_dVectorCollection_t& pre_inputs
                                      = mt_CONTROLLER_EMPTY_DBL_VECTOR);
 
-    const mt_ControlLaw* getControlLaw(unsigned int bot_num, unsigned int law_num) const;
+    mt_ControlLaw* const getControlLaw(unsigned int bot_num, unsigned int law_num) const;
 
     mt_dVector_t calculateControlFor(unsigned int bot_num,
                                      const mt_dVector_t& state,
                                      const mt_dVector_t& u_to_now = mt_CONTROLLER_EMPTY_VECTOR);
+
+
+    mt_dVector_t getParameters(unsigned int bot_num, unsigned int law_num) const;
+    bool setParameters(unsigned int bot_num,
+                       unsigned int law_num,
+                       const mt_dVector_t& parameters);
+    std::string getName(unsigned int bot_num, unsigned int law_num) const;
 
     unsigned int getNumControlInputsFor(unsigned int bot_num) const;
     unsigned int getNumLawsFor(unsigned int bot_num) const;
@@ -82,7 +89,9 @@ protected:
     
     std::vector<mt_pControlLawContainer_t> m_vqpControlLaws;
 
-    bool ensureControlLawProperties(unsigned int bot_num, const mt_ControlLaw* p_control_law);
+    bool ensureControlLawProperties(unsigned int bot_num,
+                                    const mt_ControlLaw* p_control_law) const;
+    bool validateBotAndLawNum(unsigned int bot_num, unsigned int law_num) const;    
 
     /**********************************************************************
      * Garbage collection methods
