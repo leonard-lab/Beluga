@@ -3,44 +3,6 @@
 unsigned int mt_ControlLaw::s_iMaxControlLawID = 0;
 std::string mt_ControlLaw::s_sName = std::string("mt_ControlLaw Base");
 
-mt_ControlUIEvent::mt_ControlUIEvent(eventType type,
-                                     double screenX,
-                                     double screenY,
-                                     double worldX,
-                                     double worldY,
-                                     int camera_id,
-                                     int event_info)
-    : m_eventType(type),
-      m_dScreenX(screenX),
-      m_dScreenY(screenY),
-      m_dWorldX(worldX),
-      m_dWorldY(worldY),
-      m_iCameraID(camera_id),
-      m_iEventInfo(event_info)
-{
-}
-
-
-mt_ControlUIEvent mt_ControlUIEvent::keyboardEvent(char key,
-                                                   double screenX,
-                                                   double screenY,
-                                                   double worldX,
-                                                   double worldY,
-                                                   int camera_id)
-{
-    return mt_ControlUIEvent(keyboard, screenX, screenY, worldX, worldY, camera_id);
-}
-    
-mt_ControlUIEvent mt_ControlUIEvent::mouseEvent(mouseEventInfo button,
-                                                double screenX,
-                                                double screenY,
-                                                double worldX,
-                                                double worldY,
-                                                int camera_id)
-{
-    return mt_ControlUIEvent(mouse, screenX, screenY, worldX, worldY, camera_id);
-}
-    
 mt_ControlLaw::mt_ControlLaw(unsigned int num_control_inputs,
                              unsigned int num_parameters)
     : m_iNumControlInputs(num_control_inputs),
