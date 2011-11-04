@@ -98,6 +98,16 @@ std::string mt_Controller::getName(unsigned int bot_num, unsigned int law_num) c
     return m_vqpControlLaws[bot_num][law_num]->getName();
 }
 
+unsigned int mt_Controller::getNumControlInputs(unsigned int bot_num, unsigned int law_num) const
+{
+    if(!validateBotAndLawNum(bot_num, law_num))
+    {
+        fprintf(stderr, "\t In mt_Controller::getNumControlInputs\n");
+        return 0;
+    }
+    return m_vqpControlLaws[bot_num][law_num]->getNumControlInputs();
+}
+
 /* Note: It may be more efficient to pass in an already-allocated input
  * and return a reference to that same variable.  I've chosen not
  * to do that because we aren't experiencing any major performance
@@ -118,9 +128,8 @@ mt_dVector_t mt_Controller::calculateControlFor(unsigned int bot_num,
                                      const mt_dVector_t& state,
                                      const mt_dVector_t& u_in)
 {
-    unsigned int m = getNumControlInputsFor(bot_num);
-    mt_dVector_t u_to_now(m, 0.0);
-    if(u_in.size() == m)
+    mt_dVector_t u_to_now(0, 0.0);
+    if(u_in.size() > 0)
     {
         u_to_now = u_in;
     }
@@ -130,28 +139,6 @@ mt_dVector_t mt_Controller::calculateControlFor(unsigned int bot_num,
         u_to_now = runControlLaw(bot_num, law_num, u_to_now, state);
     }
     return u_to_now;
-}
-
-unsigned int mt_Controller::getNumControlInputsFor(unsigned int bot_num) const
-{
-    if(bot_num < getNumBots())
-    {
-        if(getNumLawsFor(bot_num) > 0)
-        {
-            return m_vqpControlLaws[bot_num][0]->getNumControlInputs();
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    else
-    {
-        fprintf(stderr, "mt_Controller::getNumControlInputsFor error, "
-                "requested robot number %d out of bounds "
-                "(have %d)\n", bot_num, getNumBots());
-        return 0;
-    }    
 }
 
 unsigned int mt_Controller::getNumLawsFor(unsigned int bot_num) const 
@@ -190,15 +177,6 @@ bool mt_Controller::ensureControlLawProperties(unsigned int bot_num,
         fprintf(stderr, "mt_Controller::ensureControlLawProperties error, "
                 "requested robot number %d out of bounds "
                 "(have %d)\n", bot_num, getNumBots());
-        return false;
-    }
-    else if((getNumLawsFor(bot_num) != 0) &&
-       (p_control_law->getNumControlInputs() != getNumControlInputsFor(bot_num)))
-    {
-        fprintf(stderr, "mt_Controller::ensureControlLawProperties error, "
-                "number of control inputs mismatch (given %d, have %d)\n",
-                p_control_law->getNumControlInputs(),
-                getNumControlInputsFor(bot_num));
         return false;
     }
     else

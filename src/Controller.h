@@ -38,8 +38,8 @@ public:
                        unsigned int law_num,
                        const mt_dVector_t& parameters);
     std::string getName(unsigned int bot_num, unsigned int law_num) const;
+    unsigned int getNumControlInputs(unsigned int bot_num, unsigned int law_num) const;
 
-    unsigned int getNumControlInputsFor(unsigned int bot_num) const;
     unsigned int getNumLawsFor(unsigned int bot_num) const;
     unsigned int getNumBots() const;
 
