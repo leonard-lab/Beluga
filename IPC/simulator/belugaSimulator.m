@@ -29,13 +29,21 @@ start(t);
 
 function updateSimulator(f, h, sock)
 
-[go_x, go_y, go_z] = belugaGetCommandIPC(0, sock);
-[x, y, z] = belugaSimulatorDoStep(go_x, go_y, go_z);
+[go_x_0, go_y_0, go_z_0] = belugaGetCommandIPC(0, sock);
+% TODO:  [go_x_1, go_x_2, go_x_3] = belugaGetCommandIPC(1, sock);, etc
 
-set(h(1), 'XData', go_x, 'YData', go_y)
-set(h(2), 'XData', x, 'YData', y)
+GO_X = [go_x_0];  % TODO: vectorize
+GO_Y = [go_y_0];  % TODO: vectorize
+GO_Z = [go_z_0];  % TODO: vectorize
 
-belugaSendPositionIPC(0, x, y, z);
+[X, Y, Z] = belugaSimulatorDoStep(GO_X, GO_Y, GO_Z);
+
+% may need to change this
+set(h(1), 'XData', GO_X, 'YData', GO_Y)
+set(h(2), 'XData', X, 'YData', Y)
+
+belugaSendPositionIPC(0, X(1), Y(1), Z(1));
+% TODO: belugaSendPositionIPC(1, X(2), Y(2), Z(2));
 
 function doneSimulator(f, h, sock)
 
