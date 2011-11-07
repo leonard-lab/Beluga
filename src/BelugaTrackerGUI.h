@@ -14,6 +14,8 @@
 #include "BelugaRobot.h"
 #include "BelugaTracker.h"
 
+#include "BelugaControl.h"
+
 /**********************************************************************
  * GUI Frame Class
  *********************************************************************/
@@ -68,6 +70,11 @@ protected:
     void manageIPCConnection();
     bool tryIPCConnect();
     void sendRobotDataToTracker();
+
+    mt_Controller m_Controller;
+    BelugaWaypointControlLaw* m_apWaypointController[4];
+    BelugaLowLevelControlLaw* m_apLowLevelController[4];
+    void initController();
 
 public:
     BelugaTrackerFrame(wxFrame* parent,

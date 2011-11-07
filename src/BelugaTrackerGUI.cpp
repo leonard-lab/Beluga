@@ -97,17 +97,33 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_dGotoXW(0),
 	m_dGotoYW(0),
 	m_bCamerasReady(false),
-	m_bConnectSocket(false)
+	m_bConnectSocket(false),
+    m_Controller()
 {
 	for(unsigned int i = 0; i < 4; i++)
 	{
-		m_pSlaves[i] = NULL;
+        m_pSlaves[i] = NULL;
+        m_apWaypointController[i] = NULL;
+        m_apLowLevelController[i] = NULL;
 	}
 	m_pBelugaTracker = NULL;
 }
 
 BelugaTrackerFrame::~BelugaTrackerFrame()
 {
+    for(unsigned int i = 0; i < 4; i++)
+    {
+        if(m_apWaypointController[i])
+        {
+            delete m_apWaypointController[i];
+            m_apWaypointController[i] = NULL;
+        }
+        if(m_apLowLevelController[i])
+        {
+            delete m_apLowLevelController[i];
+            m_apLowLevelController[i] = NULL;
+        }
+    }
 }
 
 void BelugaTrackerFrame::doUserQuit()
@@ -194,6 +210,8 @@ void BelugaTrackerFrame::initUserData()
                             &m_sQuad3MaskPath);
     m_pSetupInfo->AddString("Quadrant IV Mask",
                             &m_sQuad4MaskPath);
+
+    initController();
                             
     setTimer(FRAME_PERIOD_MSEC);
 
@@ -252,6 +270,17 @@ MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* na
 	m_Robots.TrackingIndex[0] = 0;
 
     return thebot;
+}
+
+void BelugaTrackerFrame::initController()
+{
+    for(unsigned int i = 0; i < 4; i++)
+    {
+        m_apWaypointController[i] = new BelugaWaypointControlLaw();
+        m_apLowLevelController[i] = new BelugaLowLevelControlLaw();
+        m_Controller.appendControlLawToBot(i, m_apWaypointController[i], mt_CONTROLLER_NO_GC);
+        m_Controller.appendControlLawToBot(i, m_apLowLevelController[i], mt_CONTROLLER_NO_GC);
+    }
 }
 
 void BelugaTrackerFrame::doUserStep()
@@ -404,8 +433,7 @@ void BelugaTrackerFrame::doUserControl()
 
     doIPCExchange();
     
-	std::vector<double> u;
-	u.resize(BELUGA_CONTROL_SIZE, 0.0);
+	std::vector<double> u(BELUGA_CONTROL_SIZE, 0.0);
 
     if(!m_pTracker)
 	{
@@ -429,46 +457,35 @@ void BelugaTrackerFrame::doUserControl()
 		return;
 	}
 
-	if(m_Robots.IsPhysical(2))
-	{
-		m_dGotoXW = m_Robots[2]->GetX();
-		m_dGotoYW = m_Robots[2]->GetY();
-	}
+    std::vector<double> u_waypoint(BELUGA_WAYPOINT_SIZE, 0.0);
+    u_waypoint[BELUGA_WAYPOINT_X] = m_dGotoXW;
+    u_waypoint[BELUGA_WAYPOINT_Y] = m_dGotoYW;
+    u_waypoint[BELUGA_WAYPOINT_Z] = 0;
 
-	double dx = m_dGotoXW - m_Robots[0]->GetX();
-	double dy = m_dGotoYW - m_Robots[0]->GetY();
-	double dth = (m_Robots[0]->GetTheta()) - atan2(dy, dx);
-	double d = sqrt(dx*dx + dy*dy);
-	double spd = 0;
-	double vert = 0;
-	double turn = 0;
+    mt_dVectorCollection_t X_all(4);
+    mt_dVectorCollection_t u_in_all(4);
+    for(unsigned int i = 0; i < m_iNToTrack; i++)
+    {
+        if(m_Robots.IsPhysical(i) && m_Robots.TrackingIndex[i] != MT_NOT_TRACKED)
+        {
+            X_all[i] = m_pBelugaTracker->getBelugaState(m_Robots.TrackingIndex[i]);
+            u_in_all[i] = mt_CONTROLLER_EMPTY_VECTOR;
+        }
+        else
+        {
+            X_all[i] = mt_CONTROLLER_EMPTY_VECTOR;
+            u_in_all[i] = mt_CONTROLLER_EMPTY_VECTOR;
+        }
+    }
 
-	if(d < m_dGotoDist)
-	{
-		m_bGotoActive = false;
-	}
-	else
-	{
-		if(d > 3.0*m_dGotoDist)
-		{
-			spd = m_dGotoMaxSpeed;
-		}
-		else
-		{
-			spd = m_dGotoMaxSpeed*0.3333*(d/m_dGotoDist);
-		}
+    m_apWaypointController[0]->doActivate();
 
-		turn = -m_dGotoTurningGain*sin(dth);
-	}
+    u_in_all[0] = u_waypoint;
 
-/*	printf("dx = %f, dy = %f, dth = %f (%f - %f) spd = %f, turn = %f\n",
-		dx, dy, MT_RAD2DEG*dth, MT_RAD2DEG*atan2(dy, dx), MT_RAD2DEG*m_Robots[0]->GetTheta(), spd, turn);*/
+    mt_dVectorCollection_t u_all;
+    u_all = m_Controller.doControl(X_all, u_in_all);
 
-	u[BELUGA_CONTROL_FWD_SPEED] = -spd;
-	u[BELUGA_CONTROL_VERT_SPEED] = vert;
-	u[BELUGA_CONTROL_STEERING] = turn;
-
-	m_Robots[0]->SetControl(u);
+	m_Robots[0]->SetControl(u_all[0]);
 	m_Robots[0]->Control();
 
 }
