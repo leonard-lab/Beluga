@@ -1,10 +1,24 @@
 #include "BelugaControl.h"
 
 std::string BelugaWaypointControlLaw::s_sName("Beluga Waypoint Controller\n");
+std::string BelugaLowLevelControlLaw::s_sName("Beluga Low Level Controller\n");
+
+BelugaWaypointControlLaw* belugaWaypointControlLawFactory(unsigned int bot_num,
+                                                          unsigned int law_num)
+{
+    return new BelugaWaypointControlLaw();
+}
+
+BelugaLowLevelControlLaw* belugaLowLevelControlLawFactory(unsigned int bot_num,
+                                                          unsigned int law_num)
+{
+    return new BelugaLowLevelControlLaw();
+}
+
 
 BelugaWaypointControlLaw::BelugaWaypointControlLaw()
-    : mt_ControlLaw(2 /* # control inputs */,
-                    2 /* # parameters */),
+    : mt_ControlLaw(3 /* # control inputs */,
+                    3 /* # parameters */),
       m_bActive(false),
       m_dDist(0.5),
       m_dMaxSpeed(1.0),
@@ -15,21 +29,26 @@ BelugaWaypointControlLaw::BelugaWaypointControlLaw()
 mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
                                                  const mt_dVector_t& u_in)
 {
-    if(!m_bActive || state.size() < 4 || u_in.size() < 3)
+    if(!m_bActive || state.size() < BELUGA_NUM_STATES || u_in.size() < BELUGA_WAYPOINT_SIZE)
     {
         return u_in;
     }
 
-    mt_dVector_t u(3, 0.0);
+    mt_dVector_t u(BELUGA_CONTROL_SIZE, 0.0);
 
-    double x = state[0];
-    double y = state[1];
-    double z = state[2];
-    double th = state[3];
+    double x = state[BELUGA_STATE_X];
+    double y = state[BELUGA_STATE_Y];
+    double z = state[BELUGA_STATE_Z];
+    double th = state[BELUGA_STATE_THETA];
 
-    double to_x = u_in[0];
-    double to_y = u_in[1];
-    double to_z = u_in[2];
+    double to_x = u_in[BELUGA_WAYPOINT_X];
+    double to_y = u_in[BELUGA_WAYPOINT_Y];
+    double to_z = u_in[BELUGA_WAYPOINT_Z];
+
+    if(to_z BELUGA_MAINTAIN_Z)
+    {
+        to_z = z;
+    }
 
     double dx = x - to_x;
     double dy = y - to_y;
@@ -63,4 +82,32 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
     u[BELUGA_CONTROL_STEERING] = u_turn;    
     
     return u;
+}
+
+BelugaLowLevelControlLaw::BelugaLowLevelControlLaw()
+    : mt_ControlLaw(3 /* # control inputs */,
+                    0 /* # parameters */),
+      m_bActive(true)
+{
+    
+}
+
+mt_dVector_t BelugaLowLevelControlLaw::doControl(const mt_dVector_t& state,
+                                                 const mt_dVector_t& u_in)
+{
+    if(!m_bActive || state.size() < 4 || u_in.size() < 3)
+    {
+        return u_in;
+    }
+    
+    mt_dVector_t u(BELUGA_CONTROL_SIZE, 0.0);
+    
+    double u_speed = u_in[BELUGA_CONTROL_FWD_SPEED];
+    double u_vert = u_in[BELUGA_CONTROL_VERT_SPEED];
+    double u_turn = u_in[BELUGA_CONTROL_STEERING];
+
+    u[BELUGA_CONTROL_FWD_SPEED] = u_speed;
+    u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
+    u[BELUGA_CONTROL_STEERING] = u_turn;    
+        
 }

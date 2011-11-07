@@ -142,5 +142,23 @@ enum
 	BELUGA_ROBOT_MEASUREMENT_SIZE /* must always be the last one */
 };
 
+/**********************************************************************
+ * Control constants
+ **********************************************************************/
+
+enum
+{
+    BELUGA_WAYPOINT_X = 0,
+    BELUGA_WAYPOINT_Y,
+    BELUGA_WAYPOINT_Z,
+
+    BELUGA_WAYPOINT_SIZE /* must always be the last one */
+};
+
+/* we can use negative z to specify that we want to maintain depth
+ * since z < 0 is beneath the tank */
+const double BELUGA_WAYPOINT_SAME_Z = -1.0;
+
+#define BELUGA_MAINTAIN_Z < 0
 
 #endif // BELUGA_CONSTANTS

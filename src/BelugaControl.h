@@ -22,7 +22,24 @@ protected:
     static std::string s_sName;
 };
 
+class BelugaLowLevelControlLaw : public mt_ControlLaw
+{
+public:
+    BelugaLowLevelControlLaw();
+
+    mt_dVector_t doControl(const mt_dVector_t& state,
+                           const mt_dVector_t& u_in);
+
+protected:
+    bool m_bActive;
+    
+    static std::string s_sName;
+};
+
 BelugaWaypointControlLaw* belugaWaypointControlLawFactory(unsigned int bot_num,
                                                           unsigned int law_num);
+BelugaLowLevelControlLaw* belugaLowLevelControlLawFactory(unsigned int bot_num,
+                                                          unsigned int law_num);
+
 
 #endif // BELUGA_CONTROL_H
