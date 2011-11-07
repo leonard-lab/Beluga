@@ -111,6 +111,10 @@ const double BELUGA_MAX_TURN = 68.5;
 const double BELUGA_DEFAULT_SPEED_DEADBAND = 0.05;
 const double BELUGA_DEFAULT_TURN_DEADBAND = 0.05;
 
+/* reasonable based on one of the robots as of 11/7/11 - DTS*/
+const unsigned int BELUGA_DEFAULT_DEPTH_MEAS_AT_SURFACE = 145;
+const unsigned int BELUGA_DEFAULT_DEPTH_MEAS_AT_BOTTOM = 600;
+
 const unsigned int BELUGA_SERVO_MIN = 0;
 const unsigned int BELUGA_SERVO_MAX = 137;
 

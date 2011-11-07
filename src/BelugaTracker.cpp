@@ -8,7 +8,7 @@
 #include "BelugaConstants.h"
 
 /* uncomment to see extra output from the tracker in the console */
-//#define DEBUG_VERBOSE
+#define DEBUG_VERBOSE
 
 /* used for readability of grabbing the last row of a CvMat */
 #define LAST_ROW(a_cv_mat) (a_cv_mat)->rows - 1
@@ -1183,6 +1183,7 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
         cvSetReal2D(m_pz, j*(BELUGA_NUM_MEAS - 1) + BELUGA_MEAS_Y, 0, y);
         cvSetReal2D(m_pz, j*(BELUGA_NUM_MEAS - 1) + BELUGA_MEAS_THETA, 0, th);
     }
+	printf("Depth meas is %f\n", m_vdDepthMeasurement[obj_number]);
     double z_new = m_dWaterDepth - m_vdDepthMeasurement[obj_number];
     cvSetReal2D(m_pz, LAST_ROW(m_pz), 0, z_new);
 

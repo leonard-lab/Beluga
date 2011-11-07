@@ -3,6 +3,8 @@
 
 #include "MT_Robot.h"
 
+#define BYTES_TO_READ 16
+
 class Beluga : public MT_RobotBase
 {
 public:
@@ -29,12 +31,16 @@ public:
 	std::vector<double> GetControl();
 	std::vector<double> GetMeasurements();
 
+	double convertDepthMeasurement(int d);
+
 	void Control();
 	void SafeStop();
 
     unsigned char IsConnected() const;
 
 	double getDepth();
+
+	void setWaterDepth(double d){if(d > 0){m_dWaterDepth = d;}};
 
 protected:
     MT_ComIO m_COMPort;
@@ -48,7 +54,7 @@ protected:
 private:
     mutable bool m_bIsConnected;
 
-	unsigned char m_ucDepthByte[6];
+	unsigned char m_ucDepthByte[BYTES_TO_READ];
 	double m_dDepth;
 
     double m_dMaxSpeed;
@@ -60,6 +66,10 @@ private:
     double m_dVertSpeed;
 
     double m_dMinCommandPeriod_msec;
+
+	unsigned int m_iDepthMeasAtSurface;
+	unsigned int m_iDepthMeasAtBottom;
+	double m_dWaterDepth;
     
 };
 

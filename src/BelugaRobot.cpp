@@ -8,7 +8,10 @@ Beluga::Beluga()
       m_COMPort("stderr", BELUGA_HANDSHAKING),
       m_sPort("stderr"),
       m_bIsConnected(false),
-      m_dMinCommandPeriod_msec(BELUGA_MIN_COMMAND_PERIOD_MSEC)
+      m_dMinCommandPeriod_msec(BELUGA_MIN_COMMAND_PERIOD_MSEC),
+	  m_iDepthMeasAtSurface(BELUGA_DEFAULT_DEPTH_MEAS_AT_SURFACE),
+	  m_iDepthMeasAtBottom(BELUGA_DEFAULT_DEPTH_MEAS_AT_BOTTOM),
+	  m_dWaterDepth(DEFAULT_WATER_DEPTH)
 {
     doCommonInit();
 }
@@ -94,6 +97,20 @@ void Beluga::doCommonInit()
                              MT_DATA_READWRITE,
                              0,
                              1.0);
+	m_pParameters->AddDouble("Water Depth",
+		                     &m_dWaterDepth,
+							 MT_DATA_READWRITE,
+							 0);
+	m_pParameters->AddUInt("Depth Meas at Surface",
+		                   &m_iDepthMeasAtSurface,
+						   MT_DATA_READWRITE,
+						   0,
+						   1000);
+	m_pParameters->AddUInt("Depth Meas at Bottom",
+		                   &m_iDepthMeasAtBottom,
+						   MT_DATA_READWRITE,
+						   0,
+						   1000);
 
 }
 
@@ -211,28 +228,41 @@ void Beluga::SendCommand(const char* command)
         m_COMPort.SendCommand(cmd);
 
         int r;
-        r = m_COMPort.ReadData(m_ucDepthByte, 6);
+        r = m_COMPort.ReadData(m_ucDepthByte, BYTES_TO_READ);
 
-/*	printf("Got %d %d %d %d %d %d %d\n", 
-    r,
-    m_ucDepthByte[0], 
-    m_ucDepthByte[1], 
-    m_ucDepthByte[2], 
-    m_ucDepthByte[3],
-    m_ucDepthByte[4],
-    m_ucDepthByte[5]); */
+		printf("Depth Bytes (%d): ", r);
+		for(unsigned int i = 0; i < BYTES_TO_READ; i++)
+		{
+			printf("%c ", m_ucDepthByte[i]);
+		}
+		printf("\n");
+
         m_ucDepthByte[4] = 0;
         int d;
         sscanf((const char*) m_ucDepthByte, "%d", &d);
-        m_dDepth = d;
-        printf("\t -> %f\n", m_dDepth);
+        m_dDepth = convertDepthMeasurement(d);
+
     }
+}
+
+double Beluga::convertDepthMeasurement(int d_meas)
+{
+	double d = m_dWaterDepth*((double)(d_meas - m_iDepthMeasAtSurface))/((double)(m_iDepthMeasAtBottom - m_iDepthMeasAtSurface));
+	if(d < 0)
+	{
+		d = 0;
+	}
+	if(d > m_dWaterDepth)
+	{
+		d = m_dWaterDepth;
+	}
+	printf("depth meas is %d -> %f\n", d_meas, d);
+	return d;
 }
 
 double Beluga::getDepth()
 {
-	/* this is wrong, but it will show us the bytes */
-	return 100*m_ucDepthByte[0] + m_ucDepthByte[1];
+	return m_dDepth;
 }
 
 /* function to check if the COM port is connected */

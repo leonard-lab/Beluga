@@ -100,7 +100,7 @@ void beluga_dynamics(const CvMat* x_k,
                               - k_d*fabs(zdot)*zdot
                               + k_teth*(z_off - z));
     zdot += dT*zddot;
-    
+
     /* works just like cvGetReal2D */
     cvSetReal2D(x_kplus1, BELUGA_STATE_X, 0, x);
 	cvSetReal2D(x_kplus1, BELUGA_STATE_Y, 0, y);
@@ -182,7 +182,7 @@ void beluga_measurement(const CvMat* x_k,
     {
         z = BelugaDynamicsParameters::m_dWaterDepth;
     }
-    
+
     cvSetReal2D(z_k, nrows-1, 0, z);
 }
 

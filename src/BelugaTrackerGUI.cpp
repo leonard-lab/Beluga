@@ -324,7 +324,7 @@ void BelugaTrackerFrame::sendRobotDataToTracker()
         if(ti != MT_NOT_TRACKED)
         {
             z = m_Robots[i]->GetMeasurements();
-            depth[ti] = 0;//z[BELUGA_ROBOT_MEASUREMENT_DEPTH];
+            depth[ti] = z[BELUGA_ROBOT_MEASUREMENT_DEPTH];
 
             u = m_Robots[i]->GetControl();
             speed[ti] = u[BELUGA_CONTROL_FWD_SPEED];
