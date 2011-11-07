@@ -98,7 +98,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_dGotoYW(0),
 	m_bCamerasReady(false),
 	m_bConnectSocket(false),
-    m_Controller()
+    m_Controller(4 /* # robots */)
 {
 	for(unsigned int i = 0; i < 4; i++)
 	{
@@ -422,6 +422,7 @@ void BelugaTrackerFrame::doIPCExchange()
 				m_dGotoXW = x;
 				m_dGotoYW = y;
 				m_pBelugaTracker->getCameraXYFromWorldXYandDepth(&m_iGotoCam, &m_dGotoXC, &m_dGotoYC, m_dGotoXW, m_dGotoYW, 0, false);
+				m_dGotoYC =  m_dGotoYC;
 			}
 		}
 	}
@@ -464,7 +465,7 @@ void BelugaTrackerFrame::doUserControl()
 
     mt_dVectorCollection_t X_all(4);
     mt_dVectorCollection_t u_in_all(4);
-    for(unsigned int i = 0; i < m_iNToTrack; i++)
+    for(int i = 0; i < m_iNToTrack; i++)
     {
         if(m_Robots.IsPhysical(i) && m_Robots.TrackingIndex[i] != MT_NOT_TRACKED)
         {
@@ -606,7 +607,7 @@ bool BelugaTrackerFrame::doSlaveMouseCallback(wxMouseEvent& event, double viewpo
 				m_bGotoActive = true;
 				m_iGotoCam = slave_index;
 				m_dGotoXC = viewport_x;
-				m_dGotoYC = viewport_y;
+				m_dGotoYC = m_ClientSize.GetHeight() - viewport_y;
 				if(m_pBelugaTracker)
 				{
 					double z = 0;
@@ -688,7 +689,7 @@ bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x,
 				m_bGotoActive = true;
 				m_iGotoCam = 0;
 				m_dGotoXC = viewport_x;
-				m_dGotoYC = viewport_y;
+				m_dGotoYC =  m_ClientSize.GetHeight() - viewport_y;
 				if(m_pBelugaTracker)
 				{
 					double z = 0;
@@ -733,7 +734,7 @@ void BelugaTrackerFrame::doUserGLDrawing()
 
 	if(m_bGotoActive && m_iGotoCam == 0)
 	{
-		MT_DrawCircle(m_dGotoXC, m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
+		MT_DrawCircle(m_dGotoXC, m_ClientSize.GetHeight() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
 	}
 }
 
@@ -741,7 +742,7 @@ void BelugaTrackerFrame::doSlaveGLDrawing(int slave_index)
 {
 	if(m_bGotoActive && m_iGotoCam == slave_index)
 	{
-		MT_DrawCircle(m_dGotoXC, m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
+		MT_DrawCircle(m_dGotoXC, m_ClientSize.GetHeight() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
 	}
 }
 

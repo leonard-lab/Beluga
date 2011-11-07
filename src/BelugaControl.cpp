@@ -21,8 +21,8 @@ BelugaWaypointControlLaw::BelugaWaypointControlLaw()
                     3 /* # parameters */),
       m_bActive(false),
       m_dDist(0.5),
-      m_dMaxSpeed(1.0),
-      m_dTurningGain(1.0)
+      m_dMaxSpeed(30.0),
+      m_dTurningGain(20.0)
 {
 }
 
@@ -50,11 +50,13 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
         to_z = z;
     }
 
-    double dx = x - to_x;
-    double dy = y - to_y;
-    double dz = z - to_z;
+    double dx = to_x - x;
+    double dy = to_y - y;
+    double dz = to_z - z;
 
-    double dth = th - atan2(dy, dx);
+    double dth = atan2(dy, dx) - th;
+	dth = atan2(sin(dth), sin(dx));
+
     double d = sqrt(dx*dx + dy*dy);
     double u_speed = 0;
     double u_vert = 0;
@@ -74,13 +76,15 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
         {
             u_speed = m_dMaxSpeed*0.333*(d/m_dDist);
         }
-        u_turn = -m_dTurningGain*sin(dth);
+        u_turn = m_dTurningGain*sin(dth);
     }
 
     u[BELUGA_CONTROL_FWD_SPEED] = u_speed;
     u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
     u[BELUGA_CONTROL_STEERING] = u_turn;    
     
+	//printf("Control out: %f, %f, %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
+
     return u;
 }
 
@@ -99,7 +103,7 @@ mt_dVector_t BelugaLowLevelControlLaw::doControl(const mt_dVector_t& state,
     {
         return u_in;
     }
-    
+
     mt_dVector_t u(BELUGA_CONTROL_SIZE, 0.0);
     
     double u_speed = u_in[BELUGA_CONTROL_FWD_SPEED];
@@ -108,6 +112,8 @@ mt_dVector_t BelugaLowLevelControlLaw::doControl(const mt_dVector_t& state,
 
     u[BELUGA_CONTROL_FWD_SPEED] = u_speed;
     u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
-    u[BELUGA_CONTROL_STEERING] = u_turn;    
-        
+    u[BELUGA_CONTROL_STEERING] = u_turn;  
+
+	return u;
+
 }

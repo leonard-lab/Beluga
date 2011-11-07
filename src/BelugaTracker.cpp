@@ -8,7 +8,7 @@
 #include "BelugaConstants.h"
 
 /* uncomment to see extra output from the tracker in the console */
-#define DEBUG_VERBOSE
+//#define DEBUG_VERBOSE
 
 /* used for readability of grabbing the last row of a CvMat */
 #define LAST_ROW(a_cv_mat) (a_cv_mat)->rows - 1
@@ -304,7 +304,7 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     m_vdTracked_Speed.resize(m_iNObj);    
     m_vdTracked_Heading.resize(m_iNObj);
     m_vdTracked_Omega.resize(m_iNObj);
-    for(unsigned int i = 0; i < m_iNObj; i++)
+    for(int i = 0; i < m_iNObj; i++)
     {
         /* assume we start on the surface */
         m_vdTracked_X[i] = 0;
@@ -1496,8 +1496,8 @@ std::vector<double> BelugaTracker::getBelugaState(unsigned int i)
 	r[BELUGA_STATE_Z] = m_vdTracked_Z[i];
     r[BELUGA_STATE_ZDOT] = m_vdTracked_ZDot[i];
 	r[BELUGA_STATE_SPEED] = m_vdTracked_Speed[i];    
-	r[BELUGA_STATE_HEADING] = m_vdTracked_Heading[i];
-	r[BELUGA_STATE_ORIENTATION] = m_vdTracked_Omega[i];
+	r[BELUGA_STATE_THETA] = m_vdTracked_Heading[i];
+	r[BELUGA_STATE_OMEGA] = m_vdTracked_Omega[i];
 
 	return r;
 }

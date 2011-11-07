@@ -19,7 +19,7 @@ typedef std::deque<mt_ControlLaw*> mt_pControlLawContainer_t;
 
 class mt_Controller {
 public:
-    mt_Controller();
+    mt_Controller(unsigned int num_robots);
     ~mt_Controller();
 
     mt_dVectorCollection_t doControl(const mt_dVectorCollection_t& states,

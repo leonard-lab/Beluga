@@ -261,7 +261,7 @@ void Beluga::JoyStickControl(std::vector<double> js_axes,
     double turn = 0;
 
     double x = -js_axes[0];
-    double y = -js_axes[1];
+    double y = js_axes[1];
     double w = 0;//js_axes[2];
     double z = 0;//-js_axes[3];
 
@@ -315,8 +315,8 @@ void Beluga::SendCommand(double fwd_speed, double up_speed, double turn)
     unsigned int spd_cmd;
     char d = 0;
 
-    /* the first digit is 1 if speed is negative */
-    if(fwd_speed < 0)
+    /* the first digit is 1 if speed is positive */
+    if(fwd_speed > 0)
     {
         d = 1;
     }

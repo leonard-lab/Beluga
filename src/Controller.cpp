@@ -1,7 +1,7 @@
 #include "Controller.h"
 
-mt_Controller::mt_Controller()
-    : m_vqpControlLaws(0),
+mt_Controller::mt_Controller(unsigned int num_robots)
+    : m_vqpControlLaws(num_robots),
       m_gc_vpManagedControlLaws(0)
 {
 }
@@ -122,6 +122,8 @@ mt_dVectorCollection_t mt_Controller::doControl(const mt_dVectorCollection_t& st
                                                    states[bot_num],
                                                    pre_inputs[bot_num]);
     }
+
+	return control_out;
 }
 
 mt_dVector_t mt_Controller::calculateControlFor(unsigned int bot_num,
@@ -136,7 +138,7 @@ mt_dVector_t mt_Controller::calculateControlFor(unsigned int bot_num,
     
     for(unsigned int law_num = 0; law_num < getNumLawsFor(bot_num); law_num++)
     {
-        u_to_now = runControlLaw(bot_num, law_num, u_to_now, state);
+        u_to_now = runControlLaw(bot_num, law_num, state, u_to_now);
     }
     return u_to_now;
 }

@@ -17,7 +17,7 @@ public:
     virtual bool setParameters(const mt_dVector_t& new_params);
     virtual mt_dVector_t getParameters() const;
 
-    virtual bool getNumControlInputs() const {return m_iNumControlInputs;};
+    virtual unsigned int getNumControlInputs() const {return m_iNumControlInputs;};
 
     virtual mt_dVector_t doControl(const mt_dVector_t& state,
                                    const mt_dVector_t& u_to_now)
