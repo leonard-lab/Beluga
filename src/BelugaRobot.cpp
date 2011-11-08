@@ -11,7 +11,9 @@ Beluga::Beluga()
       m_dMinCommandPeriod_msec(BELUGA_MIN_COMMAND_PERIOD_MSEC),
 	  m_iDepthMeasAtSurface(BELUGA_DEFAULT_DEPTH_MEAS_AT_SURFACE),
 	  m_iDepthMeasAtBottom(BELUGA_DEFAULT_DEPTH_MEAS_AT_BOTTOM),
-	  m_dWaterDepth(DEFAULT_WATER_DEPTH)
+	  m_dWaterDepth(DEFAULT_WATER_DEPTH),
+	  m_iDepthMeas(0),
+	  m_dDepth(0)
 {
     doCommonInit();
 }
@@ -230,16 +232,18 @@ void Beluga::SendCommand(const char* command)
         int r;
         r = m_COMPort.ReadData(m_ucDepthByte, BYTES_TO_READ);
 
+		/*
 		printf("Depth Bytes (%d): ", r);
 		for(unsigned int i = 0; i < BYTES_TO_READ; i++)
 		{
 			printf("%c ", m_ucDepthByte[i]);
 		}
-		printf("\n");
+		printf("\n"); */
 
         m_ucDepthByte[4] = 0;
         int d;
         sscanf((const char*) m_ucDepthByte, "%d", &d);
+		m_iDepthMeas = d;
         m_dDepth = convertDepthMeasurement(d);
 
     }
@@ -256,11 +260,11 @@ double Beluga::convertDepthMeasurement(int d_meas)
 	{
 		d = m_dWaterDepth;
 	}
-	printf("depth meas is %d -> %f\n", d_meas, d);
+	//printf("depth meas is %d -> %f\n", d_meas, d);
 	return d;
 }
 
-double Beluga::getDepth()
+double Beluga::getDepth() const
 {
 	return m_dDepth;
 }
@@ -268,7 +272,7 @@ double Beluga::getDepth()
 /* function to check if the COM port is connected */
 unsigned char Beluga::IsConnected() const
 {
-    m_bIsConnected = (bool) m_COMPort.IsConnected();
+    m_bIsConnected = (m_COMPort.IsConnected() > 0);
     return m_bIsConnected;
 }
 
@@ -366,4 +370,9 @@ void Beluga::Control()
 	SendCommand(m_vdControls[BELUGA_CONTROL_FWD_SPEED],
 		m_vdControls[BELUGA_CONTROL_VERT_SPEED],
 		m_vdControls[BELUGA_CONTROL_STEERING]);
+}
+
+Beluga* castMTRobotToBeluga(MT_RobotBase* bot)
+{
+	return static_cast<Beluga*>(bot);
 }

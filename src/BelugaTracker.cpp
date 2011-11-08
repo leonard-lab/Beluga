@@ -8,7 +8,7 @@
 #include "BelugaConstants.h"
 
 /* uncomment to see extra output from the tracker in the console */
-#define DEBUG_VERBOSE
+//#define DEBUG_VERBOSE
 
 /* used for readability of grabbing the last row of a CvMat */
 #define LAST_ROW(a_cv_mat) (a_cv_mat)->rows - 1
@@ -483,8 +483,12 @@ void BelugaTracker::doInit(IplImage* ProtoFrame)
     MT_DataReport* dr_tracked = new MT_DataReport("Tracked data");
     dr_tracked->AddDouble("X", &m_vdTracked_X);
     dr_tracked->AddDouble("Y", &m_vdTracked_Y);
-    dr_tracked->AddDouble("Hdg", &m_vdTracked_Heading);
+    dr_tracked->AddDouble("Z", &m_vdTracked_Z);
+    dr_tracked->AddDouble("Zdot", &m_vdTracked_ZDot);
+	dr_tracked->AddDouble("Hdg", &m_vdTracked_Heading);
+    dr_tracked->AddDouble("Omega", &m_vdTracked_Omega);
     dr_tracked->AddDouble("Spd", &m_vdTracked_Speed);
+	dr_tracked->AddDouble("Zmeas", &m_vdDepthMeasurement);
 
 	MT_DataReport* dr_blobs = new MT_DataReport("Blob Info");
 	dr_blobs->AddDouble("X", &m_vdBlobs_X);
@@ -870,7 +874,7 @@ void BelugaTracker::updateUKFParameters()
         cvSetReal2D(m_pR, BELUGA_MEAS_Y, BELUGA_MEAS_Y, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
         cvSetReal2D(m_pR, BELUGA_MEAS_THETA, BELUGA_MEAS_THETA,
                     m_dSigmaHeadingMeas*m_dSigmaHeadingMeas);
-        cvSetReal2D(m_pR, BELUGA_MEAS_Z, BELUGA_MEAS_Z, m_dSigmaPositionMeas*m_dSigmaPositionMeas);
+        cvSetReal2D(m_pR, BELUGA_MEAS_Z, BELUGA_MEAS_Z, m_dSigmaZMeas*m_dSigmaZMeas);
 
 		/* makes sure we only have to copy the numbers once - it will
 		 * automatically get copied again later if necessary */
@@ -1183,7 +1187,6 @@ void BelugaTracker::applyUKFToObject(unsigned int obj_number)
         cvSetReal2D(m_pz, j*(BELUGA_NUM_MEAS - 1) + BELUGA_MEAS_Y, 0, y);
         cvSetReal2D(m_pz, j*(BELUGA_NUM_MEAS - 1) + BELUGA_MEAS_THETA, 0, th);
     }
-	printf("Depth meas is %f\n", m_vdDepthMeasurement[obj_number]);
     double z_new = m_dWaterDepth - m_vdDepthMeasurement[obj_number];
     cvSetReal2D(m_pz, LAST_ROW(m_pz), 0, z_new);
 
@@ -1273,7 +1276,7 @@ bool BelugaTracker::tryInitStateVectors()
     std::vector<double> TH(0, 0);
     std::vector<double> A(0, 0);
     std::vector<double> C(0, 0);
-    double x1, y1, z, th;
+    double x1, y1, z; //, th;
     double x2, y2;
 
     for(unsigned int c = 0; c < 4; c++)

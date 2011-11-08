@@ -38,7 +38,8 @@ public:
 
     unsigned char IsConnected() const;
 
-	double getDepth();
+	double getDepth() const;
+	unsigned int getDepthMeasurement() const {return m_iDepthMeas;};
 
 	void setWaterDepth(double d){if(d > 0){m_dWaterDepth = d;}};
 
@@ -55,6 +56,7 @@ private:
     mutable bool m_bIsConnected;
 
 	unsigned char m_ucDepthByte[BYTES_TO_READ];
+	unsigned int m_iDepthMeas;
 	double m_dDepth;
 
     double m_dMaxSpeed;
@@ -72,5 +74,9 @@ private:
 	double m_dWaterDepth;
     
 };
+
+/* use this VERY carefully - you should know for sure that
+ * the object you're passing in is, in fact, a Beluga */
+Beluga* castMTRobotToBeluga(MT_RobotBase* bot);
 
 #endif // BELUGAROBOT_H

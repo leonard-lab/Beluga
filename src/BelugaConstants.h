@@ -85,7 +85,7 @@ const double K_omega = 7.0;
 const double eta_up = 5.0e-4;
 const double eta_down = 4.0e-4;
 const double v_off = 0.2;
-const double k_d = 70.0;
+const double k_d = 1.0; // original: 70.0;
 const double z_off = 0.75;
 const double k_teth = 1.1;
 const double k_vp = 11.25; // linear coefficient in voltage->power
@@ -94,7 +94,7 @@ const double J = 2.5; // kg*m^2 moment of inertia
 
 /* state constraints */
 const double BELUGA_CONSTRAINT_MAX_SPEED = 100.0; 
-const double BELUGA_CONSTRAINT_MAX_VERTICAL_SPEED = 100.0;
+const double BELUGA_CONSTRAINT_MAX_VERTICAL_SPEED = 1.0;
 const double BELUGA_CONSTRAINT_MAX_TURN_RATE = 100.0;
 
 

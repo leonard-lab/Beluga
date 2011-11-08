@@ -99,6 +99,8 @@ void beluga_dynamics(const CvMat* x_k,
                               + eta_down*v_vert_inv*(u_down + k_vp*u_down)
                               - k_d*fabs(zdot)*zdot
                               + k_teth*(z_off - z));
+/*	printf("u_h %f, z %f, zdot %f, zddot %f, drag %f, teth %f, dT %f\n", u_h, z, zdot, zddot, 
+		-k_d*fabs(zdot)*zdot, k_teth*(z_off - z), dT);*/
     zdot += dT*zddot;
 
     /* works just like cvGetReal2D */
@@ -172,16 +174,10 @@ void beluga_measurement(const CvMat* x_k,
     }
 
     z += z_noise;
-    if(z < 0)
-    {
-        z = 0;
-    }
 
-    // MAYBE: not strictly necessary
-    if(z > BelugaDynamicsParameters::m_dWaterDepth)
-    {
-        z = BelugaDynamicsParameters::m_dWaterDepth;
-    }
+	/* NOTE:  Specifically not constraining z here, b/c the constraint
+	 * induces an artificial disturbance near the boundaries.  The constraint
+	 * is applied afterwords. */
 
     cvSetReal2D(z_k, nrows-1, 0, z);
 }
@@ -218,7 +214,6 @@ void constrain_state(CvMat* x_k,
 	double speed_p = cvGetReal2D(X_p, BELUGA_STATE_SPEED, 0);
 	double theta_p = cvGetReal2D(X_p, BELUGA_STATE_THETA, 0);
 	double omega_p = cvGetReal2D(X_p, BELUGA_STATE_OMEGA, 0);	 
-
 
     x = check_nan(x, x_p, 0);
     y = check_nan(y, y_p, 0);
