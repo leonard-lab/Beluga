@@ -2,7 +2,8 @@ function belugaSimulator()
 
 addpath('../matlab');
 
-[status, r] = system('ruby ../beluga_server.rb >> simulator.log &');
+server_path = fullfile(fileparts(mfilename('fullpath')), '../beluga_server.rb');
+[status, r] = system(sprintf('ruby %s >> simulator.log 2>&1 &', server_path));
 if status > 0,
     error(r)
 end
@@ -10,6 +11,9 @@ end
 pause(0.1)
 
 sock = getBelugaIPCSocket('127.0.0.1', 1234);
+sock.Timeout = 0.1;
+sock.Name = 'SimulatorSocket';
+sock.ErrorFcn = @(varargin) sockError();
 [go_x, go_y, go_z] = belugaGetCommandIPC(0, sock);
 
 fig = figure();
@@ -42,8 +46,8 @@ GO_Z = [go_z_0];  % TODO: vectorize
 set(h(1), 'XData', GO_X, 'YData', GO_Y)
 set(h(2), 'XData', X, 'YData', Y)
 
-belugaSendPositionIPC(0, X(1), Y(1), Z(1));
-% TODO: belugaSendPositionIPC(1, X(2), Y(2), Z(2));
+belugaSendPositionIPC(0, X(1), Y(1), Z(1), sock);
+% TODO: belugaSendPositionIPC(1, X(2), Y(2), Z(2), sock);
 
 function doneSimulator(f, h, sock)
 
@@ -52,3 +56,7 @@ title('Beluga Simulator - Done');
 
 stopBelugaServer(sock);
 closeBelugaSocket(sock);
+
+function sockError()
+
+puts 'A socket error has occurred in the simulator.'
