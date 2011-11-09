@@ -20,27 +20,18 @@ end
 
 class BelugaServer < Rhubarb
   
-  def initialize(*args)
-    super(*args)
+  @@robots = Array.new;
+  @@robots << Robot.new(0);
+  @@robots << Robot.new(1);
+  @@robots << Robot.new(2);
+  @@robots << Robot.new(3);
 
-    # these are class variables because we want each client
-    # to know about them
-    @@robots = Array.new;
-    @@robots << Robot.new(0);
-    @@robots << Robot.new(1);
-    @@robots << Robot.new(2);
-    @@robots << Robot.new(3);
+  cmd_position = {:name => "position", :setArgs => 3, :maxIndex => 3}
+  cmd_cmd = {:name => "command", :setArgs => 3, :maxIndex => 3}
 
-    cmd_position = {:name => "position", :setArgs => 3, :maxIndex => 3}
-    cmd_cmd = {:name => "command", :setArgs => 3, :maxIndex => 3}
-
-    @indexed_get_commands << cmd_position
-    @indexed_get_commands << cmd_cmd
-    @indexed_set_commands << cmd_position
-    @indexed_set_commands << cmd_cmd
-
-  end
-
+  add_indexed_get_set_command cmd_position
+  add_indexed_get_set_command cmd_cmd
+  
   def robot(id)
     @@robots[id]
   end
