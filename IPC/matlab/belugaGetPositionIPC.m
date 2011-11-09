@@ -1,4 +1,4 @@
-function belugaGetPositionIPC(robot_id, sock)
+function [x, y, z] = belugaGetPositionIPC(robot_id, sock)
 
 if nargin == 1,
     sock = [];
