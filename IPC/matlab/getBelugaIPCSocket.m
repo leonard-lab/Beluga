@@ -12,12 +12,19 @@ end
     
 sock = tcpip(host, port);
 fopen(sock);
+
+if ~strcmp(sock.Status, 'open')
+    error('Unable to open IPC socket.')
+    sock = 0;
+    return
+end
+
 r = fgetl(sock);
 
 expected_response = 'Welcome to BelugaServer, client ';
 
-if ~strcmp(r(1 : length(expected_response)), expected_response)
+if isempty(r) || ~strncmp(r, expected_response, min(length(r), length(expected_response)))
     error('Unable to open IPC socket.')
-    fclose(sock)
-    sock = 0
+    fclose(sock);
+    sock = 0;
 end
