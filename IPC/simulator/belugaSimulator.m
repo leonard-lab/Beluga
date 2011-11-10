@@ -2,13 +2,7 @@ function belugaSimulator()
 
 addpath('../matlab');
 
-server_path = fullfile(fileparts(mfilename('fullpath')), '../beluga_server.rb');
-[status, r] = system(sprintf('ruby %s >> simulator.log 2>&1 &', server_path));
-if status > 0,
-    error(r)
-end
-
-pause(0.1)
+startBelugaServer('simulator.log');
 
 sock = getBelugaIPCSocket('127.0.0.1', 1234);
 sock.Timeout = 0.1;
