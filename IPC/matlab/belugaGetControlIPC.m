@@ -49,7 +49,7 @@ IX = zeros(num_bots, 1);
 resp = sscanf(resp_string, '%f ');
 
 if length(resp) < 3*num_bots,
-    fprintf('Unexpected response from server: %s\n', resp_string_orig);
+    fprintf('Unexpected response from server in %s: %s\n', mfilename, resp_string);
     X = [];
     Y = [];
     Z = [];
@@ -69,7 +69,7 @@ else
         ZDOT = resp(3 : 3 : end);
         IX = robot_id;
     else
-        fprintf('Unexpected mode recieved from server: %s\n', mode);
+        fprintf('Unexpected mode recieved from server in %s: %s\n', mfilename, mode);
     end
 end
 

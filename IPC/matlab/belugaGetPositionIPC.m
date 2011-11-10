@@ -24,7 +24,7 @@ IX = zeros(num_bots, 1);
 resp = sscanf(resp_string, '%f ');
 
 if length(resp) < 3*num_bots,
-    fprintf('Unexpected response from server: %s', resp_string);
+    fprintf('Unexpected response from server in %s: %s\n', mfilename, resp_string);
     X = -1*ones(num_bots, 1);
     Y = -1*ones(num_bots, 1);
     Z = -1*ones(num_bots, 1);
