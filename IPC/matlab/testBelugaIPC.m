@@ -82,7 +82,42 @@ try
     
     disp('checking get control [0 1 2 3] (kinematics)')
     check_get_control_response([0 1 2 3], [], [], [], zeros(1, 4), zeros(1, 4), zeros(1, 4), sock)        
+
+    disp('checking set control 0 (waypoint)')
+    check_set_control_response(0, 1, 2, 3, [], [], [], sock)
+
+    disp('checking set control 1 (waypoint)')
+    check_set_control_response(1, 1, 2, 3, [], [], [], sock)
     
+    disp('checking set control 2 (waypoint)')
+    check_set_control_response(2, 1, -2, 3.4, [], [], [], sock)
+    
+    disp('checking set control 3 (waypoint)')
+    check_set_control_response(3, exp(-1), randn(1), 5e4, [], [], [], sock)
+    
+    disp('checking set control [3 1] (waypoint)')
+    check_set_control_response([3 1], [1/pi 1], [-1 pi], [0 5], [], [], [], sock)    
+
+    disp('checking set control [0 1 2 3] (waypoint)')
+    check_set_control_response([0 : 3], randn(4,1), randn(4, 1), randn(4, 1), [], [], [], sock)    
+    
+    disp('checking set control 0 (kinematics)')
+    check_set_control_response(0, [], [], [], 3, 2, 1, sock)
+
+    disp('checking set control 1 (kinematics)')
+    check_set_control_response(1, [], [], [], 1e4, 2, -3, sock)
+    
+    disp('checking set control 2 (kinematics)')
+    check_set_control_response(2, [], [], [], 1/pi, -2, 3.4, sock)
+    
+    disp('checking set control 3 (kinematics)')
+    check_set_control_response(3, [], [], [], exp(2), randn(1), 5e4, sock)
+    
+    disp('checking set control [3 1] (kinematics)')
+    check_set_control_response([3 1],  [], [], [], [pi -5], [1 -1/pi], [10 5], sock)    
+
+    disp('checking set control [0 1 2 3] (kinematics)')
+    check_set_control_response([0 : 3], [], [], [], randn(4,1), randn(4, 1), randn(4, 1), sock)    
     stopBelugaServer
     
 catch err
@@ -135,6 +170,21 @@ if ~iseqwf(x, x_ex) || ~iseqwf(y, y_ex) || ~iseqwf(z, z_ex)...
     error('Unexpected response from server in check_get_position_response');
 end
 
+function check_set_control_response(id, x_ex, y_ex, z_ex, s_ex, o_ex, zd_ex, sock)
+
+[x, y, z, spd, omega, zdot, id_out] = belugaSetControlIPC(id, ...
+    x_ex, y_ex, z_ex, s_ex, o_ex, zd_ex, sock);
+
+if ~iseqwf(x, x_ex) || ~iseqwf(y, y_ex) || ~iseqwf(z, z_ex)...
+        || ~iseqwf(spd, s_ex) || ~iseqwf(omega, o_ex) || ~iseqwf(zdot, zd_ex)...
+        || ~iseqwf(id, id_out)
+    dump_vecs('x', x, 'x_ex', x_ex, 'y', y, 'y_ex', y_ex, 'z', z, 'z_ex', z_ex,...
+        'spd', spd, 's_ex', s_ex, 'omega', omega, 'o_ex', o_ex,...
+        'zdot', zdot, 'zd_ex', zd_ex, 'id', id, 'id_ex', id_out);
+    error('Unexpected response from server in check_get_position_response');
+end
+
+check_get_control_response(id, x_ex, y_ex, z_ex, s_ex, o_ex, zd_ex, sock)
 
 function dump_vecs(varargin)
 
