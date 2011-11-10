@@ -23,6 +23,8 @@ try
     TankRadius = 3.0; %roughly
     WaterDepth = 2.286; %pretty close
     
+    Ts = 0.2;  % simulator sample rate
+    
     % the simulator runs in waypoint mode. we initially set the waypoints to
     % evenly distributed points around the tank and just below the surface
     X_init = (2/3)*TankRadius*cos(pi/4 + pi/2*[0 : 3]);
@@ -43,7 +45,7 @@ try
     
     timer_sim = timer('ExecutionMode', 'fixedRate', ...
         'StartDelay', 0, ...
-        'Period', 0.2);
+        'Period', Ts);
     
     set(timer_sim, 'TimerFcn', @(varargin) updateSimulator(fig, h, sock), ...
         'StopFcn', @(varargin) doneSimulator(fig, h, sock),...
