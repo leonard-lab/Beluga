@@ -1,17 +1,17 @@
-function [X, Y, Z, IX] = belugaGetPositionIPC(robot_id, sock)
+function [X, Y, Z, IX] = belugaSetPositionIPC(robot_id, x, y, z, sock)
 
-if nargin == 1,
+if nargin == 4,
     sock = [];
 end
 
-msg = 'get position ';
+msg = 'set position ';
 num_bots = length(robot_id);
 for ix = 1 : num_bots,
     r_id = robot_id(ix);
     if(r_id > 3)
         error('Robot id %d is out of bounds (3 max)', r_id)
     end
-    msg = [msg int2str(r_id) ' '];
+    msg = [msg int2str(r_id) sprintf(' %f %f %f ', x(ix), y(ix), z(ix))];
 end
 
 resp_string = belugaIPCMessage(msg, sock);
@@ -37,4 +37,3 @@ else
         IX(ix) = robot_id(ix);
     end
 end
-
