@@ -41,7 +41,7 @@ sock = getBelugaIPCSocket('127.0.0.1', 1234);
 resp = belugaIPCMessage('ping', sock);
 
 if ~strcmp(resp, 'PONG!')
-    error('Failure to confirm server launch.')
+    error('Failure to confirm server launch [got %s].', resp)
     success = 0;
     return
 end
