@@ -31,17 +31,22 @@ sock.Name = 'ClientSocket';
 % uncomment if you want verbose output in the simulator log file
 %belugaIPCMessage('set verbose on');
 
+TankRadius = 3.0; %roughly
+WaterDepth = 2.286; %pretty close
+
 for t = 1 : 10
-    [x, y, z] = belugaGetPositionIPC(0, sock);
+    [X, Y, Z] = belugaGetPositionIPC([0 : 3], sock);
     
-    % execute a random walk
-    go_x = x + randn(1);
-    go_y = y + randn(1);
-    go_z = 0;
+    % go to a random location in the tank
+    TH = 2*pi*rand(4,1);
+    R = TankRadius*rand(4,1);
+    GO_X = R.*cos(TH);
+    GO_Y = R.*sin(TH);
+    GO_Z = WaterDepth*rand(4,1);
+
+    belugaSetWaypointIPC([0 : 3], GO_X, GO_Y, GO_Z, sock);
     
-    belugaSendCommandIPC(0, go_x, go_y, go_z, sock);
-    
-    pause(2);
+    pause(5);
 end
 
 % stop the simulator when we're done
