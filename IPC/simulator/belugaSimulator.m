@@ -38,10 +38,11 @@ try
     end 
     
     fig = figure();
-    h = plot(go_x, go_y, 'rs', 0, 0, 'go');
+    h = plot3(go_x, go_y, go_z, 'rs', 0, 0, 0, 'go');
     
     title('Beluga Simulator - Running')
-    axis([-3 3 -3 3]);
+    view(3)
+    axis([-3 3 -3 3 0 3]);
     
     timer_sim = timer('ExecutionMode', 'fixedRate', ...
         'StartDelay', 0, ...
@@ -76,8 +77,8 @@ else
     [X, Y, Z] = belugaSimulatorDoStep(GO_X, GO_Y, GO_Z);
     
     % may need to change this
-    set(h(1), 'XData', GO_X, 'YData', GO_Y)
-    set(h(2), 'XData', X, 'YData', Y)
+    set(h(1), 'XData', GO_X, 'YData', GO_Y, 'ZData', GO_Z)
+    set(h(2), 'XData', X, 'YData', Y, 'ZData', Z)
     
     belugaSetPositionIPC([0 : 3], X, Y, Z, sock);
     
