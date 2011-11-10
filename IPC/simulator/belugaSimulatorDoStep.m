@@ -7,11 +7,11 @@ persistent TH;
 persistent V;
 
 if isempty(X),
-    X = zeros(4,1);
-    Y = zeros(4,1);
-    Z = zeros(4,1);
-    TH = zeros(4,1);
-    V = 0.05*ones(4,1);
+    X = zeros(4, 1);
+    Y = zeros(4, 1);
+    Z = zeros(4, 1);
+    TH = zeros(4, 1);
+    V = 0.05*ones(4, 1);
 end
 
 rmax = 3.2;
@@ -80,7 +80,7 @@ for ix = 1 : 4,
     TH(ix) = th;
     V(ix) = v;
     
-    X_o(ix) = x;
-    Y_o(ix) = y;
-    Z_o(ix) = z;
+    X_o(ix, 1) = x;
+    Y_o(ix, 1) = y;
+    Z_o(ix, 1) = z;
 end

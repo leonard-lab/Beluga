@@ -38,7 +38,10 @@ try
     end 
     
     fig = figure();
-    h = plot3(go_x, go_y, go_z, 'rs', 0, 0, 0, 'go');
+    h = plot3(go_x(1), go_y(1), go_z(1), 'rs', 0, 0, 0, 'ro',...
+        go_x(2), go_y(2), go_z(2), 'gs', 0, 0, 0, 'go',...
+        go_x(3), go_y(3), go_z(3), 'bs', 0, 0, 0, 'bo',...
+        go_x(4), go_y(4), go_z(4), 'ks', 0, 0, 0, 'ko');
     
     title('Beluga Simulator - Running')
     view(3)
@@ -77,12 +80,12 @@ else
     [X, Y, Z] = belugaSimulatorDoStep(GO_X, GO_Y, GO_Z);
     
     % may need to change this
-    set(h(1), 'XData', GO_X, 'YData', GO_Y, 'ZData', GO_Z)
-    set(h(2), 'XData', X, 'YData', Y, 'ZData', Z)
+    set(h([1 : 2 : end]), {'XData'}, num2cell(GO_X), {'YData'}, num2cell(GO_Y), {'ZData'}, num2cell(GO_Z))
+    set(h([2 : 2 : end]), {'XData'}, num2cell(X), {'YData'}, num2cell(Y), {'ZData'}, num2cell(Z))
     
     belugaSetPositionIPC([0 : 3], X, Y, Z, sock);
     
-end    
+end 
 
 function doneSimulator(f, h, sock)
 
