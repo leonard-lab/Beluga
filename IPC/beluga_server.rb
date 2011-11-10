@@ -1,60 +1,58 @@
 require File.dirname(__FILE__) + "/rhubarb/rhubarb.rb"
 
-class Robot
-
-  attr_accessor :cmd_x, :cmd_y, :cmd_z, :position_x, :position_y, :position_z, :robot_id
-  
-  def initialize(id)
-    @cmd_x = 0;
-    @cmd_y = 0;
-    @cmd_z = 0;
-     
-    @position_x = 0;
-    @position_y = 0;
-    @position_z = 0;
-     
-    @robot_id = id;
-  end
-
-end
-
 class BelugaServer < Rhubarb
-  
-  @@robots = Array.new;
-  @@robots << Robot.new(0);
-  @@robots << Robot.new(1);
-  @@robots << Robot.new(2);
-  @@robots << Robot.new(3);
 
-  cmd_position = {:name => "position", :setArgs => 3, :maxIndex => 3}
-  cmd_cmd = {:name => "command", :setArgs => 3, :maxIndex => 3}
+  @@num_bots = 4
 
-  add_indexed_get_set_command cmd_position
-  add_indexed_get_set_command cmd_cmd
-  
-  def robot(id)
-    @@robots[id]
+  # this function is useful to set initial data values and is
+  # especially useful in testing
+  def self.reset_data
+    @@positions = [[0.0, 0.0, 0.0]]*@@num_bots
+    @@controls = ({ :waypoint =>  [[0.0, 0.0, 0.0]]*@@num_bots,
+                    :kinematics => [[0.0, 0.0, 0.0]]*@@num_bots })
+    @@control_mode = :waypoint    
   end
 
-  def getCommand(i)
-    " #{robot(i).robot_id} #{robot(i).cmd_x} #{robot(i).cmd_y} #{robot(i).cmd_z}"
+  # makes sure the data is reset when we launch a server
+  reset_data
+
+  @@cmd_control = ({ :name => "control",
+                     :modes => {
+                       :waypoint => { :setArgs => 3 },
+                       :kinematics => { :setArgs => 3 }
+                     },
+                     :maxIndex => @@num_bots-1
+                   })
+  
+
+  add_indexed_get_set_command :name => "position", :setArgs => 3, :maxIndex => 3
+  add_indexed_get_set_command @@cmd_control
+
+  def getControlMode
+    @@control_mode
   end
 
-  def setCommand(i, args)
-    @@robots[i].cmd_x = args[0].to_f
-    @@robots[i].cmd_y = args[1].to_f
-    @@robots[i].cmd_z = args[2].to_f
-    getCommand(i)
+  def setControlMode mode
+    return false unless @@cmd_control[:modes].has_key?(mode.to_sym)
+    @@control_mode = mode.to_sym
+    return true
+  end    
+  
+  def getControl(i)
+    @@controls[@@control_mode][i].collect{ |c| c.to_f}.join(" ")
+  end
+
+  def setControl(i, args)
+    @@controls[@@control_mode][i] = args.collect{ |a| a.to_f }
+    getControl(i)
   end
 
   def getPosition(i)
-    " #{robot(i).robot_id} #{robot(i).position_x} #{robot(i).position_y} #{robot(i).position_z}"
+    @@positions[i].collect{ |p| p.to_f }.join(" ")
   end
 
   def setPosition(i, args)
-    @@robots[i].position_x = args[0].to_f
-    @@robots[i].position_y = args[1].to_f
-    @@robots[i].position_z = args[2].to_f
+    @@positions[i] = args.collect{ |a| a.to_f }
     getPosition(i)
   end
   
@@ -68,11 +66,16 @@ class BelugaServer < Rhubarb
 
 end
 
-server = BelugaServer.new(1234, '127.0.0.1')
+# this makes it so that we can launch the beluga server by doing
+#  'ruby beluga_server.rb' from the command line, but also allows
+#  us to include this file in other bits of code (esp. tests)
+if __FILE__ == $0
+  server = BelugaServer.new(1234, '127.0.0.1')
 
-server.audit = true
-server.start
+  server.audit = true
+  server.start
 
-server.join
+  server.join
 
-puts "Server has been terminated"
+  puts "Server has been terminated"
+end
