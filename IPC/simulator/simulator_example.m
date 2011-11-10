@@ -3,7 +3,7 @@ close all;
 
 % note, if you have trouble, you might want to do something like this:
 % 1) determine if there are any existing servers running
-% !ps -A | grep rhubarb
+% !ps -A | grep beluga
 % 2) if the results include something like 'ruby /the/path/to/rhubarb.rb..'
 % then do
 % !kill pid
