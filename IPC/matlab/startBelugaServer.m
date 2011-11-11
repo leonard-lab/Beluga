@@ -22,10 +22,13 @@ server_path = fullfile(fileparts(mfilename('fullpath')), '../beluga_server.rb');
 
 cmd = '';
 if ispc
-    cmd = sprintf('start "server" "ruby %s >> %s 2>&1"', server_path, logfile);
+    cmd = sprintf('start "beluag_server" ruby %s >> %s 2>&1', server_path, logfile);
 else
     cmd = sprintf('ruby "%s" >> "%s" 2>&1 &', server_path, logfile);
 end
+
+fprintf('cmd = |%s|\n', cmd);
+%return
 
 [status, r] = system(cmd);
 if status > 0,
