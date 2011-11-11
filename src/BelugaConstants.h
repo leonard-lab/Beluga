@@ -142,6 +142,7 @@ enum
 enum
 {
 	BELUGA_ROBOT_MEASUREMENT_DEPTH = 0,
+    BELUGA_ROBOT_MEASUREMENT_DEPTH_RAW,
 
 	BELUGA_ROBOT_MEASUREMENT_SIZE /* must always be the last one */
 };

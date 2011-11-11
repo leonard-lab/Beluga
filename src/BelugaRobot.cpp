@@ -143,6 +143,7 @@ std::vector<double> Beluga::GetMeasurements()
 {
 	std::vector<double> r(BELUGA_ROBOT_MEASUREMENT_SIZE);
 	r[BELUGA_ROBOT_MEASUREMENT_DEPTH] = m_dDepth;
+    r[BELUGA_ROBOT_MEASUREMENT_DEPTH_RAW] = m_iDepthMeas;
 	return r;
 }
 
