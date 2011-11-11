@@ -1,49 +1,91 @@
 function belugaSimulator()
 
+close all;
+
 addpath('../matlab');
 
-[status, r] = system('ruby ../beluga_server.rb >> simulator.log &');
-if status > 0,
-    error(r)
+delete(timerfind)
+
+startBelugaServer('simulator.log');
+
+try
+   
+    disp('Opening socket')
+    sock = getBelugaIPCSocket('127.0.0.1', 1234);
+    sock.Timeout = 0.5;
+    sock.Name = 'SimulatorSocket';
+    sock.ErrorFcn = @(varargin) sockError();
+    disp('Done')
+    
+    % uncomment if you want lots of output in the log file
+    % belugaIPCMessage('set verbose on');
+    
+    TankRadius = 3.0; %roughly
+    WaterDepth = 2.286; %pretty close
+    
+    Ts = 0.2;  % simulator sample rate
+    
+    % the simulator runs in waypoint mode. we initially set the waypoints to
+    % evenly distributed points around the tank and just below the surface
+    X_init = (2/3)*TankRadius*cos(pi/4 + pi/2*[0 : 3]);
+    Y_init = (2/3)*TankRadius*sin(pi/4 + pi/2*[0 : 3]);
+    Z_init = (3/4)*WaterDepth*ones(4, 1);
+    [go_x, go_y, go_z] = belugaSetWaypointIPC([0 : 3], ...
+        X_init, Y_init, Z_init, sock);
+    
+    if isempty(go_x) || isempty(go_y) || isempty(go_z)
+        error('Unable to set initial waypoint')
+    end 
+    
+    fig = figure();
+    h = plot3(go_x(1), go_y(1), go_z(1), 'rs', 0, 0, 0, 'ro',...
+        go_x(2), go_y(2), go_z(2), 'gs', 0, 0, 0, 'go',...
+        go_x(3), go_y(3), go_z(3), 'bs', 0, 0, 0, 'bo',...
+        go_x(4), go_y(4), go_z(4), 'ks', 0, 0, 0, 'ko');
+    
+    title('Beluga Simulator - Running')
+    view(3)
+    axis([-3 3 -3 3 0 3]);
+    
+    timer_sim = timer('ExecutionMode', 'fixedRate', ...
+        'StartDelay', 0, ...
+        'Period', Ts);
+    
+    set(timer_sim, 'TimerFcn', @(varargin) updateSimulator(fig, h, sock), ...
+        'StopFcn', @(varargin) doneSimulator(fig, h, sock),...
+        'name', 'BelugaSimTimer');
+    start(timer_sim);
+
+catch err
+    
+    % should make sure that the server gets stopped if we have an error
+    if exist('sock')
+        stopBelugaSimulator(sock);
+    else
+        stopBelugaSimulator
+    end
+    rethrow(err)
+    
 end
-
-pause(0.1)
-
-sock = getBelugaIPCSocket('127.0.0.1', 1234);
-[go_x, go_y, go_z] = belugaGetCommandIPC(0, sock);
-
-fig = figure();
-h = plot(go_x, go_y, 'rs', 0, 0, 'go');
-
-title('Beluga Simulator - Running')
-axis([-3 3 -3 3]);
-
-t = timer('ExecutionMode', 'fixedRate', ...
-    'StartDelay', 0, ...
-    'Period', 0.2);
-
-set(t, 'TimerFcn', @(varargin) updateSimulator(fig, h, sock), ...
-       'StopFcn', @(varargin) doneSimulator(fig, h, sock),...
-       'name', 'BelugaSimTimer');
-start(t);
-
+    
+    
 function updateSimulator(f, h, sock)
 
-[go_x_0, go_y_0, go_z_0] = belugaGetCommandIPC(0, sock);
-% TODO:  [go_x_1, go_x_2, go_x_3] = belugaGetCommandIPC(1, sock);, etc
+[GO_X, GO_Y, GO_Z, ~] = belugaGetWaypointIPC([0 : 3], sock);
 
-GO_X = [go_x_0];  % TODO: vectorize
-GO_Y = [go_y_0];  % TODO: vectorize
-GO_Z = [go_z_0];  % TODO: vectorize
-
-[X, Y, Z] = belugaSimulatorDoStep(GO_X, GO_Y, GO_Z);
-
-% may need to change this
-set(h(1), 'XData', GO_X, 'YData', GO_Y)
-set(h(2), 'XData', X, 'YData', Y)
-
-belugaSendPositionIPC(0, X(1), Y(1), Z(1));
-% TODO: belugaSendPositionIPC(1, X(2), Y(2), Z(2));
+if isempty(GO_X) || isempty(GO_Y) || isempty(GO_Z)
+    fprintf('Warning: no response from server. skipping step.\n');
+else
+    
+    [X, Y, Z] = belugaSimulatorDoStep(GO_X, GO_Y, GO_Z);
+    
+    % may need to change this
+    set(h([1 : 2 : end]), {'XData'}, num2cell(GO_X), {'YData'}, num2cell(GO_Y), {'ZData'}, num2cell(GO_Z))
+    set(h([2 : 2 : end]), {'XData'}, num2cell(X), {'YData'}, num2cell(Y), {'ZData'}, num2cell(Z))
+    
+    belugaSetPositionIPC([0 : 3], X, Y, Z, sock);
+    
+end 
 
 function doneSimulator(f, h, sock)
 
@@ -52,3 +94,7 @@ title('Beluga Simulator - Done');
 
 stopBelugaServer(sock);
 closeBelugaSocket(sock);
+
+function sockError()
+
+puts 'A socket error has occurred in the simulator.'
