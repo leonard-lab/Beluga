@@ -31,6 +31,8 @@ public:
 	std::vector<double> GetControl();
 	std::vector<double> GetMeasurements();
 
+	std::string GetStatusString();
+
 	double convertDepthMeasurement(int d);
 
 	void Control();

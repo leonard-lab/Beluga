@@ -147,6 +147,16 @@ std::vector<double> Beluga::GetMeasurements()
 	return r;
 }
 
+std::string Beluga::GetStatusString()
+{
+	std::ostringstream ss;
+	ss << m_sName;
+	ss << " depth: ";
+	ss << m_dDepth;
+	ss << " (raw: " << m_iDepthMeas << ")";
+	return ss.str();
+}
+
 double Beluga::GetX() const
 {
 	return m_vdState[BELUGA_STATE_X];
