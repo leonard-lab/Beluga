@@ -166,4 +166,10 @@ const double BELUGA_WAYPOINT_SAME_Z = -1.0;
 
 #define BELUGA_MAINTAIN_Z < 0
 
+enum BELUGA_CONTROL_MODE
+{
+    WAYPOINT,
+    KINEMATICS
+};
+
 #endif // BELUGA_CONSTANTS
