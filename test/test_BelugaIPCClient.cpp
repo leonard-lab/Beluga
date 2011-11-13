@@ -16,7 +16,8 @@ enum OP
 {
     GET_POSITION = 0,
     SET_POSITION,
-    GET_CONTROLS
+    GET_CONTROLS,
+    SET_CONTROLS
 };
 
 double randomfloat()
@@ -120,6 +121,11 @@ bool check_single(belugaIPCClient* client,
         mode = *mode_exp;
         r = client->getControl(robot, &mode, &x, &y, &z);
         break;
+    case SET_CONTROLS:
+        x = x_exp; y = y_exp; z = z_exp;
+        mode = *mode_exp;
+        r = client->setControl(robot, &mode, &x, &y, &z);
+        break;
     default:
         std::cerr << "Unknown operation" << std::endl;
         return false;
@@ -189,6 +195,11 @@ bool check_multiple(belugaIPCClient* client,
         mode = *mode_exp;
         r = client->getControls(robots, &mode, &x, &y, &z);
         break;
+    case SET_CONTROLS:
+        x = x_exp;  y = y_exp; z = z_exp;
+        mode = *mode_exp;
+        r = client->setControls(robots, &mode, &x, &y, &z);
+        break;        
     default:
         std::cerr << "Unknown operation" << std::endl;
         return false;
@@ -258,6 +269,11 @@ bool check_all(belugaIPCClient* client,
     case GET_CONTROLS:
         mode = *mode_exp;
         r = client->getAllControls(&mode, &x, &y, &z);
+        break;
+    case SET_CONTROLS:
+        x = x_exp; y = y_exp; z = z_exp;
+        mode = *mode_exp;
+        r = client->setAllControls(&mode, &x, &y, &z);
         break;
     default:
         std::cerr << "Unknown operation" << std::endl;
@@ -529,6 +545,147 @@ int main(int argc, char** argv)
     DO_TEST("Checking get all controls",
             !check_all(&client, GET_CONTROLS, x, y, z, &err_msg, &mode),
             err_msg);
+
+    DO_TEST("Checking set control (waypoint) 0",
+            !check_single(&client, SET_CONTROLS, 0, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking set control (waypoint) 1",
+            !check_single(&client, SET_CONTROLS, 1, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking set control (waypoint) 2",
+            !check_single(&client, SET_CONTROLS, 2, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking set control (waypoint) 3",
+            !check_single(&client, SET_CONTROLS, 3, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+    
+    robots.assign(bots1, bots1+1);
+    x= randomVector(1);
+    y= randomVector(1);
+    z= randomVector(1);
+
+    DO_TEST("Checking set controls (waypoint) [1]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots12, bots12+2);
+    x= randomVector(2);
+    y= randomVector(2);
+    z= randomVector(2);    
+    
+    DO_TEST("Checking set controls (waypoint) [1 2]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots3, bots3+1);
+    x= randomVector(1);
+    y= randomVector(1);
+    z= randomVector(1);    
+    
+    DO_TEST("Checking set controls (waypoint) [3]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots201, bots201+3);
+    x= randomVector(3);
+    y= randomVector(3);
+    z= randomVector(3);
+    
+    DO_TEST("Checking set controls (waypoint) [2 0 1]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots0123, bots0123+4);
+    x= randomVector(4);
+    y= randomVector(4);
+    z= randomVector(4);
+    
+    DO_TEST("Checking set controls (waypoint) [0 1 2 3]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    x= randomVector(4);
+    y= randomVector(4);
+    z= randomVector(4);
+    
+    DO_TEST("Checking set all controls (waypoint) ",
+            !check_all(&client, SET_CONTROLS, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    mode = KINEMATICS;
+
+    DO_TEST("Checking set control (kinematics) 0",
+            !check_single(&client, SET_CONTROLS, 0, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking set control (kinematics) 1",
+            !check_single(&client, SET_CONTROLS, 1, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking set control (kinematics) 2",
+            !check_single(&client, SET_CONTROLS, 2, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking set control (kinematics) 3",
+            !check_single(&client, SET_CONTROLS, 3, randomfloat(), randomfloat(), randomfloat(), &err_msg, &mode),
+            err_msg);
+    
+    robots.assign(bots1, bots1+1);
+    x= randomVector(1);
+    y= randomVector(1);
+    z= randomVector(1);
+
+    DO_TEST("Checking set controls (kinematics) [1]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots12, bots12+2);
+    x= randomVector(2);
+    y= randomVector(2);
+    z= randomVector(2);    
+    
+    DO_TEST("Checking set controls (kinematics) [1 2]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots3, bots3+1);
+    x= randomVector(1);
+    y= randomVector(1);
+    z= randomVector(1);    
+    
+    DO_TEST("Checking set controls (kinematics) [3]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots201, bots201+3);
+    x= randomVector(3);
+    y= randomVector(3);
+    z= randomVector(3);
+    
+    DO_TEST("Checking set controls (kinematics) [2 0 1]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots0123, bots0123+4);
+    x= randomVector(4);
+    y= randomVector(4);
+    z= randomVector(4);
+    
+    DO_TEST("Checking set controls (kinematics) [0 1 2 3]",
+            !check_multiple(&client, SET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    x= randomVector(4);
+    y= randomVector(4);
+    z= randomVector(4);
+    
+    DO_TEST("Checking set all controls (kinematics) ",
+            !check_all(&client, SET_CONTROLS, x, y, z, &err_msg, &mode),
+            err_msg);
+    
     
         std::cout << std::endl << "\tAll tests pass!" << std::endl;
     return OK;

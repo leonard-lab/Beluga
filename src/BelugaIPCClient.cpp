@@ -147,6 +147,20 @@ bool belugaIPCClient::getControls(std::vector<unsigned int> robots,
     return doExchange(robots, X_or_SPEED, Y_or_OMEGA, Z_or_ZDOT, "get control", mode);
 }
 
+bool belugaIPCClient::setControls(std::vector<unsigned int> robots,
+                                  BELUGA_CONTROL_MODE* mode,
+                                  std::vector<double>* X_or_SPEED,
+                                  std::vector<double>* Y_or_OMEGA,
+                                  std::vector<double>* Z_or_ZDOT)
+{
+    if(!mode)
+    {
+        std::cerr << "belugaIPCClient::setControls error - mode is NULL" << std::endl;
+        return false;
+    }
+    return doExchange(robots, X_or_SPEED, Y_or_OMEGA, Z_or_ZDOT, "set control", mode);
+}
+
 bool belugaIPCClient::doExchange(std::vector<unsigned int> robots,
                                  std::vector<double>* A,
                                  std::vector<double>* B,
@@ -162,6 +176,22 @@ bool belugaIPCClient::doExchange(std::vector<unsigned int> robots,
 
     std::ostringstream ss;
     ss << op;
+
+    if(mode && (op.compare(0, 3, "set") == 0))
+    {
+        switch(*mode)
+        {
+        case WAYPOINT:
+            ss << " waypoint";
+            break;
+        case KINEMATICS:
+            ss << " kinematics";
+            break;
+        default:
+            ERROR("belugaIPCClient error: Unknown control mode requested.");
+            break;
+        }
+    }
     
     for(unsigned int i = 0; i < robots.size(); i++)
     {
@@ -327,6 +357,38 @@ bool belugaIPCClient::getControl(unsigned int robot, BELUGA_CONTROL_MODE* mode,
     return true;
 }
 
+bool belugaIPCClient::setControl(unsigned int robot, BELUGA_CONTROL_MODE* mode,
+                                 double* x, double* y, double* z)
+{
+    if(!x || !y || !z || !mode)
+    {
+        ERROR("belugaIPCClient::setControl error: one or more inputs are NULL.");
+        return false;
+    }
+
+    if(robot >= MAX_BOTS)
+    {
+        ERROR("belugaIPCClient::setControl error: robot index out of range.");
+        return false;
+    }
+
+    std::vector<double> X(1), Y(1), Z(1);
+    std::vector<unsigned int> bot(1);
+
+    bot[0] = robot;
+
+    if(!setControls(bot, mode, &X, &Y, &Z))
+    {
+        return false;
+    }
+
+    *x = X[0];
+    *y = Y[0];
+    *z = Z[0];
+    
+    return true;
+}
+
 bool belugaIPCClient::getAllPositions(std::vector<double>* X,
                                       std::vector<double>* Y,
                                       std::vector<double>* Z)
@@ -368,3 +430,208 @@ bool belugaIPCClient::getAllControls(BELUGA_CONTROL_MODE* mode,
     return getControls(robots, mode, X, Y, Z);
 }
 
+bool belugaIPCClient::setAllControls(BELUGA_CONTROL_MODE* mode,
+                                     std::vector<double>* X,
+                                     std::vector<double>* Y,
+                                     std::vector<double>* Z)
+{
+    if(!mode)
+    {
+        std::cerr << "belugaIPCClient::setAllControls error: mode input is NULL" << std::endl;
+    }
+    std::vector<unsigned int> robots(4);
+    robots[0] = 0;
+    robots[1] = 1;
+    robots[2] = 2;
+    robots[3] = 3;
+    return setControls(robots, mode, X, Y, Z);
+}
+
+
+bool belugaIPCClient::getWaypoints(std::vector<unsigned int> robots,
+                                   std::vector<double>* X,
+                                   std::vector<double>* Y,
+                                   std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = getControls(robots, &mode, X, Y, Z);
+    if(mode != WAYPOINT)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }
+}
+
+bool belugaIPCClient::getWaypoint(unsigned int robot, double* x, double* y, double* z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = getControl(robot, &mode, x, y, z);
+    if(mode != WAYPOINT)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }    
+}
+
+bool belugaIPCClient::getAllWaypoints(std::vector<double>* X,
+                                      std::vector<double>* Y,
+                                      std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = getAllControls(&mode, X, Y, Z);
+    if(mode != WAYPOINT)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }    
+}
+
+bool belugaIPCClient::setWaypoints(std::vector<unsigned int> robots,
+                                   std::vector<double>* X,
+                                   std::vector<double>* Y,
+                                   std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = setControls(robots, &mode, X, Y, Z);
+    if(mode != WAYPOINT)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }    
+}
+
+bool belugaIPCClient::setWaypoint(unsigned int robot, double* x, double* y, double* z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = setControl(robot, &mode, x, y, z);
+    if(mode != WAYPOINT)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }        
+}
+
+bool belugaIPCClient::setAllWaypoints(std::vector<double>* X,
+                                      std::vector<double>* Y,
+                                      std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = setAllControls(&mode, X, Y, Z);
+    if(mode != WAYPOINT)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }        
+}
+
+bool belugaIPCClient::getKinematics(std::vector<unsigned int> robots,
+                                   std::vector<double>* X,
+                                   std::vector<double>* Y,
+                                   std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = getControls(robots, &mode, X, Y, Z);
+    if(mode != KINEMATICS)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }
+}
+
+bool belugaIPCClient::getKinematics(unsigned int robot, double* x, double* y, double* z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = getControl(robot, &mode, x, y, z);
+    if(mode != KINEMATICS)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }    
+}
+
+bool belugaIPCClient::getAllKinematics(std::vector<double>* X,
+                                      std::vector<double>* Y,
+                                      std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = getAllControls(&mode, X, Y, Z);
+    if(mode != KINEMATICS)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }    
+}
+
+bool belugaIPCClient::setKinematics(std::vector<unsigned int> robots,
+                                   std::vector<double>* X,
+                                   std::vector<double>* Y,
+                                   std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = setControls(robots, &mode, X, Y, Z);
+    if(mode != KINEMATICS)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }    
+}
+
+bool belugaIPCClient::setKinematics(unsigned int robot, double* x, double* y, double* z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = setControl(robot, &mode, x, y, z);
+    if(mode != KINEMATICS)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }        
+}
+
+bool belugaIPCClient::setAllKinematics(std::vector<double>* X,
+                                      std::vector<double>* Y,
+                                      std::vector<double>* Z)
+{
+    BELUGA_CONTROL_MODE mode;
+    bool r = setAllControls(&mode, X, Y, Z);
+    if(mode != KINEMATICS)
+    {
+        return false;
+    }
+    else
+    {
+        return r;
+    }        
+}
