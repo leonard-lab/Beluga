@@ -5,6 +5,8 @@
 #include <windows.h>
 #endif
 
+#include <wx/tglbtn.h>
+
 /* Include necessary MADTraC headers */
 #include "MT_Core.h"
 #include "MT_GUI.h"
@@ -21,6 +23,8 @@
 /**********************************************************************
  * GUI Frame Class
  *********************************************************************/
+
+class BelugaControlFrame;
 
 class BelugaTrackerFrame : public MT_RobotFrameBase
 {
@@ -88,6 +92,8 @@ protected:
     BelugaLowLevelControlLaw* m_apLowLevelController[4];
     void initController();
 
+    BelugaControlFrame* m_pBelugaControlFrame;
+
 public:
     BelugaTrackerFrame(wxFrame* parent,
                          wxWindowID id = wxID_ANY,
@@ -131,6 +137,43 @@ public:
    /* menu callbacks */
 	void onMenuAssign(wxCommandEvent& event);
     void onMenuFileCamSetup(wxCommandEvent& event);
+
+    MT_ControlFrameBase* createControlDialog();
+    
+};
+
+
+/**********************************************************************
+ * Control Frame Class
+ *********************************************************************/
+
+class BelugaControlFrame: public MT_RobotControlFrameBase
+{
+	friend class MT_ControlFrameBase;
+	friend class MT_FrameBase;
+	friend class MT_RobotFrameBase;
+    friend class BelugaTrackerFrame;
+
+private:
+    BelugaTrackerFrame* m_pBelugaTrackerFrame;
+
+    wxToggleButton* m_pControlActiveButton;
+    wxToggleButton* m_pIPCActiveButton;    
+
+public:
+
+	BelugaControlFrame(BelugaTrackerFrame* parent,
+                       const int Buttons = MT_TCF_DEFAULT_BUTTONS,
+                       const wxPoint& pos = wxDefaultPosition, 
+                       const wxSize& size = wxSize(150,300));
+	virtual ~BelugaControlFrame(){};
+
+	virtual unsigned int createButtons(wxBoxSizer* pSizer, wxPanel* pPanel);
+
+    virtual void onControlActiveButtonClicked(wxCommandEvent& WXUNUSED(event));
+    virtual void onIPCActiveButtonClicked(wxCommandEvent& WXUNUSED(event));    
+
+	virtual void enableButtons();
 
 };
 

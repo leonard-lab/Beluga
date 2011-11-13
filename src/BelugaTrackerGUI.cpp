@@ -49,7 +49,8 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_bCamerasReady(false),
 	m_bConnectSocket(false),
     m_Controller(4 /* # robots */),
-    m_IPCClient("127.0.0.1", 1234)
+    m_IPCClient("127.0.0.1", 1234),
+    m_pBelugaControlFrame(NULL)
 {
 	for(unsigned int i = 0; i < 4; i++)
 	{
@@ -854,6 +855,83 @@ void BelugaTrackerFrame::onMenuFileCamSetup(wxCommandEvent& event)
 			m_sQuad4CalibrationPath.c_str());
 	}
 
+}
+
+MT_ControlFrameBase* BelugaTrackerFrame::createControlDialog()
+{
+    m_pBelugaControlFrame = new BelugaControlFrame(this);
+	m_pRobotControlFrame = (MT_RobotControlFrameBase *) m_pBelugaControlFrame;
+	m_pTrackerControlFrame = (MT_TrackerControlFrameBase *) m_pRobotControlFrame; 
+	return (MT_ControlFrameBase*) m_pRobotControlFrame;
+}
+
+/**********************************************************************
+ * Control Frame Class
+ *********************************************************************/
+
+enum
+{
+    ID_CONTROL_ACTIVE_BUTTON = MT_RCF_ID_HIGHEST + 10,
+    ID_IPC_ACTIVE_BUTTON
+};
+
+BelugaControlFrame::BelugaControlFrame(BelugaTrackerFrame* parent,
+                                       const int Buttons,
+                                       const wxPoint& pos, 
+                                       const wxSize& size)
+    : MT_RobotControlFrameBase(parent, Buttons, pos, size),
+      m_pBelugaTrackerFrame(parent),
+      m_pControlActiveButton(NULL),
+      m_pIPCActiveButton(NULL)
+{
+}
+
+unsigned int BelugaControlFrame::createButtons(wxBoxSizer* pSizer, wxPanel* pPanel)
+{
+    unsigned int nbuttons = MT_RobotControlFrameBase::createButtons(pSizer, pPanel);
+
+    m_pControlActiveButton = new wxToggleButton(pPanel,
+                                                ID_CONTROL_ACTIVE_BUTTON,
+                                                wxT("Activate Control"));
+    m_pIPCActiveButton = new wxToggleButton(pPanel,
+                                            ID_IPC_ACTIVE_BUTTON,
+                                            wxT("Activate IPC"));
+
+    pSizer->Add(m_pControlActiveButton, 0, wxALL | wxCENTER, 10);
+    pSizer->Add(m_pIPCActiveButton, 0, wxALL | wxCENTER, 10);
+
+    m_pControlActiveButton->Disable();
+    m_pControlActiveButton->SetValue(false);
+    m_pIPCActiveButton->Disable();
+    m_pIPCActiveButton->SetValue(false);
+
+    Connect(ID_CONTROL_ACTIVE_BUTTON,
+            wxEVT_COMMAND_BUTTON_CLICKED,
+            wxCommandEventHandler(BelugaControlFrame::onControlActiveButtonClicked));
+    Connect(ID_IPC_ACTIVE_BUTTON,
+            wxEVT_COMMAND_BUTTON_CLICKED,
+            wxCommandEventHandler(BelugaControlFrame::onIPCActiveButtonClicked));
+
+    return nbuttons + 2;
+    
+}
+
+void BelugaControlFrame::onControlActiveButtonClicked(wxCommandEvent& WXUNUSED(event))
+{
+}
+
+void BelugaControlFrame::onIPCActiveButtonClicked(wxCommandEvent& WXUNUSED(event))
+{
+}
+
+void BelugaControlFrame::enableButtons()
+{
+    if(m_pControlActiveButton)
+    {
+        m_pControlActiveButton->Enable();
+        m_pIPCActiveButton->Enable();
+    }
+    MT_RobotControlFrameBase::enableButtons();
 }
 
 /**********************************************************************
