@@ -41,7 +41,7 @@ if(!(strlen($robot) && strlen($x) && strlen($y)))
 }
 else
 {
-    $message = "set command " . $robot . " " . $x . " " . $y . " ";
+    $message = "set control waypoint " . $robot . " " . $x . " " . $y . " ";
     if(strlen($z))
     {
         $message = $message . $z;
