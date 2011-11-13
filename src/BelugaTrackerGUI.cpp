@@ -23,56 +23,6 @@ enum
     ID_MENU_FILE_CAM_SETUP
 };
 
-/* TODO: Replace with rhubarb code */
-void writeLineToSocket(const char* str, wxSocketBase* sock)
-{
-	char* c = (char *)calloc(strlen(str)+1, sizeof(char));
-	memcpy(c, str, strlen(str));
-	c[strlen(str)] = '\n';
-	sock->Write(c, (strlen(str)+1)*sizeof(char));
-	free(c);
-}
-
-std::string readLineFromSocket(wxSocketBase* sock)
-{
-	sock->SetFlags(wxSOCKET_NOWAIT);
-	std::ostringstream ss;
-
-	char c;
-	unsigned int i = 0;
-	do
-	{
-		sock->Read(&c, 1);
-		if(c >= ' ' && '~')
-		{
-			ss << c;
-		}
-	}while(c != '\n' && i < 1024);
-
-	std::string s = ss.str();
-	return s;
-}
-
-void parseCommandFromSocket(std::string cmd, int* id, double* x, double* y, double* z)
-{
-	if(cmd.length() < 7)
-	{
-		return;
-	}
-	std::istringstream ss(cmd);
-
-	float tmp = 0;
-	ss >> tmp;
-	*id = tmp;
-	ss >> tmp;
-	*x = tmp;
-	ss >> tmp;
-	*y = tmp;
-	ss >> tmp;
-	*z = tmp;
-
-}
-
 /**********************************************************************
  * GUI Frame Class
  *********************************************************************/
