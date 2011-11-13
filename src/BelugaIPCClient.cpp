@@ -28,7 +28,17 @@ size_t find_next_nonspace(const char* str, size_t start)
     }
     return c;
 }
-    
+
+std::string chompWordFromString(std::string* input)
+{
+    size_t start = find_next_nonspace(input->c_str(), 0);
+    size_t stop = find_next_space(input->c_str(), start);
+
+    std::string result = input->substr(start, stop-start);
+    stop = find_next_nonspace(input->c_str(), stop);
+    input->erase(0, stop);
+    return result;
+}
 
 std::vector<double> chompThreeDoublesFromString(std::string* input)
 {
@@ -48,7 +58,7 @@ std::vector<double> chompThreeDoublesFromString(std::string* input)
     {
         return result;
     }
-    ss.str(input->substr(start, start-stop));
+    ss.str(input->substr(start, stop-start + 1));
     ss >> d;
     result.push_back(d);
 
@@ -59,7 +69,7 @@ std::vector<double> chompThreeDoublesFromString(std::string* input)
     {
         return result;
     }
-    ss.str(input->substr(start, start-stop));
+    ss.str(input->substr(start, stop-start + 1));
     ss >> d;
     result.push_back(d);
 
@@ -70,10 +80,10 @@ std::vector<double> chompThreeDoublesFromString(std::string* input)
     {
         return result;
     }
-    ss.str(input->substr(start, start-stop));
+    ss.str(input->substr(start, stop-start + 1));
     ss >> d;
     result.push_back(d);
-    
+
     start = find_next_nonspace(s, stop);
     input->erase(0, start-1);
 
@@ -112,7 +122,7 @@ bool belugaIPCClient::getPositions(std::vector<unsigned int> robots,
                                    std::vector<double>* Y,
                                    std::vector<double>* Z)
 {
-    return doPositionExchange(robots, X, Y, Z, "get");
+    return doExchange(robots, X, Y, Z, "get position");
 }
 
 bool belugaIPCClient::setPositions(std::vector<unsigned int> robots,
@@ -120,23 +130,38 @@ bool belugaIPCClient::setPositions(std::vector<unsigned int> robots,
                                    std::vector<double>* Y,
                                    std::vector<double>* Z)
 {
-    return doPositionExchange(robots, X, Y, Z, "set");
+    return doExchange(robots, X, Y, Z, "set position");
 }
 
-bool belugaIPCClient::doPositionExchange(std::vector<unsigned int> robots,
-                                         std::vector<double>* X,
-                                         std::vector<double>* Y,
-                                         std::vector<double>* Z,
-                                         const std::string& op)
+bool belugaIPCClient::getControls(std::vector<unsigned int> robots,
+                                  BELUGA_CONTROL_MODE* mode,
+                                  std::vector<double>* X_or_SPEED,
+                                  std::vector<double>* Y_or_OMEGA,
+                                  std::vector<double>* Z_or_ZDOT)
 {
-    if(!X || !Y || !Z)
+    if(!mode)
+    {
+        std::cerr << "belugaIPCClient::getControls error - mode is NULL" << std::endl;
+        return false;
+    }
+    return doExchange(robots, X_or_SPEED, Y_or_OMEGA, Z_or_ZDOT, "get control", mode);
+}
+
+bool belugaIPCClient::doExchange(std::vector<unsigned int> robots,
+                                 std::vector<double>* A,
+                                 std::vector<double>* B,
+                                 std::vector<double>* C,
+                                 const std::string& op,
+                                 BELUGA_CONTROL_MODE* mode)
+{
+    if(!A || !B || !C)
     {
         ERROR("belugaIPCClient error: one or more inputs are NULL.");
         return false;
     }
 
     std::ostringstream ss;
-    ss << op << " position";
+    ss << op;
     
     for(unsigned int i = 0; i < robots.size(); i++)
     {
@@ -151,9 +176,9 @@ bool belugaIPCClient::doPositionExchange(std::vector<unsigned int> robots,
             ss << " " << robots[i];
         }
 
-        if(!op.compare("set"))
+        if(!op.compare(0, 3, "set"))
         {
-            ss << " " << X->at(i) << " " << Y->at(i) << " " << Z->at(i) << " ";
+            ss << " " << A->at(i) << " " << B->at(i) << " " << C->at(i) << " ";
         }
         
     }
@@ -161,23 +186,41 @@ bool belugaIPCClient::doPositionExchange(std::vector<unsigned int> robots,
     std::string r = rhubarbClient::doMessage(ss.str().c_str());
     std::string r_orig(r);
 
-    X->resize(0);
-    Y->resize(0);
-    Z->resize(0);
+    if(mode)
+    {
+        std::string mode_string = chompWordFromString(&r);
+        if(!mode_string.compare("waypoint"))
+        {
+            *mode = WAYPOINT;
+        }
+        else if(!mode_string.compare("kinematics"))
+        {
+            *mode = KINEMATICS;
+        }
+        else
+        {
+            std::cerr << "belugaIPCClient error: Unknown control mode \""
+                      << mode_string << "\"" << std::endl;
+        }
+    }
+
+    A->resize(0);
+    B->resize(0);
+    C->resize(0);
 
     for(unsigned int i = 0; i < robots.size(); i++)
     {
-        double x, y, z;
-        if(!parseThreeDoublesFromString(&r, &x, &y, &z))
+        double a, b, c;
+        if(!parseThreeDoublesFromString(&r, &a, &b, &c))
         {
             return false;
         }
-        X->push_back(x);
-        Y->push_back(y);
-        Z->push_back(z);
+        A->push_back(a);
+        B->push_back(b);
+        C->push_back(c);
     }
 
-    if(X->size() != robots.size() || Y->size() != robots.size() || Z->size() != robots.size())
+    if(A->size() != robots.size() || B->size() != robots.size() || C->size() != robots.size())
     {
         std::cerr << "Result size mismatch in belugaIPCClient." << std::endl;
         return false;
@@ -252,6 +295,37 @@ bool belugaIPCClient::setPosition(unsigned int robot, double* x, double* y, doub
     return true;
 }
 
+bool belugaIPCClient::getControl(unsigned int robot, BELUGA_CONTROL_MODE* mode,
+                                 double* x, double* y, double* z)
+{
+    if(!x || !y || !z || !mode)
+    {
+        ERROR("belugaIPCClient::getControl error: one or more inputs are NULL.");
+        return false;
+    }
+
+    if(robot >= MAX_BOTS)
+    {
+        ERROR("belugaIPCClient::getControl error: robot index out of range.");
+        return false;
+    }
+
+    std::vector<double> X(1), Y(1), Z(1);
+    std::vector<unsigned int> bot(1);
+
+    bot[0] = robot;
+
+    if(!getControls(bot, mode, &X, &Y, &Z))
+    {
+        return false;
+    }
+
+    *x = X[0];
+    *y = Y[0];
+    *z = Z[0];
+    
+    return true;
+}
 
 bool belugaIPCClient::getAllPositions(std::vector<double>* X,
                                       std::vector<double>* Y,
@@ -276,3 +350,21 @@ bool belugaIPCClient::setAllPositions(std::vector<double>* X,
     robots[3] = 3;
     return setPositions(robots, X, Y, Z);
 }
+
+bool belugaIPCClient::getAllControls(BELUGA_CONTROL_MODE* mode,
+                                     std::vector<double>* X,
+                                     std::vector<double>* Y,
+                                     std::vector<double>* Z)
+{
+    if(!mode)
+    {
+        std::cerr << "belugaIPCClient::getAllControls error: mode input is NULL" << std::endl;
+    }
+    std::vector<unsigned int> robots(4);
+    robots[0] = 0;
+    robots[1] = 1;
+    robots[2] = 2;
+    robots[3] = 3;
+    return getControls(robots, mode, X, Y, Z);
+}
+

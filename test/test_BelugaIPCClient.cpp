@@ -15,7 +15,8 @@ const int OK = 0;
 enum OP
 {
     GET_POSITION = 0,
-    SET_POSITION
+    SET_POSITION,
+    GET_CONTROLS
 };
 
 double randomfloat()
@@ -93,15 +94,17 @@ bool check_vector_match(const std::vector<double>& a,
     return r;
 }
 
-bool check_single_position(belugaIPCClient* client,
+bool check_single(belugaIPCClient* client,
                            OP op,
                            unsigned int robot,
                            double x_exp,
                            double y_exp,
                            double z_exp,
-                           std::string* err_msg)
+                  std::string* err_msg,
+                  BELUGA_CONTROL_MODE* mode_exp = NULL)
 {
     double x = 42.0; double y = -1.0; double z = 1e3;
+    BELUGA_CONTROL_MODE mode;
 
     bool r = true;
     switch(op)
@@ -113,6 +116,10 @@ bool check_single_position(belugaIPCClient* client,
         x = x_exp; y = y_exp; z = z_exp;        
         r = client->setPosition(robot, &x, &y, &z);
         break;
+    case GET_CONTROLS:
+        mode = *mode_exp;
+        r = client->getControl(robot, &mode, &x, &y, &z);
+        break;
     default:
         std::cerr << "Unknown operation" << std::endl;
         return false;
@@ -122,26 +129,51 @@ bool check_single_position(belugaIPCClient* client,
     {
         *err_msg += "\nError getting/setting position from server.";
     }
-
-    r &= check_doubles_match(x, x_exp, y, y_exp, z, z_exp,
-                             "x position", "y position", "z position",
-                             err_msg);
+    
+    if(mode_exp)
+    {
+        if(mode != *mode_exp)
+        {
+            *err_msg += "\nControl mode mismatch.";
+            r = false;
+        }
+        if(*mode_exp == WAYPOINT)
+        {
+            check_doubles_match(x, x_exp, y, y_exp, z, z_exp,
+                               "x waypoint", "y waypoint", "z waypoint",
+                               err_msg);
+        }
+        else
+        {
+            check_doubles_match(x, x_exp, y, y_exp, z, z_exp,
+                               "speed", "omega", "zdot",
+                               err_msg);
+        }
+    }
+    else
+    {
+        check_doubles_match(x, x_exp, y, y_exp, z, z_exp,
+                           "x position", "y position", "z position",
+                           err_msg);
+    }
 
     return r;
 }
 
-bool check_multiple_positions(belugaIPCClient* client,
+bool check_multiple(belugaIPCClient* client,
                               OP op,
                               std::vector<unsigned int> robots,
                               std::vector<double> x_exp,
                               std::vector<double> y_exp,
                               std::vector<double> z_exp,
-                              std::string *err_msg)
+                              std::string *err_msg,
+                              const BELUGA_CONTROL_MODE* mode_exp = NULL)
 {
     unsigned int num_bots = robots.size();
     std::vector<double> x = randomVector(num_bots);
     std::vector<double> y = randomVector(num_bots);
-    std::vector<double> z = randomVector(num_bots);    
+    std::vector<double> z = randomVector(num_bots);
+    BELUGA_CONTROL_MODE mode;
 
     bool r = true;
     switch(op)
@@ -153,6 +185,10 @@ bool check_multiple_positions(belugaIPCClient* client,
         x = x_exp; y = y_exp; z = z_exp;
         r = client->setPositions(robots, &x, &y, &z);
         break;
+    case GET_CONTROLS:
+        mode = *mode_exp;
+        r = client->getControls(robots, &mode, &x, &y, &z);
+        break;
     default:
         std::cerr << "Unknown operation" << std::endl;
         return false;
@@ -163,22 +199,47 @@ bool check_multiple_positions(belugaIPCClient* client,
         *err_msg += "\nError getting positions from server.";
     }
 
-    check_vector_match(x, x_exp, y, y_exp, z, z_exp,
-                       "x position", "y position", "z position",
-                       err_msg);
+    if(mode_exp)
+    {
+        if(mode != *mode_exp)
+        {
+            *err_msg += "\nControl mode mismatch.";
+            r = false;
+        }
+        if(*mode_exp == WAYPOINT)
+        {
+            check_vector_match(x, x_exp, y, y_exp, z, z_exp,
+                               "x waypoint", "y waypoint", "z waypoint",
+                               err_msg);
+        }
+        else
+        {
+            check_vector_match(x, x_exp, y, y_exp, z, z_exp,
+                               "speed", "omega", "zdot",
+                               err_msg);
+        }
+    }
+    else
+    {
+        check_vector_match(x, x_exp, y, y_exp, z, z_exp,
+                           "x position", "y position", "z position",
+                           err_msg);
+    }
     
     return r;
     
 }
 
-bool check_all_positions(belugaIPCClient* client,
+bool check_all(belugaIPCClient* client,
                          OP op,
                          std::vector<double> x_exp,
                          std::vector<double> y_exp,
                          std::vector<double> z_exp,
-                         std::string *err_msg)
+               std::string *err_msg,
+               BELUGA_CONTROL_MODE* mode_exp = NULL)
 {
     unsigned int num_bots = 4;
+    BELUGA_CONTROL_MODE mode;
 
     std::vector<double> x = randomVector(4);
     std::vector<double> y = randomVector(4);
@@ -194,6 +255,10 @@ bool check_all_positions(belugaIPCClient* client,
         x = x_exp; y = y_exp; z = z_exp;
         r = client->setAllPositions(&x, &y, &z);
         break;
+    case GET_CONTROLS:
+        mode = *mode_exp;
+        r = client->getAllControls(&mode, &x, &y, &z);
+        break;
     default:
         std::cerr << "Unknown operation" << std::endl;
         return false;
@@ -204,9 +269,32 @@ bool check_all_positions(belugaIPCClient* client,
         *err_msg += "\nError getting positions from server.";
     }
 
-    check_vector_match(x, x_exp, y, y_exp, z, z_exp,
-                       "x position", "y position", "z position",
-                       err_msg);
+    if(mode_exp)
+    {
+        if(mode != *mode_exp)
+        {
+            *err_msg += "\nControl mode mismatch.";
+            r = false;
+        }
+        if(*mode_exp == WAYPOINT)
+        {
+            check_vector_match(x, x_exp, y, y_exp, z, z_exp,
+                               "x waypoint", "y waypoint", "z waypoint",
+                               err_msg);
+        }
+        else
+        {
+            check_vector_match(x, x_exp, y, y_exp, z, z_exp,
+                               "speed", "omega", "zdot",
+                               err_msg);
+        }
+    }
+    else
+    {
+        check_vector_match(x, x_exp, y, y_exp, z, z_exp,
+                           "x position", "y position", "z position",
+                           err_msg);
+    }
     
     return r;
     
@@ -234,19 +322,19 @@ int main(int argc, char** argv)
 
     std::string err_msg;
     DO_TEST("Checking get position 0",
-            !check_single_position(&client, GET_POSITION, 0, 0.0, 0.0, 0.0, &err_msg),
+            !check_single(&client, GET_POSITION, 0, 0.0, 0.0, 0.0, &err_msg),
             err_msg);
 
     DO_TEST("Checking get position 1",
-            !check_single_position(&client, GET_POSITION, 1, 0.0, 0.0, 0.0, &err_msg),
+            !check_single(&client, GET_POSITION, 1, 0.0, 0.0, 0.0, &err_msg),
             err_msg);
 
     DO_TEST("Checking get position 2",
-            !check_single_position(&client, GET_POSITION, 2, 0.0, 0.0, 0.0, &err_msg),
+            !check_single(&client, GET_POSITION, 2, 0.0, 0.0, 0.0, &err_msg),
             err_msg);
 
     DO_TEST("Checking get position 3",
-            !check_single_position(&client, GET_POSITION, 3, 0.0, 0.0, 0.0, &err_msg),
+            !check_single(&client, GET_POSITION, 3, 0.0, 0.0, 0.0, &err_msg),
             err_msg);
 
 
@@ -269,7 +357,7 @@ int main(int argc, char** argv)
     z.assign(zeros2, zeros2+2);    
     
     DO_TEST("Checking get positions [1 2]",
-            !check_multiple_positions(&client, GET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, GET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     robots.assign(bots3, bots3+1);
@@ -278,7 +366,7 @@ int main(int argc, char** argv)
     z.assign(zeros1, zeros1 + 1);    
     
     DO_TEST("Checking get positions [3]",
-            !check_multiple_positions(&client, GET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, GET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     robots.assign(bots201, bots201+3);
@@ -287,7 +375,7 @@ int main(int argc, char** argv)
     z.assign(zeros3, zeros3 + 3);    
     
     DO_TEST("Checking get positions [2 0 1]",
-            !check_multiple_positions(&client, GET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, GET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     robots.assign(bots0123, bots0123+4);
@@ -296,7 +384,7 @@ int main(int argc, char** argv)
     z.assign(zeros4, zeros4 + 4);    
     
     DO_TEST("Checking get positions [0 1 2 3]",
-            !check_multiple_positions(&client, GET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, GET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     x.assign(zeros4, zeros4 + 3);
@@ -304,23 +392,23 @@ int main(int argc, char** argv)
     z.assign(zeros4, zeros4 + 3);    
     
     DO_TEST("Checking get all positions",
-            !check_all_positions(&client, GET_POSITION, x, y, z, &err_msg),
+            !check_all(&client, GET_POSITION, x, y, z, &err_msg),
             err_msg);
 
     DO_TEST("Checking set position 0",
-            !check_single_position(&client, SET_POSITION, 0, randomfloat(), randomfloat(), randomfloat(), &err_msg),
+            !check_single(&client, SET_POSITION, 0, randomfloat(), randomfloat(), randomfloat(), &err_msg),
             err_msg);
     
     DO_TEST("Checking set position 1",
-            !check_single_position(&client, SET_POSITION, 1, randomfloat(), randomfloat(), randomfloat(), &err_msg),
+            !check_single(&client, SET_POSITION, 1, randomfloat(), randomfloat(), randomfloat(), &err_msg),
             err_msg);
     
     DO_TEST("Checking set position 2",
-            !check_single_position(&client, SET_POSITION, 2, randomfloat(), randomfloat(), randomfloat(), &err_msg),
+            !check_single(&client, SET_POSITION, 2, randomfloat(), randomfloat(), randomfloat(), &err_msg),
             err_msg);
     
     DO_TEST("Checking set position 3",
-            !check_single_position(&client, SET_POSITION, 3, randomfloat(), randomfloat(), randomfloat(), &err_msg),
+            !check_single(&client, SET_POSITION, 3, randomfloat(), randomfloat(), randomfloat(), &err_msg),
             err_msg);
 
     unsigned int bots03[] = {0, 3};
@@ -333,7 +421,7 @@ int main(int argc, char** argv)
     z = randomVector(2);
 
     DO_TEST("Checking set positions [0 3]",
-            !check_multiple_positions(&client, SET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, SET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     robots.assign(bots312, bots312+3);
@@ -342,7 +430,7 @@ int main(int argc, char** argv)
     z = randomVector(3);
 
     DO_TEST("Checking set positions [3 1 2]",
-            !check_multiple_positions(&client, SET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, SET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     robots.assign(bots1, bots1+1);
@@ -351,7 +439,7 @@ int main(int argc, char** argv)
     z = randomVector(1);
 
     DO_TEST("Checking set positions [1]",
-            !check_multiple_positions(&client, SET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, SET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     robots.assign(bots0123, bots0123+4);
@@ -360,7 +448,7 @@ int main(int argc, char** argv)
     z = randomVector(4);
 
     DO_TEST("Checking set positions [0 1 2 3]",
-            !check_multiple_positions(&client, SET_POSITION, robots, x, y, z, &err_msg),
+            !check_multiple(&client, SET_POSITION, robots, x, y, z, &err_msg),
             err_msg);
 
     x = randomVector(4);
@@ -368,9 +456,79 @@ int main(int argc, char** argv)
     z = randomVector(4);
     
     DO_TEST("Checking set all positions",
-            !check_all_positions(&client, SET_POSITION, x, y, z, &err_msg),
+            !check_all(&client, SET_POSITION, x, y, z, &err_msg),
             err_msg);
     
+    BELUGA_CONTROL_MODE mode = WAYPOINT;
+
+    DO_TEST("Checking get control 0",
+            !check_single(&client, GET_CONTROLS, 0, 0.0, 0.0, 0.0, &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking get control 1",
+            !check_single(&client, GET_CONTROLS, 1, 0.0, 0.0, 0.0, &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking get control 2",
+            !check_single(&client, GET_CONTROLS, 2, 0.0, 0.0, 0.0, &err_msg, &mode),
+            err_msg);
+
+    DO_TEST("Checking get control 3",
+            !check_single(&client, GET_CONTROLS, 3, 0.0, 0.0, 0.0, &err_msg, &mode),
+            err_msg);
+    
+    robots.assign(bots1, bots1+1);
+    x.assign(zeros1, zeros1+1);
+    y.assign(zeros1, zeros1+1);
+    z.assign(zeros1, zeros1+1);
+
+    DO_TEST("Checking get controls [1]",
+            !check_multiple(&client, GET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots12, bots12+2);
+    x.assign(zeros2, zeros2+2);
+    y.assign(zeros2, zeros2+2);
+    z.assign(zeros2, zeros2+2);    
+    
+    DO_TEST("Checking get controls [1 2]",
+            !check_multiple(&client, GET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots3, bots3+1);
+    x.assign(zeros1, zeros1 + 1);
+    y.assign(zeros1, zeros1 + 1);
+    z.assign(zeros1, zeros1 + 1);    
+    
+    DO_TEST("Checking get controls [3]",
+            !check_multiple(&client, GET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots201, bots201+3);
+    x.assign(zeros3, zeros3 + 3);
+    y.assign(zeros3, zeros3 + 3);
+    z.assign(zeros3, zeros3 + 3);    
+    
+    DO_TEST("Checking get controls [2 0 1]",
+            !check_multiple(&client, GET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    robots.assign(bots0123, bots0123+4);
+    x.assign(zeros4, zeros4 + 4);
+    y.assign(zeros4, zeros4 + 4);
+    z.assign(zeros4, zeros4 + 4);    
+    
+    DO_TEST("Checking get controls [0 1 2 3]",
+            !check_multiple(&client, GET_CONTROLS, robots, x, y, z, &err_msg, &mode),
+            err_msg);
+
+    x.assign(zeros4, zeros4 + 3);
+    y.assign(zeros4, zeros4 + 3);
+    z.assign(zeros4, zeros4 + 3);    
+    
+    DO_TEST("Checking get all controls",
+            !check_all(&client, GET_CONTROLS, x, y, z, &err_msg, &mode),
+            err_msg);
     
         std::cout << std::endl << "\tAll tests pass!" << std::endl;
     return OK;

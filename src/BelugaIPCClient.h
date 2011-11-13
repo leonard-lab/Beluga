@@ -35,13 +35,20 @@ public:
                      std::vector<double>* X_or_SPEED,
                      std::vector<double>* Y_or_OMEGA,
                      std::vector<double>* Z_or_ZDOT);
+    bool getControl(unsigned int robot, BELUGA_CONTROL_MODE* mode,
+                    double* x, double* y, double* z);
+    bool getAllControls(BELUGA_CONTROL_MODE* mode,
+                        std::vector<double>* X_or_SPEED,
+                        std::vector<double>* Y_or_OMEGA,
+                        std::vector<double>* Z_or_ZDOT);
 
 private:
-    bool doPositionExchange(std::vector<unsigned int> robots,
-                            std::vector<double>* X,
-                            std::vector<double>* Y,
-                            std::vector<double>* Z,
-                            const std::string& op);
+    bool doExchange(std::vector<unsigned int> robots,
+                    std::vector<double>* A,
+                    std::vector<double>* B,
+                    std::vector<double>* C,
+                    const std::string& op,
+                    BELUGA_CONTROL_MODE* mode = NULL);
     
 };
 
