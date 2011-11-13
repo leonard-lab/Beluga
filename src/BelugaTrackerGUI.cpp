@@ -98,7 +98,8 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_dGotoYW(0),
 	m_bCamerasReady(false),
 	m_bConnectSocket(false),
-    m_Controller(4 /* # robots */)
+    m_Controller(4 /* # robots */),
+    m_IPCClient("127.0.0.1", 1234)
 {
 	for(unsigned int i = 0; i < 4; i++)
 	{
@@ -274,12 +275,22 @@ MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* na
 
 void BelugaTrackerFrame::initController()
 {
+    m_ControlMode = UNKNOWN;
+    
     for(unsigned int i = 0; i < 4; i++)
     {
         m_apWaypointController[i] = new BelugaWaypointControlLaw();
         m_apLowLevelController[i] = new BelugaLowLevelControlLaw();
         m_Controller.appendControlLawToBot(i, m_apWaypointController[i], mt_CONTROLLER_NO_GC);
         m_Controller.appendControlLawToBot(i, m_apLowLevelController[i], mt_CONTROLLER_NO_GC);
+
+        m_adWaypointX[i] = BELUGA_WAYPOINT_NONE;
+        m_adWaypointY[i] = BELUGA_WAYPOINT_NONE;
+        m_adWaypointZ[i] = BELUGA_WAYPOINT_NONE;
+
+        m_adSpeedCommand[i] = BELUGA_CONTROL_NONE;
+        m_adOmegaCommand[i] = BELUGA_CONTROL_NONE;
+        m_adZDotCommand[i] = BELUGA_CONTROL_NONE;	   
     }
 }
 
@@ -351,22 +362,17 @@ bool BelugaTrackerFrame::tryIPCConnect()
     // TODO:  replace with rhubarb code
 
     bool connected = false;
-    
-    wxIPV4address addr;
-    addr.Hostname(wxT("127.0.0.1"));
-    addr.Service(1234);
+    std::string motd("");
 
-    m_Socket.Connect(addr, false);
-    m_Socket.WaitOnConnect(2);
-    if(!m_Socket.IsConnected())
+    if(!m_IPCClient.doConnect(&motd))
     {
         MT_ShowErrorDialog(this, wxT("Could not connect to IPC server."));
         connected = false;
     }
     else
     {
-        std::string serverMessage = readLineFromSocket(&m_Socket);
-        printf("Success connecting to IPC server, server says:\n%s\n", serverMessage.c_str());
+        printf("Success connecting to IPC server, server says:\n\t\"%s\"\n",
+               motd.c_str());
         connected = true;
     }
     
@@ -376,15 +382,15 @@ bool BelugaTrackerFrame::tryIPCConnect()
 void BelugaTrackerFrame::manageIPCConnection()
 {
     /* determine if we need to establish a connection */
-    if(m_bConnectSocket && !m_Socket.IsConnected())
+    if(m_bConnectSocket && !m_IPCClient.isConnected())
     {
         m_bConnectSocket = tryIPCConnect();
     }
 
     /* or we need to close the connection */
-    if(!m_bConnectSocket && m_Socket.IsConnected())
+    if(!m_bConnectSocket && m_IPCClient.isConnected())
     {
-        m_Socket.Close();
+        m_IPCClient.doDisconnect();
     }
 }
 
@@ -392,39 +398,71 @@ void BelugaTrackerFrame::doIPCExchange()
 {
     manageIPCConnection();
 
-	if(m_Socket.IsConnected())
+	if(m_IPCClient.isConnected())
 	{
 
-        /* TODO: update wrt new server protocol */
-		std::ostringstream ss;
-		ss << "set position";
+        std::vector<double> X(4);
+        std::vector<double> Y(4);
+        std::vector<double> Z(4);
+        std::vector<unsigned int> robots(m_iNToTrack);
+
 		for(int i = 0; i < m_iNToTrack; i++)
 		{
-			ss << " " << i;
-			ss << " " << m_pBelugaTracker->getBelugaX(i);
-			ss << " " << m_pBelugaTracker->getBelugaY(i);
-			ss << " " << m_pBelugaTracker->getBelugaZ(i);
+			X[i] = m_pBelugaTracker->getBelugaX(i);
+			Y[i] = m_pBelugaTracker->getBelugaY(i);
+			Z[i] = m_pBelugaTracker->getBelugaZ(i);
+            robots[i] = i;
 		}
-		writeLineToSocket(ss.str().c_str(), &m_Socket);
-		std::string response = readLineFromSocket(&m_Socket);
-		writeLineToSocket("get command 0", &m_Socket);
-		response = readLineFromSocket(&m_Socket);
-		int id = -1;
-		double x = -100;
-		double y = -100;
-		double z = -100;
-		parseCommandFromSocket(response, &id, &x, &y, &z);
 
-		if(id == 0)
-		{
-			if(x != m_dGotoXW || y!= m_dGotoYW)
-			{
-				m_dGotoXW = x;
-				m_dGotoYW = y;
-				m_pBelugaTracker->getCameraXYFromWorldXYandDepth(&m_iGotoCam, &m_dGotoXC, &m_dGotoYC, m_dGotoXW, m_dGotoYW, 0, false);
-				m_dGotoYC =  m_dGotoYC;
-			}
-		}
+        for(unsigned int i = m_iNToTrack; i < 4; i++)
+        {
+            X[i] = BELUGA_NOT_TRACKED_X;
+            X[i] = BELUGA_NOT_TRACKED_Y;
+            X[i] = BELUGA_NOT_TRACKED_Z;
+        }
+
+        BELUGA_CONTROL_MODE mode;
+        
+        bool r = m_IPCClient.setAllPositions(&X, &Y, &Z);
+        r &= m_IPCClient.getControls(robots, &mode, &X, &Y, &Z);
+        if(!r)
+        {
+            MT_ShowErrorDialog(this, wxT("Error during exchange with IPC server."));
+            return;
+        }
+
+        double* control_a = NULL;
+        double* control_b = NULL;
+        double* control_c = NULL;
+        
+        switch(mode)
+        {
+        case WAYPOINT:
+            control_a = m_adWaypointX;
+            control_b = m_adWaypointX;
+            control_c = m_adWaypointX;
+            break;
+        case KINEMATICS:
+            control_a = m_adSpeedCommand;
+            control_b = m_adOmegaCommand;
+            control_c = m_adZDotCommand;
+            break;
+        }
+
+        m_ControlMode = mode;
+
+        if(control_a)
+        {
+            for(int i = 0; i < m_iNToTrack; i++)
+            {
+                control_a[i] = X[i];
+                control_a[i] = Y[i];
+                control_a[i] = Z[i];                
+            }
+        }
+
+        // TODO: calculate waypoints in camera coordinates
+        
 	}
     
 }

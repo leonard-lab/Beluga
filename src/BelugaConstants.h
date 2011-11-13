@@ -25,6 +25,12 @@ const double DEFAULT_WATER_DEPTH = 2.286;
  * this is just used for constraining the state values */
 const double BELUGA_TANK_RADIUS = 10.0;
 
+/* Used in IPC exchange to indicate that a vehicle is not being
+ * tracked.  Should be a point well outside the tank boundaries! */
+const double BELUGA_NOT_TRACKED_X = -100.0;
+const double BELUGA_NOT_TRACKED_Y = -100.0;
+const double BELUGA_NOT_TRACKED_Z = -100.0;
+
 /**********************************************************************
  * UKF/dynamics constants
  **********************************************************************/
@@ -168,8 +174,12 @@ const double BELUGA_WAYPOINT_SAME_Z = -1.0;
 
 enum BELUGA_CONTROL_MODE
 {
+    UNKNOWN,
     WAYPOINT,
     KINEMATICS
 };
+
+const double BELUGA_WAYPOINT_NONE = -100.0;
+const double BELUGA_CONTROL_NONE = 0.0;
 
 #endif // BELUGA_CONSTANTS

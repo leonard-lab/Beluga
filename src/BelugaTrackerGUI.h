@@ -16,6 +16,8 @@
 
 #include "BelugaControl.h"
 
+#include "BelugaIPCClient.h"
+
 /**********************************************************************
  * GUI Frame Class
  *********************************************************************/
@@ -62,11 +64,21 @@ protected:
     std::string m_sQuad4MaskPath;  
 
 	bool m_bConnectSocket;
+
+    // TODO: this should go.
 	wxSocketClient m_Socket;
 
 	void acquireFrames();
 	void runTracker();
 
+    belugaIPCClient m_IPCClient;
+    BELUGA_CONTROL_MODE m_ControlMode;
+    double m_adWaypointX[4];
+    double m_adWaypointY[4];
+    double m_adWaypointZ[4];
+    double m_adSpeedCommand[4];
+    double m_adOmegaCommand[4];
+    double m_adZDotCommand[4];    
     void manageIPCConnection();
     bool tryIPCConnect();
     void sendRobotDataToTracker();
