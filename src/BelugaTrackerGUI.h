@@ -69,9 +69,6 @@ protected:
 
 	bool m_bConnectSocket;
 
-    // TODO: this should go.
-	wxSocketClient m_Socket;
-
 	void acquireFrames();
 	void runTracker();
 
@@ -139,6 +136,9 @@ public:
     void onMenuFileCamSetup(wxCommandEvent& event);
 
     MT_ControlFrameBase* createControlDialog();
+
+    bool toggleControlActive();
+    bool toggleIPCActive();    
     
 };
 
@@ -171,7 +171,10 @@ public:
 	virtual unsigned int createButtons(wxBoxSizer* pSizer, wxPanel* pPanel);
 
     virtual void onControlActiveButtonClicked(wxCommandEvent& WXUNUSED(event));
-    virtual void onIPCActiveButtonClicked(wxCommandEvent& WXUNUSED(event));    
+    virtual void onIPCActiveButtonClicked(wxCommandEvent& WXUNUSED(event));
+
+    void setControlActive(bool value);
+    void setIPCActive(bool value);    
 
 	virtual void enableButtons();
 

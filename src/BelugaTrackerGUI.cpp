@@ -115,8 +115,6 @@ void BelugaTrackerFrame::initUserData()
                               wxT("Number of objects to track. Default is 3."),
                               wxCMD_LINE_VAL_NUMBER);
 
-	m_pPreferences->AddBool("Connect IPC Server", &m_bConnectSocket);
-
 	m_pPreferences->AddDouble("Goto Cutoff Distance",
                               &m_dGotoDist,
                               MT_DATA_READWRITE,
@@ -357,7 +355,13 @@ void BelugaTrackerFrame::doIPCExchange()
         std::vector<double> Z(4);
         std::vector<unsigned int> robots(m_iNToTrack);
 
-		for(int i = 0; i < m_iNToTrack; i++)
+        int i1 = m_iNToTrack;
+        if(!m_pTracker)
+        {
+            i1 = 0;
+        }
+        
+		for(int i = 0; i < i1; i++)
 		{
 			X[i] = m_pBelugaTracker->getBelugaX(i);
 			Y[i] = m_pBelugaTracker->getBelugaY(i);
@@ -365,7 +369,7 @@ void BelugaTrackerFrame::doIPCExchange()
             robots[i] = i;
 		}
 
-        for(unsigned int i = m_iNToTrack; i < 4; i++)
+        for(unsigned int i = i1; i < 4; i++)
         {
             X[i] = BELUGA_NOT_TRACKED_X;
             X[i] = BELUGA_NOT_TRACKED_Y;
@@ -548,6 +552,27 @@ void BelugaTrackerFrame::updateRobotStatesFromTracker()
 
 }
 
+bool BelugaTrackerFrame::toggleControlActive()
+{
+    m_bControlActive = !m_bControlActive;
+    m_bGotoActive = m_bControlActive;
+    m_pBelugaControlFrame->setControlActive(m_bControlActive);
+    
+    return m_bControlActive;
+}
+
+bool BelugaTrackerFrame::toggleIPCActive()
+{
+    m_bConnectSocket = !m_bConnectSocket;
+
+    manageIPCConnection();
+
+    m_pBelugaControlFrame->setIPCActive(m_bConnectSocket);
+
+    return m_bConnectSocket;
+    
+}
+
 bool BelugaTrackerFrame::doSlaveKeyboardCallback(wxKeyEvent& event, int slave_index)
 {
 	bool result = MT_DO_BASE_KEY;
@@ -557,7 +582,7 @@ bool BelugaTrackerFrame::doSlaveKeyboardCallback(wxKeyEvent& event, int slave_in
 	switch(k)
 	{
 	case 'g':
-		m_bControlActive = !m_bControlActive;
+		toggleControlActive();
 		break;
 	case 'q':
 		doQuit();
@@ -576,8 +601,7 @@ bool BelugaTrackerFrame::doKeyboardCallback(wxKeyEvent& event)
 	switch(k)
 	{
 	case 'g':
-		m_bControlActive = !m_bControlActive;
-		m_bGotoActive = m_bControlActive;
+        toggleControlActive();
 		break;
 	}
 
@@ -902,14 +926,14 @@ unsigned int BelugaControlFrame::createButtons(wxBoxSizer* pSizer, wxPanel* pPan
 
     m_pControlActiveButton->Disable();
     m_pControlActiveButton->SetValue(false);
-    m_pIPCActiveButton->Disable();
+    m_pIPCActiveButton->Enable();
     m_pIPCActiveButton->SetValue(false);
 
     Connect(ID_CONTROL_ACTIVE_BUTTON,
-            wxEVT_COMMAND_BUTTON_CLICKED,
+            wxEVT_COMMAND_TOGGLEBUTTON_CLICKED,
             wxCommandEventHandler(BelugaControlFrame::onControlActiveButtonClicked));
     Connect(ID_IPC_ACTIVE_BUTTON,
-            wxEVT_COMMAND_BUTTON_CLICKED,
+            wxEVT_COMMAND_TOGGLEBUTTON_CLICKED,
             wxCommandEventHandler(BelugaControlFrame::onIPCActiveButtonClicked));
 
     return nbuttons + 2;
@@ -918,10 +942,38 @@ unsigned int BelugaControlFrame::createButtons(wxBoxSizer* pSizer, wxPanel* pPan
 
 void BelugaControlFrame::onControlActiveButtonClicked(wxCommandEvent& WXUNUSED(event))
 {
+    m_pBelugaTrackerFrame->toggleControlActive();
+}
+
+void BelugaControlFrame::setControlActive(bool value)
+{
+    m_pControlActiveButton->SetValue(value);
+    if(value)
+    {
+        m_pControlActiveButton->SetLabel(wxT("Disable Control"));
+    }
+    else
+    {
+        m_pControlActiveButton->SetLabel(wxT("Enable Control"));
+    }
 }
 
 void BelugaControlFrame::onIPCActiveButtonClicked(wxCommandEvent& WXUNUSED(event))
 {
+    m_pBelugaTrackerFrame->toggleIPCActive();
+}
+
+void BelugaControlFrame::setIPCActive(bool value)
+{
+    m_pIPCActiveButton->SetValue(value);
+    if(value)
+    {
+        m_pIPCActiveButton->SetLabel(wxT("Disable IPC"));
+    }
+    else
+    {
+        m_pIPCActiveButton->SetLabel(wxT("Enable IPC"));        
+    }
 }
 
 void BelugaControlFrame::enableButtons()
