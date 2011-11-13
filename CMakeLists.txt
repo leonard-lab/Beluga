@@ -49,10 +49,13 @@ set(APP_SRC
   src/ControlLaw.cpp
   src/ControlLaw.h
   src/Controller.cpp
-  src/Controller.h)
+  src/Controller.h
+  src/BelugaIPCClient.cpp
+  src/BelugaIPCClient.h )
 
 # adds src to the header search path
 include_directories(src)
+include_directories(IPC/rhubarb/clients)
 
 # sets up the build target
 add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE ${APP_SRC})
