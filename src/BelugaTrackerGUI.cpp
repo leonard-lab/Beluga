@@ -446,15 +446,16 @@ void BelugaTrackerFrame::doUserControl()
 
 	if(!m_bGotoActive || !m_bControlActive)
 	{
-		m_Robots[0]->SetControl(u);
-		m_Robots[0]->Control();
+        for(unsigned int i = 0; i < m_iNToTrack; i++)
+        {
+            if(m_Robots.IsPhysical(i))
+            {
+                m_Robots[i]->SetControl(u);
+                m_Robots[i]->Control();
+            }
+        }
 		return;
 	}
-
-    std::vector<double> u_waypoint(BELUGA_WAYPOINT_SIZE, 0.0);
-    u_waypoint[BELUGA_WAYPOINT_X] = m_dGotoXW;
-    u_waypoint[BELUGA_WAYPOINT_Y] = m_dGotoYW;
-    u_waypoint[BELUGA_WAYPOINT_Z] = 0;
 
     mt_dVectorCollection_t X_all(4);
     mt_dVectorCollection_t u_in_all(4);
@@ -471,16 +472,68 @@ void BelugaTrackerFrame::doUserControl()
             u_in_all[i] = mt_CONTROLLER_EMPTY_VECTOR;
         }
     }
+    
+    if(m_IPCClient.isConnected())
+    {
+        for(int i = 0; i < m_iNToTrack; i++)
+        {
+            if(m_Robots.IsPhysical(i))
+            {
+                // TODO: control via IPC
+                switch(m_ControlMode)
+                {
+                case WAYPOINT:
+                    if(m_adWaypointX[i] != BELUGA_WAYPOINT_NONE)
+                    {
+                        u[BELUGA_WAYPOINT_X] = m_adWaypointX[i];
+                        u[BELUGA_WAYPOINT_Y] = m_adWaypointY[i];
+                        u[BELUGA_WAYPOINT_Z] = m_adWaypointZ[i];
 
-    m_apWaypointController[0]->doActivate();
+                        m_apWaypointController[i]->doActivate();
+                        u_in_all[i] = u;
+                    }
+                    break;
+                case KINEMATICS:
+                    u[BELUGA_CONTROL_FWD_SPEED] = m_adSpeedCommand[i];
+                    u[BELUGA_CONTROL_STEERING] = m_adOmegaCommand[i];
+                    u[BELUGA_CONTROL_VERT_SPEED] = m_adZDotCommand[i];
 
-    u_in_all[0] = u_waypoint;
+                    /* turn off waypoint controller */
+                    m_apWaypointController[i]->doActivate(false);
+                    u_in_all[i] = u;
+
+                    break;
+                default:
+                    fprintf(stderr, "Unknown control mode.\n");
+                    return;
+                }
+            }
+        }
+    }
+    else
+    {
+        // control via mouse click -> waypoint
+        u[BELUGA_WAYPOINT_X] = m_dGotoXW;
+		u[BELUGA_WAYPOINT_Y] = m_dGotoYW;
+		u[BELUGA_WAYPOINT_Z] = 0;
+
+        m_apWaypointController[0]->doActivate();
+        
+        u_in_all[0] = u;
+        
+    }
 
     mt_dVectorCollection_t u_all;
     u_all = m_Controller.doControl(X_all, u_in_all);
 
-	m_Robots[0]->SetControl(u_all[0]);
-	m_Robots[0]->Control();
+    for(unsigned int i = 0; i < m_iNToTrack; i++)
+    {
+        if(m_Robots.IsPhysical(i))
+        {
+            m_Robots[i]->SetControl(u_all[i]);
+            m_Robots[i]->Control();
+        }
+    }
 
 }
 
