@@ -11,7 +11,7 @@ public:
 
     mt_dVector_t doControl(const mt_dVector_t& state,
                            const mt_dVector_t& u_in);
-    bool doActivate(){m_bActive = true;  return m_bActive;};
+    bool doActivate(bool value = true){m_bActive = value;  return m_bActive;};
     
     double m_dMaxSpeed;
     double m_dDist;
@@ -31,7 +31,7 @@ public:
     mt_dVector_t doControl(const mt_dVector_t& state,
                            const mt_dVector_t& u_in);
 
-    bool doActivate(){m_bActive = true;  return m_bActive;};
+    bool doActivate(bool value = true){m_bActive = value;  return m_bActive;};
 
 protected:
     bool m_bActive;
