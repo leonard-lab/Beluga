@@ -345,7 +345,8 @@ void BelugaTrackerFrame::manageIPCConnection()
 
 void BelugaTrackerFrame::doIPCExchange()
 {
-    manageIPCConnection();
+	// this is now done manually
+    // manageIPCConnection();
 
 	if(m_IPCClient.isConnected())
 	{
@@ -972,7 +973,7 @@ unsigned int BelugaControlFrame::createButtons(wxBoxSizer* pSizer, wxPanel* pPan
                                                 wxT("Activate Control"));
     m_pIPCActiveButton = new wxToggleButton(pPanel,
                                             ID_IPC_ACTIVE_BUTTON,
-                                            wxT("Activate IPC"));
+                                            wxT("Enable IPC"));
 
     pSizer->Add(m_pControlActiveButton, 0, wxALL | wxCENTER, 10);
     pSizer->Add(m_pIPCActiveButton, 0, wxALL | wxCENTER, 10);

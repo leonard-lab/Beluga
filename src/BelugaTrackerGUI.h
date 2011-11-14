@@ -1,6 +1,10 @@
 #ifndef BELUGATRACKERGUI_H
 #define BELUGATRACKERGUI_H
 
+/* This has to be included before windows.h because of
+ * wierd conflicts in the windows and winsock headers */
+#include "BelugaIPCClient.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -17,8 +21,6 @@
 #include "BelugaTracker.h"
 
 #include "BelugaControl.h"
-
-#include "BelugaIPCClient.h"
 
 /**********************************************************************
  * GUI Frame Class
