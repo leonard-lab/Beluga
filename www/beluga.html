@@ -105,7 +105,7 @@ function doUpdate()
 
     var coords = resp.split(" ");
 
-    moveDot("dot1", parseFloat(coords[1]), parseFloat(coords[2]));
+    moveDot("dot1", parseFloat(coords[0]), parseFloat(coords[1]));
     moveDot("dot2", goX, goY);
 
     if(go)
