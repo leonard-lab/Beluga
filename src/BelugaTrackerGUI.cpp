@@ -412,8 +412,8 @@ void BelugaTrackerFrame::doIPCExchange()
             for(int i = 0; i < m_iNToTrack; i++)
             {
                 control_a[i] = X[i];
-                control_a[i] = Y[i];
-                control_a[i] = Z[i];                
+                control_b[i] = Y[i];
+                control_c[i] = Z[i];                
             }
         }
 
@@ -483,7 +483,7 @@ void BelugaTrackerFrame::doUserControl()
                 // TODO: control via IPC
                 switch(m_ControlMode)
                 {
-                case WAYPOINT:
+				case WAYPOINT:
                     if(m_adWaypointX[i] != BELUGA_WAYPOINT_NONE)
                     {
                         u[BELUGA_WAYPOINT_X] = m_adWaypointX[i];
@@ -516,7 +516,7 @@ void BelugaTrackerFrame::doUserControl()
         // control via mouse click -> waypoint
         u[BELUGA_WAYPOINT_X] = m_dGotoXW;
 		u[BELUGA_WAYPOINT_Y] = m_dGotoYW;
-		u[BELUGA_WAYPOINT_Z] = 0;
+		u[BELUGA_WAYPOINT_Z] = -1;
 
         m_apWaypointController[0]->doActivate();
         

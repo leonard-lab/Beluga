@@ -114,6 +114,8 @@ mt_dVector_t BelugaLowLevelControlLaw::doControl(const mt_dVector_t& state,
     u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
     u[BELUGA_CONTROL_STEERING] = u_turn;  
 
+	//printf("Control out: %f, %f, %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
+
 	return u;
 
 }
