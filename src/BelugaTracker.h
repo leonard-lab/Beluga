@@ -283,6 +283,8 @@ public:
 		unsigned int camera);
 	void getCameraXYFromWorldXYandDepth(int* camera, double* u, double* v, double x, double y, double depth, bool distort);
 	void getCameraXYFromWorldXYandDepthFixedCamera(int camera, double* u, double* v, double x, double y, double depth, bool distort);
+
+    double getWaterDepth() const {return m_dWaterDepth;};
     
 
 	void setRobotData(const std::vector<double>& depth_meas,

@@ -416,7 +416,38 @@ void BelugaTrackerFrame::doIPCExchange()
             }
         }
 
-        // TODO: calculate waypoints in camera coordinates
+        /* update waypoint display locations */
+        if(mode == WAYPOINT && m_pBelugaTracker)
+        {
+            double w = m_pBelugaTracker->getWaterDepth();
+            for(unsigned int bot_num = 0; bot_num < BELUGA_NUM_BOTS; bot_num++)
+            {
+                for(unsigned int cam_num = 0; cam_num < BELUGA_NUM_CAMS; cam_num++)
+                {
+                    double d = w - m_adWaypointZ[bot_num];
+                    if(m_adWaypointZ[bot_num] BELUGA_MAINTAIN_Z)
+                    {
+                        if(m_Robots.TrackingIndex[bot_num] != MT_NOT_TRACKED)
+                        {
+                            d = w - m_pBelugaTracker->getBelugaZ(m_Robots.TrackingIndex[bot_num]);
+                        }
+                        else
+                        {
+                            d = 0;
+                        }
+                    }
+                    
+                    m_pBelugaTracker->getCameraXYFromWorldXYandDepthFixedCamera(
+                        cam_num,
+                        &m_adGotoXC[bot_num][cam_num],
+                        &m_adGotoYC[bot_num][cam_num],
+                        m_adWaypointX[bot_num],
+                        m_adWaypointZ[bot_num],
+                        d, /* depth */
+                        false); /* no distortion */
+                }
+            }
+        }
         
 	}
     
