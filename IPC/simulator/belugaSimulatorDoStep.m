@@ -41,7 +41,7 @@ clear t;
 vmax = 1;       % maximum forward speed (m/s)
 
 % control gains CAN STILL USE TUNING
-kPHoriz = 0.5;  % proportional control for error -> xDot, yDot
+kPHoriz = 1;    % proportional control for error -> xDot, yDot
 kFbkLin = 3;    % feedback linearization gain
 kz = 0.1;       % vertical controller proportional gain
 
@@ -80,9 +80,6 @@ for ix = 1 : 4,
     th = th + dt*omega;
     x = x + v1*cos(th)*dt;
     y = y + v1*sin(th)*dt;
-    
-    v1*[cos(th) sin(th)]
-    linVels
     
     % apply proportional control to the z dof
     z = z + kz*dz;
