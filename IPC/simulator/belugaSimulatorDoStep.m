@@ -78,8 +78,8 @@ for ix = 1 : 4,
     
     % integrate the kinematics
     th = th + dt*omega;
-    x = x + v1*cos(th);
-    y = y + v1*sin(th);
+    x = x + v1*cos(th)*dt;
+    y = y + v1*sin(th)*dt;
     
     v1*[cos(th) sin(th)]
     linVels
