@@ -41,11 +41,6 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
 	m_bControlActive(false),
 	m_iGrabbedTrackedObj(NO_ROBOT),
 	m_bGotoActive(false),
-	m_iGotoCam(0),
-	m_dGotoXC(0),
-	m_dGotoYC(0),
-	m_dGotoXW(0),
-	m_dGotoYW(0),
 	m_bCamerasReady(false),
 	m_bConnectSocket(false),
     m_Controller(4 /* # robots */),
@@ -57,6 +52,12 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
         m_pSlaves[i] = NULL;
         m_apWaypointController[i] = NULL;
         m_apLowLevelController[i] = NULL;
+
+        for(unsigned int j = 0; j < 4; j++)
+        {
+            m_adGotoXC[i][j] = BELUGA_WAYPOINT_NONE;
+            m_adGotoYC[i][j] = BELUGA_WAYPOINT_NONE;            
+        }
 	}
 	m_pBelugaTracker = NULL;
 }
@@ -308,8 +309,6 @@ void BelugaTrackerFrame::runTracker()
 
 bool BelugaTrackerFrame::tryIPCConnect()
 {
-    // TODO:  replace with rhubarb code
-
     bool connected = false;
     std::string motd("");
 
@@ -514,9 +513,9 @@ void BelugaTrackerFrame::doUserControl()
     else
     {
         // control via mouse click -> waypoint
-        u[BELUGA_WAYPOINT_X] = m_dGotoXW;
-		u[BELUGA_WAYPOINT_Y] = m_dGotoYW;
-		u[BELUGA_WAYPOINT_Z] = -1;
+        u[BELUGA_WAYPOINT_X] = m_adWaypointX[0];
+		u[BELUGA_WAYPOINT_Y] = m_adWaypointY[0];
+		u[BELUGA_WAYPOINT_Z] = BELUGA_WAYPOINT_SAME_Z;
 
         m_apWaypointController[0]->doActivate();
         
@@ -663,38 +662,10 @@ bool BelugaTrackerFrame::doKeyboardCallback(wxKeyEvent& event)
 	return result && tresult;
 }
 
-bool BelugaTrackerFrame::doSlaveMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y, int slave_index)
-{
-	bool result = MT_DO_BASE_MOUSE;
-
-		if(event.LeftUp())
-		{
-			if(m_bControlActive)
-			{
-				m_bGotoActive = true;
-				m_iGotoCam = slave_index;
-				m_dGotoXC = viewport_x;
-				m_dGotoYC = m_ClientSize.GetHeight() - viewport_y;
-				if(m_pBelugaTracker)
-				{
-					double z = 0;
-					m_pBelugaTracker->getWorldXYZFromImageXYAndDepthInCamera(
-						&m_dGotoXW,
-						&m_dGotoYW,
-						&z,
-						m_dGotoXC,
-						m_dGotoYC,
-						0,
-						false,
-						slave_index);
-				}
-			}
-		}
-
-	return result;
-}
-
-bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y)
+bool BelugaTrackerFrame::doCommonMouseCallback(wxMouseEvent& event,
+                                               double viewport_x,
+                                               double viewport_y,
+                                               int slave_index)
 {
 	const double click_thresh = 10.0*10.0;
 	bool result = MT_DO_BASE_MOUSE;
@@ -708,8 +679,10 @@ bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x,
 			double d2, dx, dy;
 			for(int i = 0; i < m_iNToTrack; i++)
 			{
-				dx = viewport_x - m_pBelugaTracker->getBelugaX(i);
-				dy = viewport_y - m_pBelugaTracker->getBelugaY(i);
+                // TODO wrong - need to get camera coords
+				/*dx = viewport_x - m_pBelugaTracker->getBelugaX(i);
+                  dy = viewport_y - m_pBelugaTracker->getBelugaY(i);*/
+                
 				d2 = dx*dx + dy*dy;
 				if(d2 < click_thresh)
 				{
@@ -738,12 +711,13 @@ bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x,
 					label.Printf("Identify Robot %s", m_Robots.RobotName[i].c_str());
 					pmenu.Append(ID_MENU_POP_ROBOT + i, label);
 					Connect(ID_MENU_POP_ROBOT + i, 
-						wxEVT_COMMAND_MENU_SELECTED,
-						wxCommandEventHandler(BelugaTrackerFrame::onMenuAssign));
+                            wxEVT_COMMAND_MENU_SELECTED,
+                            wxCommandEventHandler(BelugaTrackerFrame::onMenuAssign));
 				}
 				if(np > 0)
 				{
-					PopupMenu(&pmenu);
+                    /* TODO needs to potentially happen in the slave */
+					//PopupMenu(&pmenu);
 					result = MT_SKIP_BASE_MOUSE;
 				}
 			}
@@ -751,30 +725,63 @@ bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x,
 
 		if(event.LeftUp())
 		{
-			if(m_bControlActive)
+			if(m_bControlActive && m_pBelugaTracker)
 			{
 				m_bGotoActive = true;
-				m_iGotoCam = 0;
-				m_dGotoXC = viewport_x;
-				m_dGotoYC =  m_ClientSize.GetHeight() - viewport_y;
-				if(m_pBelugaTracker)
-				{
-					double z = 0;
-					m_pBelugaTracker->getWorldXYZFromImageXYAndDepthInCamera(
-						&m_dGotoXW,
-						&m_dGotoYW,
-						&z,
-						m_dGotoXC,
-						m_dGotoYC,
-						0,
-						false,
-						0);
-				}
+                setWaypointFromMouseClick(viewport_x,
+                                          m_ClientSize.GetHeight() - viewport_y,
+                                          slave_index);
 			}
 		}
 	}
+    
+}
+
+void BelugaTrackerFrame::setWaypointFromMouseClick(double viewport_x,
+                                                   double viewport_y,
+                                                   int slave_index)
+{
+    m_adGotoXC[0][slave_index] = viewport_x;
+    m_adGotoYC[0][slave_index] =  m_ClientSize.GetHeight() - viewport_y;
+    double z = 0;
+    m_pBelugaTracker->getWorldXYZFromImageXYAndDepthInCamera(
+        &m_adWaypointX[0],
+        &m_adWaypointY[0],
+        &z,
+        m_adGotoXC[0][0],
+        m_adGotoYC[0][0],
+        0,
+        false,
+        0);
+    for(unsigned int i = 0; i < BELUGA_NUM_CAMS; i++)
+    {
+        if(i == slave_index)
+        {
+            continue;
+        }
+
+        m_pBelugaTracker->getCameraXYFromWorldXYandDepthFixedCamera(slave_index,
+                                                                    &m_adGotoXC[0][slave_index],
+                                                                    &m_adGotoYC[0][slave_index],
+                                                                    m_adWaypointX[0],
+                                                                    m_adWaypointZ[0],
+                                                                    0, /* depth */
+                                                                    false); /* no distortion */
+    }
+}
+
+bool BelugaTrackerFrame::doSlaveMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y, int slave_index)
+{
+	return doCommonMouseCallback(event, viewport_x, viewport_y, slave_index);
+}
+
+bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y)
+{
 
     bool tresult = MT_RobotFrameBase::doMouseCallback(event, viewport_x, viewport_y);
+    /* don't short-circuit this */
+    bool result = doCommonMouseCallback(event, viewport_x, viewport_y, 0);
+        
     return tresult && result;
 }
 
@@ -799,18 +806,29 @@ void BelugaTrackerFrame::doUserGLDrawing()
 {
 	MT_RobotFrameBase::doUserGLDrawing();
 
-	if(m_bGotoActive && m_iGotoCam == 0)
-	{
-		MT_DrawCircle(m_dGotoXC, m_ClientSize.GetHeight() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
-	}
+    doCommonGLDrawing(0);
 }
 
 void BelugaTrackerFrame::doSlaveGLDrawing(int slave_index)
 {
-	if(m_bGotoActive && m_iGotoCam == slave_index)
+    doCommonGLDrawing(slave_index);
+}
+
+void BelugaTrackerFrame::doCommonGLDrawing(int slave_index)
+{
+	if(m_bGotoActive)
 	{
-		MT_DrawCircle(m_dGotoXC, m_ClientSize.GetHeight() - m_dGotoYC, MT_Green, 15.0*m_dGotoDist);
+        for(unsigned int i = 0; i < BELUGA_NUM_BOTS; i++)
+        {
+            if(m_adGotoXC[i] >= 0 && m_adGotoYC[i] >= 0)
+            {
+                MT_DrawCircle(m_adGotoXC[i][slave_index],
+                              m_ClientSize.GetHeight() - m_adGotoYC[i][slave_index],
+                              MT_Green, 15.0*m_dGotoDist);
+            }
+        }
 	}
+    
 }
 
 

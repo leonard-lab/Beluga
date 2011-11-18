@@ -1563,6 +1563,23 @@ void BelugaTracker::getCameraXYFromWorldXYandDepth(int* camera, double* u, doubl
 	*v = VFLIP *v;
 }
 
+void BelugaTracker::getCameraXYFromWorldXYandDepthFixedCamera(int camera,
+                                                              double* u,
+                                                              double* v,
+                                                              double x,
+                                                              double y,
+                                                              double depth,
+                                                              bool distort)
+{
+	if(!u || !v)
+	{
+		return;
+	}
+
+	m_CoordinateTransforms[camera].worldToImage(x, y, m_dWaterDepth-depth, u, v, distort);
+	*v = VFLIP *v;
+}
+
 /* Drawing function - gets called by the GUI
  * All of the drawing is done with OpenGL */
 void BelugaTracker::doGLDrawing(int flags)

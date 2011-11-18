@@ -2,6 +2,15 @@
 #define BELUGA_CONSTANTS
 
 /**********************************************************************
+ * General constants
+ **********************************************************************/
+
+/* These are for the sake of readability of the code.  Blindly changing
+ * these number probably won't have the desired effect. */
+const unsigned int BELUGA_NUM_BOTS = 4;
+const unsigned int BELUGA_NUM_CAMS = 4;
+
+/**********************************************************************
  * Tracker constants
  **********************************************************************/
 

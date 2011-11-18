@@ -42,11 +42,8 @@ protected:
 
     bool m_bControlActive;
 	bool m_bGotoActive;
-	int m_iGotoCam;
-	double m_dGotoXC;
-	double m_dGotoYC;
-	double m_dGotoXW;
-	double m_dGotoYW;
+	double m_adGotoXC[BELUGA_NUM_BOTS][BELUGA_NUM_CAMS]; /* 4 cams * 4 bots */
+	double m_adGotoYC[BELUGA_NUM_BOTS][BELUGA_NUM_CAMS];
 
 	bool m_bCamerasReady;
     unsigned int m_uiaIndexMap[4];
@@ -92,6 +89,15 @@ protected:
     void initController();
 
     BelugaControlFrame* m_pBelugaControlFrame;
+    void doCommonGLDrawing(int slave_index);
+    bool doCommonMouseCallback(wxMouseEvent& event,
+                               double viewport_x,
+                               double viewport_y,
+                               int slave_index);
+    void setWaypointFromMouseClick(double viewport_x,
+                                   double viewport_y,
+                                   int slave_index);
+    
 
 public:
     BelugaTrackerFrame(wxFrame* parent,
