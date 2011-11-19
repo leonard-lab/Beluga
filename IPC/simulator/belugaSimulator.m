@@ -43,6 +43,19 @@ try
         go_x(3), go_y(3), go_z(3), 'bs', 0, 0, 0, 'bo',...
         go_x(4), go_y(4), go_z(4), 'ks', 0, 0, 0, 'ko');
     
+    % Plot tank boundaries
+    hold on
+    theta = linspace(0,2*pi);
+    xx = TankRadius*cos(theta);
+    yy = TankRadius*sin(theta);
+
+    plot3(xx,yy,zeros(size(xx)),'k')
+    plot3(xx,yy,WaterDepth*ones(size(xx)),'k')
+    plot3([xx(1) xx(1)],[yy(1) yy(1)],[0 WaterDepth],'k')
+    plot3([xx(25) xx(25)],[yy(25) yy(25)],[0 WaterDepth],'k')
+    plot3([xx(50) xx(50)],[yy(50) yy(50)],[0 WaterDepth],'k')
+    plot3([xx(75) xx(75)],[yy(75) yy(75)],[0 WaterDepth],'k')
+    
     title('Beluga Simulator - Running')
     view(3)
     axis([-3 3 -3 3 0 3]);
