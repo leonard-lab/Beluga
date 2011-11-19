@@ -34,7 +34,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                const wxSize& size,     
                                long style)
   : MT_RobotFrameBase(parent, id, title, pos, size, style),
-    m_iNToTrack(1),
+    m_iNToTrack(2),
 	m_dGotoDist(50.0),
 	m_dGotoMaxSpeed(15.0),
 	m_dGotoTurningGain(25.0),
@@ -710,9 +710,8 @@ bool BelugaTrackerFrame::doCommonMouseCallback(wxMouseEvent& event,
 			double d2, dx, dy;
 			for(int i = 0; i < m_iNToTrack; i++)
 			{
-                // TODO wrong - need to get camera coords
-				/*dx = viewport_x - m_pBelugaTracker->getBelugaX(i);
-                  dy = viewport_y - m_pBelugaTracker->getBelugaY(i);*/
+				dx = viewport_x - m_pBelugaTracker->getBelugaCameraX(i, slave_index);
+				dy = (m_ClientSize.GetHeight() - viewport_y) - m_pBelugaTracker->getBelugaCameraY(i, slave_index);
                 
 				d2 = dx*dx + dy*dy;
 				if(d2 < click_thresh)
@@ -747,8 +746,7 @@ bool BelugaTrackerFrame::doCommonMouseCallback(wxMouseEvent& event,
 				}
 				if(np > 0)
 				{
-                    /* TODO needs to potentially happen in the slave */
-					//PopupMenu(&pmenu);
+					PopupMenu(&pmenu);
 					result = MT_SKIP_BASE_MOUSE;
 				}
 			}
@@ -765,6 +763,7 @@ bool BelugaTrackerFrame::doCommonMouseCallback(wxMouseEvent& event,
 			}
 		}
 	}
+	return result;
     
 }
 
@@ -808,10 +807,10 @@ bool BelugaTrackerFrame::doSlaveMouseCallback(wxMouseEvent& event, double viewpo
 
 bool BelugaTrackerFrame::doMouseCallback(wxMouseEvent& event, double viewport_x, double viewport_y)
 {
-
-    bool tresult = MT_RobotFrameBase::doMouseCallback(event, viewport_x, viewport_y);
     /* don't short-circuit this */
     bool result = doCommonMouseCallback(event, viewport_x, viewport_y, 0);
+
+    bool tresult = result && MT_RobotFrameBase::doMouseCallback(event, viewport_x, viewport_y);
         
     return tresult && result;
 }

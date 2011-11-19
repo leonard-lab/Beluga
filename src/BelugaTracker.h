@@ -4,6 +4,7 @@
 #include "MT_Core.h"
 #include "MT_Tracking.h"
 
+//#include "BelugaConstants.h"
 #include "BelugaRobot.h"
 
 #include "CoordinateTransforms.h"
@@ -272,6 +273,17 @@ public:
 	double getBelugaX(unsigned int i){if(i >= m_vdTracked_X.size()){return 0;} else {return m_vdTracked_X[i];}};
 	double getBelugaY(unsigned int i){if(i >= m_vdTracked_Y.size()){return 0;} else {return m_vdTracked_Y[i];}};
 	double getBelugaZ(unsigned int i){if(i >= m_vdTracked_Z.size()){return 0;} else {return m_vdTracked_Z[i];}};
+
+	double getBelugaCameraX(unsigned int i, unsigned int cam_num)
+	{
+		if(i >= m_vdTracked_X.size() || cam_num < 0 || cam_num >= 4){return 0;} 
+		else {return m_vdaTracked_XC[cam_num][i];}
+	};
+	double getBelugaCameraY(unsigned int i, unsigned int cam_num)
+	{
+		if(i >= m_vdTracked_Y.size() || cam_num < 0 || cam_num >= 4){return 0;} 
+		else {return m_vdaTracked_YC[cam_num][i];}
+	};
 
 	void getWorldXYZFromImageXYAndDepthInCamera(double* x,
 		double* y,

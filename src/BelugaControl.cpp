@@ -45,6 +45,11 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
     double to_y = u_in[BELUGA_WAYPOINT_Y];
     double to_z = u_in[BELUGA_WAYPOINT_Z];
 
+	if(to_x == BELUGA_WAYPOINT_NONE || to_y == BELUGA_WAYPOINT_NONE)
+	{
+		return u;
+	}
+
     if(to_z BELUGA_MAINTAIN_Z)
     {
         to_z = z;
