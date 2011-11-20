@@ -554,6 +554,13 @@ void BelugaTrackerFrame::doUserControl()
         
     }
 
+    /*printf("waypoint: %f, %f, %f -> (%f, %f), (%f, %f), (%f, %f), (%f, %f)\n",
+           m_adWaypointX[0], m_adWaypointY[0], m_adWaypointZ[0],
+           m_adGotoXC[0][0], m_adGotoYC[0][0],
+           m_adGotoXC[0][1], m_adGotoYC[0][1],
+           m_adGotoXC[0][2], m_adGotoYC[0][2],
+           m_adGotoXC[0][3], m_adGotoYC[0][3]);           */
+
     mt_dVectorCollection_t u_all;
     u_all = m_Controller.doControl(X_all, u_in_all);
 
@@ -649,6 +656,7 @@ bool BelugaTrackerFrame::toggleControlActive()
 
 void BelugaTrackerFrame::stopAllRobots()
 {
+    // TODO: there could be a MT_AllRobotContainer::stopAllRobots()
     for(unsigned int i = 0; i < MT_MAX_NROBOTS; i++)
     {
         if(m_Robots.IsPhysical(i))
@@ -786,16 +794,17 @@ void BelugaTrackerFrame::setWaypointFromMouseClick(double viewport_x,
 {
     m_adGotoXC[0][slave_index] = viewport_x;
     m_adGotoYC[0][slave_index] =  m_ClientSize.GetHeight() - viewport_y;
+
     double z = 0;
     m_pBelugaTracker->getWorldXYZFromImageXYAndDepthInCamera(
         &m_adWaypointX[0],
         &m_adWaypointY[0],
         &z,
-        m_adGotoXC[0][0],
-        m_adGotoYC[0][0],
+        m_adGotoXC[0][slave_index],
+        m_adGotoYC[0][slave_index],
         0,
         false,
-        0);
+        slave_index);
     for(unsigned int i = 0; i < BELUGA_NUM_CAMS; i++)
     {
         if(i == slave_index)
@@ -804,8 +813,8 @@ void BelugaTrackerFrame::setWaypointFromMouseClick(double viewport_x,
         }
 
         m_pBelugaTracker->getCameraXYFromWorldXYandDepthFixedCamera(slave_index,
-                                                                    &m_adGotoXC[0][slave_index],
-                                                                    &m_adGotoYC[0][slave_index],
+                                                                    &m_adGotoXC[0][i],
+																	&m_adGotoYC[0][i],
                                                                     m_adWaypointX[0],
                                                                     m_adWaypointZ[0],
                                                                     0, /* depth */
@@ -859,14 +868,18 @@ void BelugaTrackerFrame::doSlaveGLDrawing(int slave_index)
 
 void BelugaTrackerFrame::doCommonGLDrawing(int slave_index)
 {
+    double h = (double) m_ClientSize.GetHeight();
 	if(m_bGotoActive)
 	{
         for(unsigned int i = 0; i < BELUGA_NUM_BOTS; i++)
         {
-            if(m_adGotoXC[i] >= 0 && m_adGotoYC[i] >= 0)
+            if(m_Robots.IsPhysical(i) &&
+               (m_adGotoXC[i][slave_index] >= 0 && m_adGotoYC[i][slave_index] >= 0 &&
+                m_adGotoXC[i][slave_index] <= m_ClientSize.GetWidth() &&
+                m_adGotoYC[i][slave_index] <= h))
             {
                 MT_DrawCircle(m_adGotoXC[i][slave_index],
-                              m_ClientSize.GetHeight() - m_adGotoYC[i][slave_index],
+                              h - m_adGotoYC[i][slave_index],
                               MT_Green, 15.0*m_dGotoDist);
             }
         }
