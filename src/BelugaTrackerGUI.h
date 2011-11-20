@@ -97,6 +97,8 @@ protected:
     void setWaypointFromMouseClick(double viewport_x,
                                    double viewport_y,
                                    int slave_index);
+
+    void stopAllRobots();
     
 
 public:

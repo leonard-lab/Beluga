@@ -641,8 +641,21 @@ bool BelugaTrackerFrame::toggleControlActive()
     m_bControlActive = !m_bControlActive;
     m_bGotoActive = m_bControlActive;
     m_pBelugaControlFrame->setControlActive(m_bControlActive);
+
+    stopAllRobots();
     
     return m_bControlActive;
+}
+
+void BelugaTrackerFrame::stopAllRobots()
+{
+    for(unsigned int i = 0; i < MT_MAX_NROBOTS; i++)
+    {
+        if(m_Robots.IsPhysical(i))
+        {
+            m_Robots[i]->SafeStop();
+        }
+    }
 }
 
 bool BelugaTrackerFrame::toggleIPCActive()
