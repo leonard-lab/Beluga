@@ -13,7 +13,7 @@ Beluga::Beluga()
 	  m_iDepthMeasAtBottom(BELUGA_DEFAULT_DEPTH_MEAS_AT_BOTTOM),
 	  m_dWaterDepth(DEFAULT_WATER_DEPTH),
 	  m_iDepthMeas(0),
-	  m_dDepth(0)
+	  m_dDepth(DEFAULT_WATER_DEPTH)
 {
     doCommonInit();
 }

@@ -137,7 +137,7 @@ const unsigned int BELUGA_MAX_COMMAND_LENGTH = 30;
 
 /* the minimum amount of time to allow between
  * successive COM port read/writes */
-const double BELUGA_MIN_COMMAND_PERIOD_MSEC = 50.0;
+const double BELUGA_MIN_COMMAND_PERIOD_MSEC = 200.0;
 
 const unsigned char BELUGA_LINEFEED = 10;
 
