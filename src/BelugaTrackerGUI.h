@@ -187,6 +187,7 @@ public:
     void setIPCActive(bool value);    
 
 	virtual void enableButtons();
+	virtual void enableControlButton();
 
 };
 

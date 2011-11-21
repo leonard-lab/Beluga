@@ -218,7 +218,12 @@ MT_RobotBase* BelugaTrackerFrame::getNewRobot(const char* config, const char* na
     ReadDataGroupFromXML(m_XMLSettingsFile, thebot->GetParameters());
 
 	// Fixing robot 0 as tracked object 0 for now
+	// TODO: Fix
 	m_Robots.TrackingIndex[0] = 0;
+
+	// enable the "activate control" button on the control dialog once
+	//  we have a robot
+	m_pBelugaControlFrame->enableControlButton();
 
     return thebot;
 }
@@ -369,7 +374,7 @@ void BelugaTrackerFrame::doIPCExchange()
             robots[i] = i;
 		}
 
-        for(unsigned int i = i1; i < 4; i++)
+        for(unsigned int i = i1; i < BELUGA_NUM_BOTS; i++)
         {
             X[i] = BELUGA_NOT_TRACKED_X;
             X[i] = BELUGA_NOT_TRACKED_Y;
@@ -394,8 +399,8 @@ void BelugaTrackerFrame::doIPCExchange()
         {
         case WAYPOINT:
             control_a = m_adWaypointX;
-            control_b = m_adWaypointX;
-            control_c = m_adWaypointX;
+            control_b = m_adWaypointY;
+            control_c = m_adWaypointZ;
             break;
         case KINEMATICS:
             control_a = m_adSpeedCommand;
@@ -442,10 +447,16 @@ void BelugaTrackerFrame::doIPCExchange()
                         &m_adGotoXC[bot_num][cam_num],
                         &m_adGotoYC[bot_num][cam_num],
                         m_adWaypointX[bot_num],
-                        m_adWaypointZ[bot_num],
+                        m_adWaypointY[bot_num],
                         d, /* depth */
                         false); /* no distortion */
                 }
+				/*printf("waypoint %d: %f, %f, %f -> (%f, %f), (%f, %f), (%f, %f), (%f, %f)\n", bot_num,
+					m_adWaypointX[bot_num], m_adWaypointY[bot_num], m_adWaypointZ[bot_num],
+					m_adGotoXC[bot_num][0], m_adGotoYC[bot_num][0],
+					m_adGotoXC[bot_num][1], m_adGotoYC[bot_num][1],
+					m_adGotoXC[bot_num][2], m_adGotoYC[bot_num][2],
+					m_adGotoXC[bot_num][3], m_adGotoYC[bot_num][3]);   */
             }
         }
         
@@ -868,22 +879,20 @@ void BelugaTrackerFrame::doSlaveGLDrawing(int slave_index)
 
 void BelugaTrackerFrame::doCommonGLDrawing(int slave_index)
 {
-    double h = (double) m_ClientSize.GetHeight();
-	if(m_bGotoActive)
+	double h = (double) m_ClientSize.GetHeight();
+	glLineWidth(3.0);
+	for(unsigned int i = 0; i < BELUGA_NUM_BOTS; i++)
 	{
-        for(unsigned int i = 0; i < BELUGA_NUM_BOTS; i++)
-        {
-            if(m_Robots.IsPhysical(i) &&
-               (m_adGotoXC[i][slave_index] >= 0 && m_adGotoYC[i][slave_index] >= 0 &&
-                m_adGotoXC[i][slave_index] <= m_ClientSize.GetWidth() &&
-                m_adGotoYC[i][slave_index] <= h))
-            {
-                MT_DrawCircle(m_adGotoXC[i][slave_index],
-                              h - m_adGotoYC[i][slave_index],
-                              MT_Green, 15.0*m_dGotoDist);
-            }
-        }
+		if((m_adGotoXC[i][slave_index] >= 0 && m_adGotoYC[i][slave_index] >= 0 &&
+			m_adGotoXC[i][slave_index] <= m_ClientSize.GetWidth() &&
+			m_adGotoYC[i][slave_index] <= h))
+		{
+			MT_DrawCircle(m_adGotoXC[i][slave_index],
+				h - m_adGotoYC[i][slave_index],
+				MT_Green, 15.0*m_dGotoDist);
+		}
 	}
+	glLineWidth(1.0);
     
 }
 
@@ -1106,12 +1115,19 @@ void BelugaControlFrame::setIPCActive(bool value)
 
 void BelugaControlFrame::enableButtons()
 {
-    if(m_pControlActiveButton)
+    if(m_pIPCActiveButton)
     {
-        m_pControlActiveButton->Enable();
         m_pIPCActiveButton->Enable();
     }
     MT_RobotControlFrameBase::enableButtons();
+}
+
+void BelugaControlFrame::enableControlButton()
+{
+    if(m_pControlActiveButton)
+    {
+        m_pControlActiveButton->Enable();
+    }
 }
 
 /**********************************************************************
