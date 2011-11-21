@@ -13,7 +13,8 @@ Beluga::Beluga()
 	  m_iDepthMeasAtBottom(BELUGA_DEFAULT_DEPTH_MEAS_AT_BOTTOM),
 	  m_dWaterDepth(DEFAULT_WATER_DEPTH),
 	  m_iDepthMeas(0),
-	  m_dDepth(DEFAULT_WATER_DEPTH)
+	  m_dDepth(DEFAULT_WATER_DEPTH),
+	  m_dTimeOfLastSend(0)
 {
     doCommonInit();
 }
@@ -27,8 +28,9 @@ Beluga::Beluga(const char* onComPort, const char* name)
          rate set up */
       m_COMPort(onComPort, BELUGA_HANDSHAKING, MT_Baud4800),
       m_sPort(onComPort),    /* string name of the com port */
-      m_bIsConnected(false)  /* initialize as not connected (will get
+      m_bIsConnected(false), /* initialize as not connected (will get
                               * set on calling IsConnected */
+	  m_dTimeOfLastSend(0)
 {
     /* common Beluga initialization */
     doCommonInit();
@@ -44,7 +46,13 @@ Beluga::~Beluga()
 
 void Beluga::SafeStop()
 {
+	while(1000.0*(MT_getTimeSec() - m_dTimeOfLastSend) < m_dMinCommandPeriod_msec)
+	{
+		/* wait until we can send the command */
+	};
 	SendCommand(0, 0, 0);
+	std::vector<double> u(BELUGA_CONTROL_SIZE, 0.0);
+	SetControl(u);
 }
 
 void Beluga::doCommonInit()
@@ -176,8 +184,9 @@ void Beluga::SetControl(std::vector<double> u)
 {
 	if(u.size() != BELUGA_CONTROL_SIZE)
 	{
-        fprintf(stderr, "Beluga Error:  Supplied control size is the wrong size in SetControl."
+        fprintf(stderr, "Beluga Error (%s):  Supplied control size is the wrong size in SetControl."
                 "  Expect %d, got %ld.  Ignoring this control.\n",
+				m_sName.c_str(),
                 BELUGA_CONTROL_SIZE, (unsigned long) u.size());
 		return;
 	}
@@ -229,11 +238,10 @@ void Beluga::SendCommand(const char* command)
 	m_vdControls[BELUGA_CONTROL_VERT_SPEED] = v;
     
     /* command rate throttling */
-    static double t_last_command = MT_getTimeSec();
     double t_now = MT_getTimeSec();
-    if(1000.0*(t_now - t_last_command) > m_dMinCommandPeriod_msec)
+    if(1000.0*(t_now - m_dTimeOfLastSend) > m_dMinCommandPeriod_msec)
     {
-        t_last_command = MT_getTimeSec();
+        m_dTimeOfLastSend = MT_getTimeSec();
         
         /* uncomment to see output in console */
         //printf("Sending %s\n", cmd);

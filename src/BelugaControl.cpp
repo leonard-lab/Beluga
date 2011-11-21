@@ -21,8 +21,8 @@ BelugaWaypointControlLaw::BelugaWaypointControlLaw()
                     3 /* # parameters */),
       m_bActive(false),
       m_dDist(0.5),
-      m_dMaxSpeed(30.0),
-      m_dTurningGain(20.0)
+      m_dMaxSpeed(5.0),
+      m_dTurningGain(10.0)
 {
 }
 
@@ -67,7 +67,7 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
     double u_vert = 0;
     double u_turn = 0;
 
-    if(d < m_dDist)
+    if(0 /*d < m_dDist*/)
     {
         m_bActive = false;
     }
@@ -81,13 +81,14 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
         {
             u_speed = m_dMaxSpeed*0.333*(d/m_dDist);
         }
-        u_turn = m_dTurningGain*sin(dth);
+        u_turn = -m_dTurningGain*sin(dth);
     }
 
     u[BELUGA_CONTROL_FWD_SPEED] = u_speed;
     u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
     u[BELUGA_CONTROL_STEERING] = u_turn;    
     
+	//printf("dx = %f, dy = %f, dth = %f, dz = %f\n", dx, dy, dth, dz);
 	//printf("Control out: %f, %f, %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
 
     return u;

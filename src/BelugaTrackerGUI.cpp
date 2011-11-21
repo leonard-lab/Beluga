@@ -125,9 +125,7 @@ void BelugaTrackerFrame::initUserData()
                               MT_DATA_READWRITE,
                               0);
 	m_pPreferences->AddDouble("Goto Turning Gain",
-                              &m_dGotoTurningGain,
-                              MT_DATA_READWRITE,
-                              0);
+                              &m_dGotoTurningGain);
 
     std::vector<std::string> botnames;
     for(unsigned int i = 0; i < 7; i++)
@@ -503,6 +501,10 @@ void BelugaTrackerFrame::doUserControl()
     mt_dVectorCollection_t u_in_all(4);
     for(int i = 0; i < m_iNToTrack; i++)
     {
+		m_apWaypointController[i]->m_dDist = m_dGotoDist;
+		m_apWaypointController[i]->m_dMaxSpeed = m_dGotoMaxSpeed;
+		m_apWaypointController[i]->m_dTurningGain = m_dGotoTurningGain;
+
         if(m_Robots.IsPhysical(i) && m_Robots.TrackingIndex[i] != MT_NOT_TRACKED)
         {
             X_all[i] = m_pBelugaTracker->getBelugaState(m_Robots.TrackingIndex[i]);
@@ -521,6 +523,7 @@ void BelugaTrackerFrame::doUserControl()
         {
             if(m_Robots.IsPhysical(i))
             {
+
                 // TODO: control via IPC
                 switch(m_ControlMode)
                 {
@@ -786,11 +789,11 @@ bool BelugaTrackerFrame::doCommonMouseCallback(wxMouseEvent& event,
 
 		if(event.LeftUp())
 		{
-			if(m_bControlActive && m_pBelugaTracker)
+			if(m_bControlActive && m_pBelugaTracker && !m_IPCClient.isConnected())
 			{
 				m_bGotoActive = true;
                 setWaypointFromMouseClick(viewport_x,
-                                          m_ClientSize.GetHeight() - viewport_y,
+                                          viewport_y,
                                           slave_index);
 			}
 		}

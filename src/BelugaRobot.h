@@ -74,6 +74,8 @@ private:
 	unsigned int m_iDepthMeasAtSurface;
 	unsigned int m_iDepthMeasAtBottom;
 	double m_dWaterDepth;
+
+	double m_dTimeOfLastSend;
     
 };
 
