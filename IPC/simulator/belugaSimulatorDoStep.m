@@ -36,10 +36,15 @@ persistent uT_ALL;
 persistent uS_ALL;
 persistent uV_ALL;
 
-if isempty(X),
+% set > 0 to show timeseries plots of the state and commands.
+DO_TS_PLOTS = 0;
+
+if isempty(X) || sum(isnan(X)) || sum(isnan(Y)) || sum(isnan(Z))...
+        || sum(isnan(V1)) || sum(isnan(ZDOT)) || sum(isnan(TH))...
+        || sum(isnan(OMEGA)),
     X = zeros(4, 1);
     Y = zeros(4, 1);
-    Z = zeros(4, 1);
+    Z = zeros(4, 1) + 0.25*[1 : 4]';
     ZDOT = zeros(4,1);
     TH = zeros(4, 1);
     V1 = 0.05*ones(4, 1);
@@ -72,16 +77,18 @@ clear t;
 vmax = 1;       % maximum forward speed (m/s)
 
 % control gains CAN STILL USE TUNING
-kPHoriz = 0.5;    % proportional control for error -> xDot, yDot
-kFbkLin = 0.5;    % feedback linearization gain
+kPHoriz = 1;    % proportional control for error -> xDot, yDot
+kFbkLin = 1;    % feedback linearization gain
 kz = 0.5;       % vertical controller proportional gain
+
+d_min = 0.1;    % dead zone radius around target
 
 % dynamics constants
 n_up = 0.0096;       % motor up efficiency
 n_down = 0.1080;     % motor down efficiency
 v_offset = 0.2;      % vertical offset velocity [m/sec]
 k_vert = 11.25;
-K_d = 70;
+K_d = 40;
 K_t = 1.1;
 z_offset = 0.8;
 m_total = 14.4;
@@ -92,7 +99,7 @@ K_omega = 7;
 J = 2.5;
 
 % control constraints
-max_thrust = 65; % both thrusters
+max_thrust = 45; % both thrusters
 max_steer = 35;
 
 U = zeros(4, 3);
@@ -125,7 +132,12 @@ for ix = 1 : 4,
     bodyVels = kFbkLin*linVels*R;   % apply feedback linearization
     
     u_speed = bodyVels(1); % the speed and omega that we want
-    u_omega = bodyVels(2);   
+    u_omega = bodyVels(2);  
+    
+    u_speed = clamp(u_speed, 0.1, 5);
+    if(dx*dx + dy*dy < d_min*d_min),
+        u_speed = 0;
+    end
     
     u_vert = kz*dz;     % vertical proportional control
     u_vert_orig = u_vert;
@@ -134,19 +146,25 @@ for ix = 1 : 4,
     u_thrust = (K_d1/K_T3)*u_speed; 
     u_steer = (K_omega/(K_d1*(u_speed + eps)*r_torque))*u_omega;  
     
-    u_vert2 = (K_d*u_vert*abs(u_vert) - K_t*(z_offset - z))*(u_vert + v_offset);
-    p = [1 k_vert -u_vert2];
-    if(u_vert2 > 0),
-        p(3) = p(3)/n_up;
-    else
-        p(3) = -p(3)/n_down;
-    end
-    z
-    u_vert
-    p
-    rts = sort(real(roots(p)));
-    u_vert = rts(2)
+    u_vert2 = (K_d*u_vert*abs(u_vert) - K_t*(z_offset - z))*(abs(u_vert) + v_offset);
+    p_up = [1 k_vert -u_vert2/n_up];
+    p_down = [1 k_vert u_vert2/n_down];
+    rts_up = roots(p_up);
+    rts_down = roots(p_down);
     
+    if sum(imag(rts_up) > 0) == 0 && sum(real(rts_up) > 0) > 0,
+        rts_up = sort(rts_up);
+        u_vert = rts_up(2);
+    elseif sum(imag(rts_down) > 0) == 0 && sum(real(rts_down) > 0) > 0,
+        rts_down = sort(rts_down);
+        u_vert = -rts_down(2);
+    else
+        disp('Warning: Unable to find roots of vertical command polynomials. Roots are');
+        rts_up
+        rts_down
+        u_vert = 0;
+    end
+            
     %%%%% Control constraints %%%%%
     u_thrust = clamp(u_thrust, -max_thrust, max_thrust);
     u_vert = clamp(u_vert, -max_thrust, max_thrust);
@@ -171,9 +189,12 @@ for ix = 1 : 4,
         u_down = -u_vert;
     end
     
-    dzdotdt = ((n_up*u_up*(u_up + k_vert) - n_down*u_down*(u_down + k_vert))/(abs(zdot) + v_offset)...
-        - K_d*zdot*abs(zdot) + K_t*(z_offset - z))/m_total;
-    
+    t1 = n_up*u_up*(u_up + k_vert)/(abs(zdot) + v_offset);
+    t2 = -n_down*u_down*(u_down + k_vert)/(abs(zdot) + v_offset);
+    t3 = -K_d*zdot*abs(zdot);
+    t4 = K_t*(z_offset - z);
+    dzdotdt = (t1 + t2 + t3 + t4)/m_total;
+        
     %%%%% Dynamics Integration %%%%%
     x = x + v1*cos(th)*dt;
     y = y + v1*sin(th)*dt;
@@ -203,12 +224,7 @@ for ix = 1 : 4,
         th = atan2(v_vec_new(2), v_vec_new(1));
     end
     
-    if(z < 0)
-        z = 0;
-    end
-    if(z > zmax)
-        z = zmax;
-    end
+    z = clamp(z, 0, zmax);
     
     X(ix) = x;
     Y(ix) = y;
@@ -222,6 +238,10 @@ for ix = 1 : 4,
     X_o(ix, 1) = x;
     Y_o(ix, 1) = y;
     Z_o(ix, 1) = z;
+end
+
+if DO_TS_PLOTS == 0,
+    return;
 end
 
 if(isempty(T_ALL)),
@@ -367,3 +387,14 @@ end
 function update_fig(h, t, y)
 
 set(h, {'XData'}, num2cell(repmat(t, [size(y, 1) 1]), 2), {'YData'}, num2cell(y, 2));
+
+function out = clamp(in, min, max)
+
+if in < min,
+    out = min;
+elseif in > max
+    out = max;
+else
+    out = in;
+end
+    
