@@ -91,6 +91,10 @@ r_torque = 0.35;
 K_omega = 7;
 J = 2.5;
 
+% control constraints
+max_thrust = 65; % both thrusters
+max_steer = 35;
+
 U = zeros(4, 3);
 u = zeros(4, 3);
 
@@ -107,11 +111,11 @@ for ix = 1 : 4,
     go_x = GO_X(ix);
     go_y = GO_Y(ix);
     go_z = GO_Z(ix);
-    
+
+    %%%%% Waypoint Control %%%%%
     R = [cos(th) -sin(th);  % compute the rotation matrix for future use
          sin(th)  cos(th)];
     
-    % Controls
     dx = go_x - x;  % location error
     dy = go_y - y;
     dz = go_z - z;
@@ -123,12 +127,12 @@ for ix = 1 : 4,
     u_speed = bodyVels(1); % the speed and omega that we want
     u_omega = bodyVels(2);   
     
-    % kinematic controls - based on steady-state speed/omega
-    u_thrust = (K_d1/K_T3)*u_speed; 
-    u_steer = (K_omega/(K_d1*(u_speed + eps)*r_torque))*u_omega;  
-
     u_vert = kz*dz;     % vertical proportional control
     u_vert_orig = u_vert;
+    
+    %%%%% Kinematics Control %%%%%
+    u_thrust = (K_d1/K_T3)*u_speed; 
+    u_steer = (K_omega/(K_d1*(u_speed + eps)*r_torque))*u_omega;  
     
     u_vert2 = (K_d*u_vert*abs(u_vert) - K_t*(z_offset - z))*(u_vert + v_offset);
     p = [1 k_vert -u_vert2];
@@ -142,10 +146,23 @@ for ix = 1 : 4,
     p
     rts = sort(real(roots(p)));
     u_vert = rts(2)
+    
+    %%%%% Control constraints %%%%%
+    u_thrust = clamp(u_thrust, -max_thrust, max_thrust);
+    u_vert = clamp(u_vert, -max_thrust, max_thrust);
+    u_steer = clamp(u_steer, -max_steer, max_steer);
 
-    % integrate the dynamics
+    U(ix, 1) = u_thrust;
+    U(ix, 2) = u_steer;
+    U(ix, 3) = u_vert;
+    u(ix, 1) = u_speed;
+    u(ix, 2) = u_omega;
+    u(ix, 3) = u_vert_orig;    
+    
+    %%%%% Dynamics Calculation %%%%%
     dv1dt = (K_T3*u_thrust - K_d1*v1)/(m_total);
     domegadt = (K_T3*u_thrust*r_torque*u_steer - K_omega*omega)/J;
+    
     u_up = 0;
     u_down = 0;
     if u_vert > 0,
@@ -157,6 +174,7 @@ for ix = 1 : 4,
     dzdotdt = ((n_up*u_up*(u_up + k_vert) - n_down*u_down*(u_down + k_vert))/(abs(zdot) + v_offset)...
         - K_d*zdot*abs(zdot) + K_t*(z_offset - z))/m_total;
     
+    %%%%% Dynamics Integration %%%%%
     x = x + v1*cos(th)*dt;
     y = y + v1*sin(th)*dt;
     z = z + zdot*dt;
@@ -164,14 +182,8 @@ for ix = 1 : 4,
     th = th + omega*dt;
     v1 = v1 + dv1dt*dt;
     omega = omega + domegadt*dt;
-    
-    U(ix, 1) = u_thrust;
-    U(ix, 2) = u_steer;
-    U(ix, 3) = u_vert;
-    u(ix, 1) = u_speed;
-    u(ix, 2) = u_omega;
-    u(ix, 3) = u_vert_orig;
-    
+
+    %%%%% State Constraint Enforcement %%%%%%
     if(v1 > vmax)   % saturate forward velocity
         v1 = vmax;
     end
