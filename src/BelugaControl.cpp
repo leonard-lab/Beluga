@@ -116,9 +116,52 @@ mt_dVector_t BelugaLowLevelControlLaw::doControl(const mt_dVector_t& state,
     double u_vert = u_in[BELUGA_CONTROL_VERT_SPEED];
     double u_turn = u_in[BELUGA_CONTROL_STEERING];
 
-    u[BELUGA_CONTROL_FWD_SPEED] = u_speed;
-    u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
-    u[BELUGA_CONTROL_STEERING] = u_turn;  
+    double u_thrust = (K_d1/K_t)*u_speed;
+    double u_steer = (K_omega/(K_d1*(u_speed + 0.001)*r_1))*u_turn;
+    double u_vthrust = 0;
+
+    /* need z in the vertical thrust controller */
+    double z = state[BELUGA_STATE_Z];
+    
+    /* calculating the vertical thrust requires finding the roots of
+     * the polynomial u^2 + k_vp*u - (S/eta_x)*g, g defined here,
+     * eta_x either eta_up or eta_down, and S either +1 (eta_up) or
+     * -1 (eta_down).  One of the two combinations should give a positive
+     * result - the corresponding thrust has this magnitude and is
+     * negative if the eta_down (S = -1) solution is taken.  */
+    double g = (k_d*u_vert*fabs(u_vert) - K_t*(z_off - z))*(fabs(u_vert) + v_off);
+
+    /* determinants for polynomial */
+    double D_up = k_vp*k_vp + 4*g/eta_up;
+    double D_down = k_vp*k_vp - 4*g/eta_down;
+
+    /* roots - note we'll throw out the -'ve root (i.e. (-b - sqrt(D))/2a */
+    double r_up = -0.5*k_vp;  /* just -b part */
+    double r_down = r_up;     /* same */
+
+    /* can only calculate the determinant part if D > 0 */
+    if(D_up > 0)
+    {
+        r_up += 0.25*sqrt(D_up);
+    }
+    if(D_down > 0)
+    {
+        r_down += 0.25*sqrt(D_down);
+    }
+
+    /* note we favor up control if both have solutions */
+    if(D_down > 0)
+    {
+        u_vthrust = -r_down;
+    }
+    if(D_up > 0)
+    {
+        u_vthrust = r_up;
+    }
+
+    u[BELUGA_CONTROL_FWD_SPEED] = u_thrust;
+    u[BELUGA_CONTROL_VERT_SPEED] = u_steer;
+    u[BELUGA_CONTROL_STEERING] = u_vthrust;
 
 	//printf("Control out: %f, %f, %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
 
