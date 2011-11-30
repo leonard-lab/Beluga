@@ -40,6 +40,7 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
     double y = state[BELUGA_STATE_Y];
     double z = state[BELUGA_STATE_Z];
     double th = state[BELUGA_STATE_THETA];
+    double omega = state[BELUGA_STATE_OMEGA];
 
     double to_x = u_in[BELUGA_WAYPOINT_X];
     double to_y = u_in[BELUGA_WAYPOINT_Y];
@@ -82,6 +83,16 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
             u_speed = m_dMaxSpeed*0.333*(d/m_dDist);
         }
         u_turn = -m_dTurningGain*sin(dth);
+        if(fabs(dth) > 2.618) /* i.e., around +/-150 degrees */
+        {
+            /* maximum turn in the direction of omega (positive if
+             * omega = 0) */
+            u_turn = m_dTurningGain;
+            if(omega < 0)
+            {
+                u_turn = -m_dTurningGain;
+            }
+        }
     }
 
     u[BELUGA_CONTROL_FWD_SPEED] = u_speed;
