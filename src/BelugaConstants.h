@@ -191,4 +191,8 @@ enum BELUGA_CONTROL_MODE
 const double BELUGA_WAYPOINT_NONE = -100.0;
 const double BELUGA_CONTROL_NONE = 0.0;
 
+/* if |speed| < BELUGA_MIN_TURNING_SPEED, then when we calculate
+ * the turning angle, we divide by sign(speed)*BELUGA_MIN_TURNING_SPEED */
+const double BELUGA_MIN_TURNING_SPEED = 0.2;
+
 #endif // BELUGA_CONSTANTS

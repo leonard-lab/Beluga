@@ -61,7 +61,7 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
     double dz = to_z - z;
 
     double dth = atan2(dy, dx) - th;
-	dth = atan2(sin(dth), sin(dx));
+	dth = atan2(sin(dth), cos(dth));
 
     double d = sqrt(dx*dx + dy*dy);
     double u_speed = 0;
@@ -80,7 +80,7 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
         }
         else
         {
-            u_speed = m_dMaxSpeed*0.333*(d/m_dDist);
+            u_speed = m_dMaxSpeed*0.333*(d/m_dDist)*fabs(cos(dth));
         }
         u_turn = -m_dTurningGain*sin(dth);
         if(fabs(dth) > 2.618) /* i.e., around +/-150 degrees */
@@ -99,8 +99,8 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
     u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
     u[BELUGA_CONTROL_STEERING] = u_turn;    
     
-	//printf("dx = %f, dy = %f, dth = %f, dz = %f\n", dx, dy, dth, dz);
-	//printf("Control out: %f, %f, %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
+	printf("dx = %f, dy = %f, dth = %f, dz = %f\n", dx, dy, dth, dz);
+	printf("Control out: speed %f, vert %f, steer %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
 
     return u;
 }
@@ -128,7 +128,19 @@ mt_dVector_t BelugaLowLevelControlLaw::doControl(const mt_dVector_t& state,
     double u_turn = u_in[BELUGA_CONTROL_STEERING];
 
     double u_thrust = (K_d1/K_t)*u_speed;
-    double u_steer = (K_omega/(K_d1*(u_speed + 0.001)*r_1))*u_turn;
+	double speed_normalization_factor = 0.2;
+	if(fabs(u_speed) > BELUGA_MIN_TURNING_SPEED)
+	{
+		speed_normalization_factor = u_speed;
+	}
+	else
+	{
+		if(u_speed < 0)
+		{
+			speed_normalization_factor *= -1.0;
+		}
+	}
+    double u_steer = (K_omega/(K_d1*speed_normalization_factor*r_1))*u_turn;
     double u_vthrust = 0;
 
     /* need z in the vertical thrust controller */
@@ -171,10 +183,10 @@ mt_dVector_t BelugaLowLevelControlLaw::doControl(const mt_dVector_t& state,
     }
 
     u[BELUGA_CONTROL_FWD_SPEED] = u_thrust;
-    u[BELUGA_CONTROL_VERT_SPEED] = u_steer;
-    u[BELUGA_CONTROL_STEERING] = u_vthrust;
+    u[BELUGA_CONTROL_VERT_SPEED] = 0; //u_vthrust;
+    u[BELUGA_CONTROL_STEERING] = u_steer;
 
-	//printf("Control out: %f, %f, %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
+	printf("Control out: thrust %f, v_thrust %f, turn %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
 
 	return u;
 
