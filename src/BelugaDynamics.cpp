@@ -58,7 +58,9 @@ void beluga_dynamics(const CvMat* x_k,
     double u_z = 0;
     double u_h = 0;
     double u_steer = 0;
-    if(u_k)
+
+	/* temporary? ignore input -> better robustness, possibly less fidelity */
+    if(0 && u_k)
     {
         u_z		= cvGetReal2D(u_k, BELUGA_INPUT_VERTICAL_SPEED, 0);
 		u_h		= cvGetReal2D(u_k, BELUGA_INPUT_FORWARD_SPEED, 0);
