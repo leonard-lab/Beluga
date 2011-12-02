@@ -357,7 +357,10 @@ void BelugaTrackerFrame::doIPCExchange()
         std::vector<double> Y(4);
         std::vector<double> Z(4);
         std::vector<unsigned int> robots(m_iNToTrack);
-
+		for(unsigned int i = 0; i < m_iNToTrack; i++)
+		{
+			robots[i] = i;
+		}
 
         int i1 = m_iNToTrack;
         if(!m_pTracker)
@@ -482,12 +485,12 @@ void BelugaTrackerFrame::doIPCExchange()
                         d, /* depth */
                         false); /* no distortion */
                 }
-				/*printf("waypoint %d: %f, %f, %f -> (%f, %f), (%f, %f), (%f, %f), (%f, %f)\n", bot_num,
+				/* printf("waypoint %d: %f, %f, %f -> (%f, %f), (%f, %f), (%f, %f), (%f, %f)\n", bot_num,
 					m_adWaypointX[bot_num], m_adWaypointY[bot_num], m_adWaypointZ[bot_num],
 					m_adGotoXC[bot_num][0], m_adGotoYC[bot_num][0],
 					m_adGotoXC[bot_num][1], m_adGotoYC[bot_num][1],
 					m_adGotoXC[bot_num][2], m_adGotoYC[bot_num][2],
-					m_adGotoXC[bot_num][3], m_adGotoYC[bot_num][3]);   */
+					m_adGotoXC[bot_num][3], m_adGotoYC[bot_num][3]); */
             }
         }
         
