@@ -34,7 +34,7 @@ BelugaTrackerFrame::BelugaTrackerFrame(wxFrame* parent,
                                const wxSize& size,     
                                long style)
   : MT_RobotFrameBase(parent, id, title, pos, size, style),
-    m_iNToTrack(1),
+    m_iNToTrack(2),
 	m_dGotoDist(50.0),
 	m_dGotoMaxSpeed(15.0),
 	m_dGotoTurningGain(25.0),
@@ -358,27 +358,60 @@ void BelugaTrackerFrame::doIPCExchange()
         std::vector<double> Z(4);
         std::vector<unsigned int> robots(m_iNToTrack);
 
+
         int i1 = m_iNToTrack;
         if(!m_pTracker)
         {
             i1 = 0;
         }
-        
-		for(int i = 0; i < i1; i++)
+
+		std::vector<bool> track_sent(m_iNToTrack, false);
+		std::vector<bool> track_loaded(BELUGA_NUM_BOTS, false);
+
+		/* attach robot i to position i */
+		for(unsigned int i = 0; i < BELUGA_NUM_BOTS; i++)
 		{
-			X[i] = m_pBelugaTracker->getBelugaX(i);
-			Y[i] = m_pBelugaTracker->getBelugaY(i);
-			Z[i] = m_pBelugaTracker->getBelugaZ(i);
-            robots[i] = i;
+			int j = m_Robots.TrackingIndex[i];
+			if(j != MT_NOT_TRACKED)
+			{
+				X[i] = m_pBelugaTracker->getBelugaX(j);
+				Y[i] = m_pBelugaTracker->getBelugaY(j);
+				Z[i] = m_pBelugaTracker->getBelugaZ(j);
+				track_sent[j] = true;
+				track_loaded[i] = true;
+			}
 		}
-
-        for(unsigned int i = i1; i < BELUGA_NUM_BOTS; i++)
-        {
-            X[i] = BELUGA_NOT_TRACKED_X;
-            X[i] = BELUGA_NOT_TRACKED_Y;
-            X[i] = BELUGA_NOT_TRACKED_Z;
-        }
-
+		/* for each tracked object we haven't attached to a position */
+		for(unsigned int i = 0; i < m_iNToTrack; i++)
+		{
+			if(!track_sent[i])
+			{
+				/* attach it to the first available position */
+				for(unsigned int j = 0; j < BELUGA_NUM_BOTS; j++)
+				{
+					if(!track_loaded[j])
+					{
+						X[j] = m_pBelugaTracker->getBelugaX(i);
+						Y[j] = m_pBelugaTracker->getBelugaY(i);
+						Z[j] = m_pBelugaTracker->getBelugaZ(i);
+						track_loaded[j] = true;
+						track_sent[i] = true;
+						break;
+					}
+				}
+			}
+		}
+		/* set the rest to default values */
+		for(unsigned int i = 0; i < BELUGA_NUM_BOTS; i++)
+		{
+			if(!track_loaded[i])
+			{
+				X[i] = BELUGA_NOT_TRACKED_X;
+				Y[i] = BELUGA_NOT_TRACKED_Y;
+				Z[i] = BELUGA_NOT_TRACKED_Z;
+			}
+		}
+        
         BELUGA_CONTROL_MODE mode;
         
         bool r = m_IPCClient.setAllPositions(&X, &Y, &Z);
