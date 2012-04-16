@@ -1,9 +1,8 @@
 #ifndef CONTROL_LAW_H
 #define CONTROL_LAW_H
 
+#include <string>
 #include <vector>
-
-#include "MT_Robot.h"
 
 // shorthand for a vector of doubles
 typedef std::vector<double> mt_dVector_t;

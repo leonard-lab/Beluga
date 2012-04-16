@@ -1,5 +1,7 @@
 #include "BelugaControl.h"
 
+#include <math.h>
+
 std::string BelugaWaypointControlLaw::s_sName("Beluga Waypoint Controller\n");
 std::string BelugaLowLevelControlLaw::s_sName("Beluga Low Level Controller\n");
 
