@@ -99,8 +99,8 @@ mt_dVector_t BelugaWaypointControlLaw::doControl(const mt_dVector_t& state,
     u[BELUGA_CONTROL_VERT_SPEED] = u_vert;
     u[BELUGA_CONTROL_STEERING] = u_turn;    
     
-	printf("dx = %f, dy = %f, dth = %f, dz = %f\n", dx, dy, dth, dz);
-	printf("Control out: speed %f, vert %f, steer %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
+	//printf("dx = %f, dy = %f, dth = %f, dz = %f\n", dx, dy, dth, dz);
+	//printf("Control out: speed %f, vert %f, steer %f\n", u[BELUGA_CONTROL_FWD_SPEED], u[BELUGA_CONTROL_VERT_SPEED], u[BELUGA_CONTROL_STEERING]);
 
     return u;
 }
