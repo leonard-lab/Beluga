@@ -316,6 +316,25 @@ bool check_all(belugaIPCClient* client,
     
 }
 
+bool check_params(belugaIPCClient* client, std::string params_in, std::string* err_msg)
+{
+    std::string orig_params(params_in);
+
+    /* setParams sets the value of params_in to whatever the server
+     * responds with */
+    bool r = client->setParams(&params_in);
+    
+    if(!r || (orig_params != params_in))
+    {
+        *err_msg += "\nError setting params on server.  Reponse was \"";
+        *err_msg += params_in;
+        *err_msg += "\".";
+        return false;
+    }
+
+    return true;
+}
+
 int main(int argc, char** argv)
 {
     belugaIPCClient client("127.0.0.1", 1234);
@@ -324,7 +343,7 @@ int main(int argc, char** argv)
 
     DO_TEST("Check connection", !client.doConnect(&motd), "Unable to connect to server.");
     
-    std::string expected_motd("Welcome to BelugaServer, client ");
+    std::string expected_motd("Welcome to Beluga IPC Server, client ");
 
     DO_TEST("Check MOTD",
             expected_motd.compare(0, expected_motd.size(), motd, 0, expected_motd.size()) != 0,
@@ -685,8 +704,12 @@ int main(int argc, char** argv)
     DO_TEST("Checking set all controls (kinematics) ",
             !check_all(&client, SET_CONTROLS, x, y, z, &err_msg, &mode),
             err_msg);
+
+    std::string params = "abc def";
+    DO_TEST("Checking set params",
+            !check_params(&client, params, &err_msg),
+            err_msg);
     
-    
-        std::cout << std::endl << "\tAll tests pass!" << std::endl;
+    std::cout << std::endl << "\tAll tests pass!" << std::endl;
     return OK;
 }

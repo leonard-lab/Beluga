@@ -141,7 +141,7 @@ bool belugaIPCClient::getControls(std::vector<unsigned int> robots,
 {
     if(!mode)
     {
-        std::cerr << "belugaIPCClient::getControls B_ERROR - mode is NULL" << std::endl;
+        std::cerr << "belugaIPCClient::getControls error - mode is NULL" << std::endl;
         return false;
     }
     return doExchange(robots, X_or_SPEED, Y_or_OMEGA, Z_or_ZDOT, "get control", mode);
@@ -155,7 +155,7 @@ bool belugaIPCClient::setControls(std::vector<unsigned int> robots,
 {
     if(!mode)
     {
-        std::cerr << "belugaIPCClient::setControls B_ERROR - mode is NULL" << std::endl;
+        std::cerr << "belugaIPCClient::setControls error - mode is NULL" << std::endl;
         return false;
     }
     return doExchange(robots, X_or_SPEED, Y_or_OMEGA, Z_or_ZDOT, "set control", mode);
@@ -170,7 +170,7 @@ bool belugaIPCClient::doExchange(std::vector<unsigned int> robots,
 {
     if(!A || !B || !C)
     {
-        B_ERROR("belugaIPCClient B_ERROR: one or more inputs are NULL.");
+        B_ERROR("belugaIPCClient error: one or more inputs are NULL.");
         return false;
     }
 
@@ -188,7 +188,7 @@ bool belugaIPCClient::doExchange(std::vector<unsigned int> robots,
             ss << " kinematics";
             break;
         default:
-            B_ERROR("belugaIPCClient B_ERROR: Unknown control mode requested.");
+            B_ERROR("belugaIPCClient error: Unknown control mode requested.");
             break;
         }
     }
@@ -197,7 +197,7 @@ bool belugaIPCClient::doExchange(std::vector<unsigned int> robots,
     {
         if(robots[i] >= MAX_BOTS)
         {
-            B_ERROR("belugaIPCClient::getPositions B_ERROR: robot index "
+            B_ERROR("belugaIPCClient::getPositions error: robot index "
                   << robots[i] << " out of range.");
             return false;
         }
@@ -229,7 +229,7 @@ bool belugaIPCClient::doExchange(std::vector<unsigned int> robots,
         }
         else
         {
-            std::cerr << "belugaIPCClient B_ERROR: Unknown control mode \""
+            std::cerr << "belugaIPCClient error: Unknown control mode \""
                       << mode_string << "\"" << std::endl;
         }
     }
@@ -263,13 +263,13 @@ bool belugaIPCClient::getPosition(unsigned int robot, double* x, double* y, doub
 {
     if(!x || !y || !z)
     {
-        B_ERROR("belugaIPCClient::getPosition B_ERROR: one or more inputs are NULL.");
+        B_ERROR("belugaIPCClient::getPosition error: one or more inputs are NULL.");
         return false;
     }
 
     if(robot >= MAX_BOTS)
     {
-        B_ERROR("belugaIPCClient::getPosition B_ERROR: robot index out of range.");
+        B_ERROR("belugaIPCClient::getPosition error: robot index out of range.");
         return false;
     }
 
@@ -294,13 +294,13 @@ bool belugaIPCClient::setPosition(unsigned int robot, double* x, double* y, doub
 {
     if(!x || !y || !z)
     {
-        B_ERROR("belugaIPCClient::setPosition B_ERROR: one or more inputs are NULL.");
+        B_ERROR("belugaIPCClient::setPosition error: one or more inputs are NULL.");
         return false;
     }
 
     if(robot >= MAX_BOTS)
     {
-        B_ERROR("belugaIPCClient::setPosition B_ERROR: robot index out of range.");
+        B_ERROR("belugaIPCClient::setPosition error: robot index out of range.");
         return false;
     }
 
@@ -330,13 +330,13 @@ bool belugaIPCClient::getControl(unsigned int robot, BELUGA_CONTROL_MODE* mode,
 {
     if(!x || !y || !z || !mode)
     {
-        B_ERROR("belugaIPCClient::getControl B_ERROR: one or more inputs are NULL.");
+        B_ERROR("belugaIPCClient::getControl error: one or more inputs are NULL.");
         return false;
     }
 
     if(robot >= MAX_BOTS)
     {
-        B_ERROR("belugaIPCClient::getControl B_ERROR: robot index out of range.");
+        B_ERROR("belugaIPCClient::getControl error: robot index out of range.");
         return false;
     }
 
@@ -362,13 +362,13 @@ bool belugaIPCClient::setControl(unsigned int robot, BELUGA_CONTROL_MODE* mode,
 {
     if(!x || !y || !z || !mode)
     {
-        B_ERROR("belugaIPCClient::setControl B_ERROR: one or more inputs are NULL.");
+        B_ERROR("belugaIPCClient::setControl error: one or more inputs are NULL.");
         return false;
     }
 
     if(robot >= MAX_BOTS)
     {
-        B_ERROR("belugaIPCClient::setControl B_ERROR: robot index out of range.");
+        B_ERROR("belugaIPCClient::setControl error: robot index out of range.");
         return false;
     }
 
@@ -420,7 +420,7 @@ bool belugaIPCClient::getAllControls(BELUGA_CONTROL_MODE* mode,
 {
     if(!mode)
     {
-        std::cerr << "belugaIPCClient::getAllControls B_ERROR: mode input is NULL" << std::endl;
+        std::cerr << "belugaIPCClient::getAllControls error: mode input is NULL" << std::endl;
     }
     std::vector<unsigned int> robots(4);
     robots[0] = 0;
@@ -437,7 +437,7 @@ bool belugaIPCClient::setAllControls(BELUGA_CONTROL_MODE* mode,
 {
     if(!mode)
     {
-        std::cerr << "belugaIPCClient::setAllControls B_ERROR: mode input is NULL" << std::endl;
+        std::cerr << "belugaIPCClient::setAllControls error: mode input is NULL" << std::endl;
     }
     std::vector<unsigned int> robots(4);
     robots[0] = 0;
@@ -635,3 +635,34 @@ bool belugaIPCClient::setAllKinematics(std::vector<double>* X,
         return r;
     }        
 }
+
+bool belugaIPCClient::getParams(std::string* params)
+{
+    if(!params)
+    {
+        B_ERROR("belugaIPCClient::getParams error: null pointer input");
+        return false;
+    }
+
+    *params = rhubarbClient::doMessage("get params");
+
+    return true;
+}
+
+bool belugaIPCClient::setParams(std::string* params)
+{
+    if(!params)
+    {
+        B_ERROR("belugaIPCClient::getParams error: null pointer input");
+        return false;
+    }
+
+    std::string msg("set params \"");
+    msg += *params;
+    msg += "\"";
+
+    *params = rhubarbClient::doMessage(msg.c_str());
+
+    return true;
+}
+

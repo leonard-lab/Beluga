@@ -90,6 +90,9 @@ public:
                          std::vector<double>* Y,
                          std::vector<double>* Z);
 
+    bool getParams(std::string* params);
+    bool setParams(std::string* params);
+
 private:
     bool doExchange(std::vector<unsigned int> robots,
                     std::vector<double>* A,
