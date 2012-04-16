@@ -1,3 +1,0 @@
-[submodule "IPC/rhubarb"]
-	path = IPC/rhubarb
-	url = git://github.com/dantswain/rhubarb.git
