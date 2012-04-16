@@ -1,0 +1,14 @@
+GIT
+  remote: git://github.com/leonard-lab/BelugaIPC.git
+  revision: f16693d025e8b40e9a1f1c7bd63701b2990f7189
+  specs:
+    beluga_ipc (0.1.1)
+
+GEM
+  specs:
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  beluga_ipc (= 0.1.1)!
