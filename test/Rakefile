@@ -1,0 +1,25 @@
+require 'rake/clean'
+
+CLEAN.include('*.o')
+CLOBBER.include('test_BelugaIPCClient')
+
+INC_DIR = "../src"
+
+task :default => ["test_BelugaIPCClient", "test_Controller"]
+
+rule '.o' => '.cpp' do |t|
+  sh "g++ -I#{INC_DIR} -c #{t.source}"
+end
+
+# build targets
+task "test_BelugaIPCClient" => ['../src/BelugaIPCClient.o', 'test_BelugaIPCClient.o'] do |t|
+  objs = t.prerequisites.map{|p| p.pathmap("%f")}.join(' ')
+  sh "g++ -o #{t.name} #{objs}"
+end
+
+task "test_Controller" => ["../src/BelugaControl.o",
+                           "../src/ControlLaw.o",
+                           "test_Controller.o"] do |t|
+  objs = t.prerequisites.map{|p| p.pathmap("%f")}.join(' ')
+  sh "g++ -o #{t.name} #{objs}"
+end
