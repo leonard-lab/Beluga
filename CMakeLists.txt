@@ -55,7 +55,6 @@ set(APP_SRC
 
 # adds src to the header search path
 include_directories(src)
-include_directories(IPC/rhubarb/clients)
 
 # sets up the build target
 add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE ${APP_SRC})

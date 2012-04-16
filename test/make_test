@@ -4,4 +4,4 @@
 
 #g++ test_CoordinateTransform.cpp ../src/CoordinateTransforms.cpp ../src/CalibrationDataFile.cpp -I../src -I../../MADTraC/build/include `pkg-config opencv --cflags`  `pkg-config opencv --libs``pkg-config opencv --cflags`  `pkg-config opencv --libs` ../../MADTraC/build/lib/libMT_Core.a -o test_CoordinateTransform
 
-g++ test_BelugaIPCClient.cpp ../src/BelugaIPCClient.cpp -I../src -I../IPC/rhubarb/clients -o test_BelugaIPCClient
+g++ test_BelugaIPCClient.cpp ../src/BelugaIPCClient.cpp -I../src -o test_BelugaIPCClient
